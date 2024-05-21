@@ -1,5 +1,5 @@
-name := 'cosmic-app-template'
-export APPID := 'com.example.CosmicAppTemplate'
+name := 'cosmic-dex'
+export APPID := 'dev.mariinkys.CosmicDex'
 
 rootdir := ''
 prefix := '/usr'
