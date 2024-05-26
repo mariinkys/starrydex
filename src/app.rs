@@ -8,7 +8,6 @@ use cosmic::iced::alignment::{Horizontal, Vertical};
 use cosmic::iced::{Alignment, Length};
 use cosmic::widget::{self, icon, menu, nav_bar};
 use cosmic::{cosmic_theme, theme, Application, ApplicationExt, Apply, Element};
-use rustemon::error::Error;
 use rustemon::model::pokemon::Pokemon;
 use rustemon::model::resource::NamedApiResource;
 
@@ -26,7 +25,11 @@ pub struct CosmicDex {
     /// A model that contains all of the pages assigned to the nav bar panel.
     nav: nav_bar::Model,
     /// The rustemon client for interacting with PokeApi
-    rustemon_client: rustemon::client::RustemonClient,
+    //rustemon_client: rustemon::client::RustemonClient,
+    /// Contains the list of all Pokémon
+    pokemon_list: Vec<NamedApiResource<Pokemon>>,
+    /// Currently viewing Pokémon
+    selected_pokemon: Option<NamedApiResource<Pokemon>>,
 }
 
 /// This is the enum that contains all the possible variants that your application will need to transmit messages.
@@ -36,13 +39,13 @@ pub struct CosmicDex {
 pub enum Message {
     LaunchUrl(String),
     ToggleContextPage(ContextPage),
+    LoadedPokemonList(Vec<NamedApiResource<Pokemon>>),
 }
 
 /// Identifies a page in the application.
 pub enum Page {
     Page1,
     Page2,
-    Page3,
 }
 
 /// Identifies a context page to display in the context drawer.
@@ -126,22 +129,22 @@ impl Application for CosmicDex {
             .data::<Page>(Page::Page2)
             .icon(icon::from_name("applications-system-symbolic"));
 
-        nav.insert()
-            .text("Page 3")
-            .data::<Page>(Page::Page3)
-            .icon(icon::from_name("applications-games-symbolic"));
-
         let mut app = CosmicDex {
             core,
             context_page: ContextPage::default(),
             key_binds: HashMap::new(),
             nav,
-            rustemon_client: rustemon::client::RustemonClient::default(),
+            //rustemon_client: rustemon::client::RustemonClient::default(),
+            pokemon_list: Vec::<NamedApiResource<Pokemon>>::new(),
+            selected_pokemon: None,
         };
 
-        let command = app.update_titles();
+        let cmd = cosmic::app::Command::perform(load_all_pokemon(), |pokemon_list| {
+            cosmic::app::message::app(Message::LoadedPokemonList(pokemon_list))
+        });
+        let commands = Command::batch(vec![app.update_titles(), cmd]);
 
-        (app, command)
+        (app, commands)
     }
 
     /// Elements to pack at the start of the header bar.
@@ -164,8 +167,15 @@ impl Application for CosmicDex {
     ///
     /// To get a better sense of which widgets are available, check out the `widget` module.
     fn view(&self) -> Element<Self::Message> {
-        widget::text::title1(fl!("welcome"))
-            .apply(widget::container)
+        let content = match self.nav.active_data::<Page>() {
+            Some(page) => match page {
+                Page::Page1 => self.landing(),
+                Page::Page2 => self.testing_error_page(),
+            },
+            None => todo!(),
+        };
+
+        widget::container(content)
             .width(Length::Fill)
             .height(Length::Fill)
             .align_x(Horizontal::Center)
@@ -181,7 +191,6 @@ impl Application for CosmicDex {
             Message::LaunchUrl(url) => {
                 let _result = open::that_detached(url);
             }
-
             Message::ToggleContextPage(context_page) => {
                 if self.context_page == context_page {
                     // Close the context drawer if the toggled context page is the same.
@@ -194,6 +203,9 @@ impl Application for CosmicDex {
 
                 // Set the title of the context drawer.
                 self.set_context_title(context_page.title());
+            }
+            Message::LoadedPokemonList(pokemons) => {
+                self.pokemon_list = pokemons;
             }
         }
         Command::none()
@@ -246,6 +258,36 @@ impl CosmicDex {
             .into()
     }
 
+    pub fn landing(&self) -> Element<Message> {
+        let cosmic_theme::Spacing { space_xxs, .. } = theme::active().cosmic().spacing;
+        let mut col = widget::column()
+            .align_items(Alignment::Center)
+            .spacing(space_xxs);
+
+        for pokemon in &self.pokemon_list {
+            col = col.push(
+                widget::text::title1(pokemon.name.to_string())
+                    .apply(widget::container)
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .align_x(Horizontal::Center)
+                    .align_y(Vertical::Center),
+            );
+        }
+
+        return col.into();
+    }
+
+    pub fn testing_error_page(&self) -> Element<Message> {
+        widget::text::title1(fl!("generic_error"))
+            .apply(widget::container)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .align_x(Horizontal::Center)
+            .align_y(Vertical::Center)
+            .into()
+    }
+
     /// Updates the header and window titles.
     pub fn update_titles(&mut self) -> Command<Message> {
         let mut window_title = fl!("app-title");
@@ -262,10 +304,11 @@ impl CosmicDex {
     }
 }
 
-async fn load_all_pokemon(
-    client: rustemon::client::RustemonClient,
-) -> Result<Vec<NamedApiResource<Pokemon>>, Error> {
-    rustemon::pokemon::pokemon::get_all_entries(&client).await
+async fn load_all_pokemon() -> Vec<NamedApiResource<Pokemon>> {
+    let client = rustemon::client::RustemonClient::default();
+    rustemon::pokemon::pokemon::get_all_entries(&client)
+        .await
+        .unwrap_or_default()
     // let pokemon: Vec<Pokemon> = api_all_pokemon
     //     .into_iter()
     //     .map(|pokemon_api_res| pokemon_api_res.name)
