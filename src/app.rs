@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
+use std::any::Any;
 use std::collections::HashMap;
 
 use crate::fl;
@@ -30,7 +31,7 @@ pub struct CosmicDex {
     /// Contains the list of all Pokémon
     pokemon_list: Vec<NamedApiResource<Pokemon>>,
     /// Currently viewing Pokémon
-    selected_pokemon: Option<NamedApiResource<Pokemon>>,
+    selected_pokemon: Option<Pokemon>,
 }
 
 /// This is the enum that contains all the possible variants that your application will need to transmit messages.
@@ -41,6 +42,8 @@ pub enum Message {
     LaunchUrl(String),
     ToggleContextPage(ContextPage),
     LoadedPokemonList(Vec<NamedApiResource<Pokemon>>),
+    LoadPokemon(String),
+    LoadedPokemon(Pokemon),
 }
 
 /// Identifies a page in the application.
@@ -208,6 +211,15 @@ impl Application for CosmicDex {
             Message::LoadedPokemonList(pokemons) => {
                 self.pokemon_list = pokemons;
             }
+            Message::LoadedPokemon(pokemon) => {
+                self.selected_pokemon = Some(pokemon);
+                //TODO: Change to Page2 ?
+            }
+            Message::LoadPokemon(pokemon_name) => {
+                return cosmic::app::Command::perform(load_pokemon(pokemon_name), |pokemon| {
+                    cosmic::app::message::app(Message::LoadedPokemon(pokemon))
+                });
+            }
         }
         Command::none()
     }
@@ -263,17 +275,20 @@ impl CosmicDex {
         let space_xxs = theme::active().cosmic().spacing.space_xxs;
 
         let children = self.pokemon_list.iter().map(|pokemon| {
-            widget::text::text(pokemon.name.to_string())
-                .width(Length::Fill)
-                .height(Length::Shrink)
-                .horizontal_alignment(Horizontal::Center)
-                // .vertical_alignment(Vertical::Center)
-                .into()
+            widget::button(
+                widget::text::text(pokemon.name.to_string())
+                    .width(Length::Shrink)
+                    .height(Length::Shrink)
+                    .horizontal_alignment(Horizontal::Center),
+            )
+            .on_press_down(Message::LoadPokemon(pokemon.name.to_string()))
+            .into()
         });
 
         widget::scrollable(
             Column::with_children(children)
                 .align_items(Alignment::Center)
+                .width(Length::Fill)
                 .spacing(space_xxs),
         )
         .into()
@@ -314,4 +329,11 @@ async fn load_all_pokemon() -> Vec<NamedApiResource<Pokemon>> {
     //     .into_iter()
     //     .map(|pokemon_api_res| pokemon_api_res.name)
     //     .collect();
+}
+
+async fn load_pokemon(pokemon_name: String) -> Pokemon {
+    let client = rustemon::client::RustemonClient::default();
+    rustemon::pokemon::pokemon::get_by_name(pokemon_name.as_str(), &client)
+        .await
+        .unwrap_or_default()
 }
