@@ -8,6 +8,9 @@ use cosmic::iced::alignment::{Horizontal, Vertical};
 use cosmic::iced::{Alignment, Length};
 use cosmic::widget::{self, icon, menu, nav_bar};
 use cosmic::{cosmic_theme, theme, Application, ApplicationExt, Apply, Element};
+use rustemon::error::Error;
+use rustemon::model::pokemon::Pokemon;
+use rustemon::model::resource::NamedApiResource;
 
 const REPOSITORY: &str = "https://github.com/mariinkys/cosmicdex";
 
@@ -22,6 +25,8 @@ pub struct CosmicDex {
     key_binds: HashMap<menu::KeyBind, MenuAction>,
     /// A model that contains all of the pages assigned to the nav bar panel.
     nav: nav_bar::Model,
+    /// The rustemon client for interacting with PokeApi
+    rustemon_client: rustemon::client::RustemonClient,
 }
 
 /// This is the enum that contains all the possible variants that your application will need to transmit messages.
@@ -131,6 +136,7 @@ impl Application for CosmicDex {
             context_page: ContextPage::default(),
             key_binds: HashMap::new(),
             nav,
+            rustemon_client: rustemon::client::RustemonClient::default(),
         };
 
         let command = app.update_titles();
@@ -219,8 +225,7 @@ impl CosmicDex {
         let cosmic_theme::Spacing { space_xxs, .. } = theme::active().cosmic().spacing;
 
         let icon = widget::svg(widget::svg::Handle::from_memory(
-            &include_bytes!("../res/icons/hicolor/128x128/apps/com.example.CosmicAppTemplate.svg")
-                [..],
+            &include_bytes!("../res/icons/hicolor/128x128/apps/dev.mariinkys.CosmicDex.svg")[..],
         ));
 
         let title = widget::text::title3(fl!("app-title"));
@@ -255,4 +260,14 @@ impl CosmicDex {
         self.set_header_title(header_title);
         self.set_window_title(window_title)
     }
+}
+
+async fn load_all_pokemon(
+    client: rustemon::client::RustemonClient,
+) -> Result<Vec<NamedApiResource<Pokemon>>, Error> {
+    rustemon::pokemon::pokemon::get_all_entries(&client).await
+    // let pokemon: Vec<Pokemon> = api_all_pokemon
+    //     .into_iter()
+    //     .map(|pokemon_api_res| pokemon_api_res.name)
+    //     .collect();
 }
