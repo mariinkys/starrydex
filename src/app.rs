@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-use std::any::Any;
 use std::collections::HashMap;
 
 use crate::fl;
@@ -8,7 +7,7 @@ use cosmic::app::{Command, Core};
 use cosmic::iced::alignment::{Horizontal, Vertical};
 use cosmic::iced::{Alignment, Length};
 use cosmic::iced_widget::Column;
-use cosmic::widget::{self, icon, menu, nav_bar};
+use cosmic::widget::{self, menu};
 use cosmic::{cosmic_theme, theme, Application, ApplicationExt, Apply, Element};
 use rustemon::model::pokemon::Pokemon;
 use rustemon::model::resource::NamedApiResource;
@@ -24,8 +23,8 @@ pub struct CosmicDex {
     context_page: ContextPage,
     /// Key bindings for the application's menu bar.
     key_binds: HashMap<menu::KeyBind, MenuAction>,
-    /// A model that contains all of the pages assigned to the nav bar panel.
-    nav: nav_bar::Model,
+    /// Currently selected Page
+    current_page: Page,
     /// The rustemon client for interacting with PokeApi
     //rustemon_client: rustemon::client::RustemonClient,
     /// Contains the list of all Pokémon
@@ -34,9 +33,6 @@ pub struct CosmicDex {
     selected_pokemon: Option<Pokemon>,
 }
 
-/// This is the enum that contains all the possible variants that your application will need to transmit messages.
-/// This is used to communicate between the different parts of your application.
-/// If your application does not need to send messages, you can use an empty enum or `()`.
 #[derive(Debug, Clone)]
 pub enum Message {
     LaunchUrl(String),
@@ -44,12 +40,13 @@ pub enum Message {
     LoadedPokemonList(Vec<NamedApiResource<Pokemon>>),
     LoadPokemon(String),
     LoadedPokemon(Pokemon),
+    ReturnToLandingPage,
 }
 
 /// Identifies a page in the application.
 pub enum Page {
-    Page1,
-    Page2,
+    LandingPage,
+    PokemonPage,
 }
 
 /// Identifies a context page to display in the context drawer.
@@ -70,6 +67,7 @@ impl ContextPage {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MenuAction {
     About,
+    Back,
 }
 
 impl menu::action::MenuAction for MenuAction {
@@ -78,6 +76,7 @@ impl menu::action::MenuAction for MenuAction {
     fn message(&self) -> Self::Message {
         match self {
             MenuAction::About => Message::ToggleContextPage(ContextPage::About),
+            MenuAction::Back => Message::ReturnToLandingPage,
         }
     }
 }
@@ -107,37 +106,12 @@ impl Application for CosmicDex {
         &mut self.core
     }
 
-    /// Instructs the cosmic runtime to use this model as the nav bar model.
-    fn nav_model(&self) -> Option<&nav_bar::Model> {
-        Some(&self.nav)
-    }
-
-    /// This is the entry point of your application, it is where you initialize your application.
-    ///
-    /// Any work that needs to be done before the application starts should be done here.
-    ///
-    /// - `core` is used to passed on for you by libcosmic to use in the core of your own application.
-    /// - `flags` is used to pass in any data that your application needs to use before it starts.
-    /// - `Command` type is used to send messages to your application. `Command::none()` can be used to send no messages to your application.
     fn init(core: Core, _flags: Self::Flags) -> (Self, Command<Self::Message>) {
-        let mut nav = nav_bar::Model::default();
-
-        nav.insert()
-            .text("Page 1")
-            .data::<Page>(Page::Page1)
-            .icon(icon::from_name("applications-science-symbolic"))
-            .activate();
-
-        nav.insert()
-            .text("Page 2")
-            .data::<Page>(Page::Page2)
-            .icon(icon::from_name("applications-system-symbolic"));
-
         let mut app = CosmicDex {
             core,
             context_page: ContextPage::default(),
             key_binds: HashMap::new(),
-            nav,
+            current_page: Page::LandingPage,
             //rustemon_client: rustemon::client::RustemonClient::default(),
             pokemon_list: Vec::<NamedApiResource<Pokemon>>::new(),
             selected_pokemon: None,
@@ -153,30 +127,31 @@ impl Application for CosmicDex {
 
     /// Elements to pack at the start of the header bar.
     fn header_start(&self) -> Vec<Element<Self::Message>> {
-        let menu_bar = menu::bar(vec![menu::Tree::with_children(
-            menu::root(fl!("view")),
-            menu::items(
-                &self.key_binds,
-                vec![menu::Item::Button(fl!("about"), MenuAction::About)],
+        let menu_bar = menu::bar(vec![
+            menu::Tree::with_children(
+                menu::root(fl!("view")),
+                menu::items(
+                    &self.key_binds,
+                    vec![menu::Item::Button(fl!("about"), MenuAction::About)],
+                ),
             ),
-        )]);
+            //TODO: This should be a button that allows to go back?
+            menu::Tree::with_children(
+                menu::root(fl!("back")),
+                menu::items(
+                    &self.key_binds,
+                    vec![menu::Item::Button(fl!("back"), MenuAction::Back)],
+                ),
+            ),
+        ]);
 
         vec![menu_bar.into()]
     }
 
-    /// This is the main view of your application, it is the root of your widget tree.
-    ///
-    /// The `Element` type is used to represent the visual elements of your application,
-    /// it has a `Message` associated with it, which dictates what type of message it can send.
-    ///
-    /// To get a better sense of which widgets are available, check out the `widget` module.
     fn view(&self) -> Element<Self::Message> {
-        let content = match self.nav.active_data::<Page>() {
-            Some(page) => match page {
-                Page::Page1 => self.landing(),
-                Page::Page2 => self.testing_error_page(),
-            },
-            None => todo!(),
+        let content = match self.current_page {
+            Page::LandingPage => self.landing(),
+            Page::PokemonPage => self.testing_error_page(),
         };
 
         widget::container(content)
@@ -187,9 +162,6 @@ impl Application for CosmicDex {
             .into()
     }
 
-    /// Application messages are handled here. The application state can be modified based on
-    /// what message was received. Commands may be returned for asynchronous execution on a
-    /// background thread managed by the application's executor.
     fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
         match message {
             Message::LaunchUrl(url) => {
@@ -213,13 +185,14 @@ impl Application for CosmicDex {
             }
             Message::LoadedPokemon(pokemon) => {
                 self.selected_pokemon = Some(pokemon);
-                //TODO: Change to Page2 ?
+                self.current_page = Page::PokemonPage;
             }
             Message::LoadPokemon(pokemon_name) => {
                 return cosmic::app::Command::perform(load_pokemon(pokemon_name), |pokemon| {
                     cosmic::app::message::app(Message::LoadedPokemon(pokemon))
                 });
             }
+            Message::ReturnToLandingPage => self.current_page = Page::LandingPage,
         }
         Command::none()
     }
@@ -233,14 +206,6 @@ impl Application for CosmicDex {
         Some(match self.context_page {
             ContextPage::About => self.about(),
         })
-    }
-
-    /// Called when a nav item is selected.
-    fn on_nav_select(&mut self, id: nav_bar::Id) -> Command<Self::Message> {
-        // Activate the page in the model.
-        self.nav.activate(id);
-
-        self.update_titles()
     }
 }
 
@@ -309,10 +274,17 @@ impl CosmicDex {
         let mut window_title = fl!("app-title");
         let mut header_title = String::new();
 
-        if let Some(page) = self.nav.text(self.nav.active()) {
-            window_title.push_str(" — ");
-            window_title.push_str(page);
-            header_title.push_str(page);
+        match self.current_page {
+            Page::LandingPage => {
+                window_title.push_str(" — ");
+                window_title.push_str("All Pokémon");
+                header_title.push_str("All Pokémon");
+            }
+            Page::PokemonPage => {
+                window_title.push_str(" — ");
+                window_title.push_str("Pokémon");
+                header_title.push_str("Pokémon");
+            }
         }
 
         self.set_header_title(header_title);
@@ -325,10 +297,6 @@ async fn load_all_pokemon() -> Vec<NamedApiResource<Pokemon>> {
     rustemon::pokemon::pokemon::get_all_entries(&client)
         .await
         .unwrap_or_default()
-    // let pokemon: Vec<Pokemon> = api_all_pokemon
-    //     .into_iter()
-    //     .map(|pokemon_api_res| pokemon_api_res.name)
-    //     .collect();
 }
 
 async fn load_pokemon(pokemon_name: String) -> Pokemon {
