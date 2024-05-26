@@ -151,7 +151,7 @@ impl Application for CosmicDex {
     fn view(&self) -> Element<Self::Message> {
         let content = match self.current_page {
             Page::LandingPage => self.landing(),
-            Page::PokemonPage => self.testing_error_page(),
+            Page::PokemonPage => self.pokemon_page(),
         };
 
         widget::container(content)
@@ -259,14 +259,41 @@ impl CosmicDex {
         .into()
     }
 
-    pub fn testing_error_page(&self) -> Element<Message> {
-        widget::text::title1(fl!("generic_error"))
-            .apply(widget::container)
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .align_x(Horizontal::Center)
-            .align_y(Vertical::Center)
-            .into()
+    // pub fn testing_error_page(&self) -> Element<Message> {
+    //     widget::text::title1(fl!("generic_error"))
+    //         .apply(widget::container)
+    //         .width(Length::Fill)
+    //         .height(Length::Fill)
+    //         .align_x(Horizontal::Center)
+    //         .align_y(Vertical::Center)
+    //         .into()
+    // }
+
+    pub fn pokemon_page(&self) -> Element<Message> {
+        let content: widget::Column<_> = match &self.selected_pokemon {
+            Some(pokemon) => {
+                let page_title = widget::text::title1(pokemon.name.to_string())
+                    .apply(widget::container)
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .align_x(Horizontal::Center)
+                    .align_y(Vertical::Center);
+
+                widget::Column::new().push(page_title).into()
+            }
+            None => {
+                let error = widget::text::title1(fl!("generic_error"))
+                    .apply(widget::container)
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .align_x(Horizontal::Center)
+                    .align_y(Vertical::Center);
+
+                widget::Column::new().push(error).into()
+            }
+        };
+
+        widget::container(content).into()
     }
 
     /// Updates the header and window titles.
