@@ -6,6 +6,7 @@ use crate::fl;
 use cosmic::app::{Command, Core};
 use cosmic::iced::alignment::{Horizontal, Vertical};
 use cosmic::iced::{Alignment, Length};
+use cosmic::iced_widget::Column;
 use cosmic::widget::{self, icon, menu, nav_bar};
 use cosmic::{cosmic_theme, theme, Application, ApplicationExt, Apply, Element};
 use rustemon::model::pokemon::Pokemon;
@@ -259,23 +260,23 @@ impl CosmicDex {
     }
 
     pub fn landing(&self) -> Element<Message> {
-        let cosmic_theme::Spacing { space_xxs, .. } = theme::active().cosmic().spacing;
-        let mut col = widget::column()
-            .align_items(Alignment::Center)
-            .spacing(space_xxs);
+        let space_xxs = theme::active().cosmic().spacing.space_xxs;
 
-        for pokemon in &self.pokemon_list {
-            col = col.push(
-                widget::text::title1(pokemon.name.to_string())
-                    .apply(widget::container)
-                    .width(Length::Fill)
-                    .height(Length::Fill)
-                    .align_x(Horizontal::Center)
-                    .align_y(Vertical::Center),
-            );
-        }
+        let children = self.pokemon_list.iter().map(|pokemon| {
+            widget::text::text(pokemon.name.to_string())
+                .width(Length::Fill)
+                .height(Length::Shrink)
+                .horizontal_alignment(Horizontal::Center)
+                // .vertical_alignment(Vertical::Center)
+                .into()
+        });
 
-        return col.into();
+        widget::scrollable(
+            Column::with_children(children)
+                .align_items(Alignment::Center)
+                .spacing(space_xxs),
+        )
+        .into()
     }
 
     pub fn testing_error_page(&self) -> Element<Message> {
