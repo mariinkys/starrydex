@@ -9,7 +9,7 @@ use cosmic::iced::{Alignment, Length};
 use cosmic::iced_widget::Column;
 use cosmic::widget::{self, menu};
 use cosmic::{cosmic_theme, theme, Application, ApplicationExt, Apply, Element};
-use rustemon::model::pokemon::Pokemon;
+use rustemon::model::pokemon::{Pokemon, PokemonStat, PokemonType};
 use rustemon::model::resource::NamedApiResource;
 
 const REPOSITORY: &str = "https://github.com/mariinkys/cosmicdex";
@@ -186,6 +186,7 @@ impl Application for CosmicDex {
             Message::LoadedPokemon(pokemon) => {
                 self.selected_pokemon = Some(pokemon);
                 self.current_page = Page::PokemonPage;
+                let _ = self.update_titles();
             }
             Message::LoadPokemon(pokemon_name) => {
                 return cosmic::app::Command::perform(load_pokemon(pokemon_name), |pokemon| {
@@ -273,13 +274,40 @@ impl CosmicDex {
         let content: widget::Column<_> = match &self.selected_pokemon {
             Some(pokemon) => {
                 let page_title = widget::text::title1(pokemon.name.to_string())
-                    .apply(widget::container)
                     .width(Length::Fill)
-                    .height(Length::Fill)
-                    .align_x(Horizontal::Center)
-                    .align_y(Vertical::Center);
+                    .horizontal_alignment(Horizontal::Center);
 
-                widget::Column::new().push(page_title).into()
+                // TODO: How can I load the pokemon image having the URL?
+                // let pokemon_image_url = pokemon.sprites.front_default.clone().unwrap_or_default();
+                // let pokemon_image = widget::Image::new(pokemon_image_url)
+                //     .content_fit(cosmic::iced::ContentFit::Fill);
+
+                let pokemon_weight = widget::text::text(format!(
+                    "WEIGHT: {}Kg",
+                    scale_numbers(pokemon.weight).to_string()
+                ))
+                .width(Length::Fill)
+                .horizontal_alignment(Horizontal::Center);
+
+                let pokemon_height = widget::text::text(format!(
+                    "HEIGHT: {}m",
+                    scale_numbers(pokemon.height).to_string()
+                ))
+                .width(Length::Fill)
+                .horizontal_alignment(Horizontal::Center);
+
+                let parsed_pokemon_stats = self.parse_pokemon_stats(&pokemon.stats);
+
+                let parsed_pokemon_types = self.parse_pokemon_types(&pokemon.types);
+
+                widget::Column::new()
+                    .push(page_title)
+                    .push(pokemon_weight)
+                    .push(pokemon_height)
+                    .push(parsed_pokemon_stats)
+                    .push(parsed_pokemon_types)
+                    .align_items(Alignment::Center)
+                    .into()
             }
             None => {
                 let error = widget::text::title1(fl!("generic_error"))
@@ -317,6 +345,34 @@ impl CosmicDex {
         self.set_header_title(header_title);
         self.set_window_title(window_title)
     }
+
+    pub fn parse_pokemon_stats(&self, stats: &Vec<PokemonStat>) -> Element<Message> {
+        let children = stats.iter().map(|pokemon_stats| {
+            widget::Row::new()
+                .push(widget::text(convert_stats_names(&pokemon_stats.stat.name)))
+                .push(widget::text(pokemon_stats.base_stat.to_string()))
+                .spacing(10.0)
+                .into()
+        });
+
+        Column::with_children(children)
+            .align_items(Alignment::Center)
+            .width(Length::Fill)
+            .into()
+    }
+
+    pub fn parse_pokemon_types(&self, types: &Vec<PokemonType>) -> Element<Message> {
+        let children = types.iter().map(|pokemon_types| {
+            widget::Row::new()
+                .push(widget::text(pokemon_types.type_.name.to_uppercase()))
+                .into()
+        });
+
+        Column::with_children(children)
+            .align_items(Alignment::Center)
+            .width(Length::Fill)
+            .into()
+    }
 }
 
 async fn load_all_pokemon() -> Vec<NamedApiResource<Pokemon>> {
@@ -331,4 +387,26 @@ async fn load_pokemon(pokemon_name: String) -> Pokemon {
     rustemon::pokemon::pokemon::get_by_name(pokemon_name.as_str(), &client)
         .await
         .unwrap_or_default()
+}
+
+fn convert_stats_names(input: &str) -> String {
+    let words: Vec<&str> = input.split('-').collect();
+
+    let capitalized_words: Vec<String> = words
+        .iter()
+        .map(|word| {
+            let mut chars = word.chars();
+            if let Some(first_char) = chars.next() {
+                first_char.to_uppercase().collect::<String>() + chars.as_str()
+            } else {
+                String::new()
+            }
+        })
+        .collect();
+
+    capitalized_words.join(" ")
+}
+
+fn scale_numbers(num: i64) -> f64 {
+    (num as f64) / 10.0
 }
