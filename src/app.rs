@@ -271,41 +271,67 @@ impl CosmicDex {
     // }
 
     pub fn pokemon_page(&self) -> Element<Message> {
+        let spacing = theme::active().cosmic().spacing;
+
         let content: widget::Column<_> = match &self.selected_pokemon {
             Some(pokemon) => {
-                let page_title = widget::text::title1(pokemon.name.to_string())
+                let page_title = widget::text::title1(capitalize_string(pokemon.name.as_str()))
                     .width(Length::Fill)
                     .horizontal_alignment(Horizontal::Center);
 
-                // TODO: How can I load the pokemon image having the URL?
+                // TODO: Load the pokemon image having the URL
                 // let pokemon_image_url = pokemon.sprites.front_default.clone().unwrap_or_default();
                 // let pokemon_image = widget::Image::new(pokemon_image_url)
                 //     .content_fit(cosmic::iced::ContentFit::Fill);
+                let pokemon_image = widget::Image::new("tmp/ditto_front.png")
+                    .content_fit(cosmic::iced::ContentFit::Fill);
 
-                let pokemon_weight = widget::text::text(format!(
-                    "WEIGHT: {}Kg",
-                    scale_numbers(pokemon.weight).to_string()
-                ))
-                .width(Length::Fill)
-                .horizontal_alignment(Horizontal::Center);
+                let pokemon_weight = widget::container::Container::new(
+                    widget::Column::new()
+                        .push(widget::text::title3("WEIGHT"))
+                        .push(
+                            widget::text::text(format!(
+                                "{} Kg",
+                                scale_numbers(pokemon.weight).to_string()
+                            ))
+                            .size(15.0),
+                        )
+                        .align_items(Alignment::Center),
+                )
+                .style(theme::Container::ContextDrawer)
+                .padding([spacing.space_none, spacing.space_xxs]);
 
-                let pokemon_height = widget::text::text(format!(
-                    "HEIGHT: {}m",
-                    scale_numbers(pokemon.height).to_string()
-                ))
-                .width(Length::Fill)
-                .horizontal_alignment(Horizontal::Center);
+                let pokemon_height = widget::container::Container::new(
+                    widget::Column::new()
+                        .push(widget::text::title3("HEIGHT"))
+                        .push(
+                            widget::text::text(format!(
+                                "{} m",
+                                scale_numbers(pokemon.height).to_string()
+                            ))
+                            .size(15.0),
+                        )
+                        .align_items(Alignment::Center),
+                )
+                .style(theme::Container::ContextDrawer)
+                .padding([spacing.space_none, spacing.space_xxs]);
 
-                let parsed_pokemon_stats = self.parse_pokemon_stats(&pokemon.stats);
+                let parsed_pokemon_types = self.parse_pokemon_types(&pokemon.types, &spacing);
 
-                let parsed_pokemon_types = self.parse_pokemon_types(&pokemon.types);
+                let pokemon_first_row = widget::Row::new()
+                    .push(pokemon_weight)
+                    .push(pokemon_height)
+                    .push(parsed_pokemon_types)
+                    .spacing(8.0)
+                    .align_items(Alignment::Center);
+
+                let parsed_pokemon_stats = self.parse_pokemon_stats(&pokemon.stats, &spacing);
 
                 widget::Column::new()
                     .push(page_title)
-                    .push(pokemon_weight)
-                    .push(pokemon_height)
+                    .push(pokemon_image)
+                    .push(pokemon_first_row)
                     .push(parsed_pokemon_stats)
-                    .push(parsed_pokemon_types)
                     .align_items(Alignment::Center)
                     .into()
             }
@@ -346,32 +372,48 @@ impl CosmicDex {
         self.set_window_title(window_title)
     }
 
-    pub fn parse_pokemon_stats(&self, stats: &Vec<PokemonStat>) -> Element<Message> {
+    pub fn parse_pokemon_stats(
+        &self,
+        stats: &Vec<PokemonStat>,
+        spacing: &cosmic_theme::Spacing,
+    ) -> Element<Message> {
+        //TODO: Missing card title
+
         let children = stats.iter().map(|pokemon_stats| {
             widget::Row::new()
-                .push(widget::text(convert_stats_names(&pokemon_stats.stat.name)))
+                .push(widget::text(capitalize_string(&pokemon_stats.stat.name)))
                 .push(widget::text(pokemon_stats.base_stat.to_string()))
                 .spacing(10.0)
                 .into()
         });
 
-        Column::with_children(children)
-            .align_items(Alignment::Center)
-            .width(Length::Fill)
-            .into()
+        widget::container::Container::new(
+            Column::with_children(children).align_items(Alignment::Center),
+        )
+        .style(theme::Container::ContextDrawer)
+        .padding([spacing.space_none, spacing.space_xxs])
+        .into()
     }
 
-    pub fn parse_pokemon_types(&self, types: &Vec<PokemonType>) -> Element<Message> {
+    pub fn parse_pokemon_types(
+        &self,
+        types: &Vec<PokemonType>,
+        spacing: &cosmic_theme::Spacing,
+    ) -> Element<Message> {
+        //TODO: Missing card title
+
         let children = types.iter().map(|pokemon_types| {
             widget::Row::new()
                 .push(widget::text(pokemon_types.type_.name.to_uppercase()))
                 .into()
         });
 
-        Column::with_children(children)
-            .align_items(Alignment::Center)
-            .width(Length::Fill)
-            .into()
+        widget::container::Container::new(
+            Column::with_children(children).align_items(Alignment::Center),
+        )
+        .style(theme::Container::ContextDrawer)
+        .padding([spacing.space_none, spacing.space_xxs])
+        .into()
     }
 }
 
@@ -389,7 +431,7 @@ async fn load_pokemon(pokemon_name: String) -> Pokemon {
         .unwrap_or_default()
 }
 
-fn convert_stats_names(input: &str) -> String {
+fn capitalize_string(input: &str) -> String {
     let words: Vec<&str> = input.split('-').collect();
 
     let capitalized_words: Vec<String> = words
