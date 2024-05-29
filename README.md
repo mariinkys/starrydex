@@ -6,7 +6,7 @@ A simple Pokédex application.
 
 Created by [mariinkys](https://github.com/mariinkys). Pokémon and Pokémon character names are trademarks of Nintendo.
 
-This application uses [PokeApi](https://github.com/PokeAPI/) and it's resources. [PokeApi](https://github.com/PokeAPI/) resources comply with [PokeApi](https://github.com/PokeAPI/)'s [LICENSE](https://github.com/mariinkys/cosmicdex/resources/LICENSE.md)
+This application uses [PokeApi](https://github.com/PokeAPI/) and it's resources. [PokeApi](https://github.com/PokeAPI/) resources comply with [PokeApi](https://github.com/PokeAPI/)'s [LICENSE](https://github.com/mariinkys/cosmicdex/blob/main/resources/LICENSE.md)
 
 ## Install
 
