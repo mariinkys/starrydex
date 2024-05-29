@@ -1,18 +1,12 @@
-# COSMIC Application Template
+# CosmicDex
 
-A template for COSMIC applications.
+A simple Pokédex application.
 
-## Getting Started
+## Information
 
-To get started, click the "Use this template" button above. This will create a new repository in your account with the contents of this template.
+Created by [mariinkys](https://github.com/mariinkys). Pokémon and Pokémon character names are trademarks of Nintendo.
 
-Once you have created a new repository from this template, you can clone it to your local machine and start developing your COSMIC application.
-
-## Development
-
-When you open the repository in your code editor, you will see a lot of comments in the code. These comments are there to help you get a basic understanding of what each part of the code does.
-
-Once you feel comfortable with it, refer back to the [COSMIC documentation](https://pop-os.github.io/libcosmic/cosmic/) for more information on how to build COSMIC applications.
+This application uses [PokeApi](https://github.com/PokeAPI/) and it's resources. [PokeApi](https://github.com/PokeAPI/) resources comply with [PokeApi](https://github.com/PokeAPI/)'s [LICENSE](https://github.com/mariinkys/cosmicdex/resources/LICENSE.md)
 
 ## Install
 
