@@ -1,7 +1,11 @@
 app-title = CosmicDex
 about = About
+settings = Settings
 view = View
 back = Back
 welcome = Welcome to COSMIC! ✨
 app_info = This application has been made for testing purposes.
 generic_error = Oops, something has gone wrong...
+download = Download
+download_all_images = Download all sprites
+download_all_info = This will only download not yet downloaded sprites

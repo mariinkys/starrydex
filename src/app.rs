@@ -41,6 +41,8 @@ pub enum Message {
     LoadPokemon(String),
     LoadedPokemon(CustomPokemon),
     ReturnToLandingPage,
+    DownloadAllImages,
+    DownloadedAllImages,
 }
 
 /// Identifies a page in the application.
@@ -54,12 +56,14 @@ pub enum Page {
 pub enum ContextPage {
     #[default]
     About,
+    Settings,
 }
 
 impl ContextPage {
     fn title(&self) -> String {
         match self {
             Self::About => fl!("about"),
+            Self::Settings => fl!("settings"),
         }
     }
 }
@@ -67,6 +71,7 @@ impl ContextPage {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MenuAction {
     About,
+    Settings,
     Back,
 }
 
@@ -76,6 +81,7 @@ impl menu::action::MenuAction for MenuAction {
     fn message(&self) -> Self::Message {
         match self {
             MenuAction::About => Message::ToggleContextPage(ContextPage::About),
+            MenuAction::Settings => Message::ToggleContextPage(ContextPage::Settings),
             MenuAction::Back => Message::ReturnToLandingPage,
         }
     }
@@ -132,7 +138,10 @@ impl Application for CosmicDex {
                 menu::root(fl!("view")),
                 menu::items(
                     &self.key_binds,
-                    vec![menu::Item::Button(fl!("about"), MenuAction::About)],
+                    vec![
+                        menu::Item::Button(fl!("about"), MenuAction::About),
+                        menu::Item::Button(fl!("settings"), MenuAction::Settings),
+                    ],
                 ),
             ),
             //TODO: This should be a button that allows to go back?
@@ -194,6 +203,12 @@ impl Application for CosmicDex {
                 });
             }
             Message::ReturnToLandingPage => self.current_page = Page::LandingPage,
+            Message::DownloadAllImages => {
+                return cosmic::app::Command::perform(download_all_pokemon_sprites(), |_| {
+                    cosmic::app::message::app(Message::DownloadedAllImages)
+                });
+            }
+            Message::DownloadedAllImages => todo!(),
         }
         Command::none()
     }
@@ -206,6 +221,7 @@ impl Application for CosmicDex {
 
         Some(match self.context_page {
             ContextPage::About => self.about(),
+            ContextPage::Settings => self.settings(),
         })
     }
 }
@@ -232,6 +248,27 @@ impl CosmicDex {
             .push(title)
             .push(app_info)
             .push(link)
+            .align_items(Alignment::Center)
+            .spacing(space_xxs)
+            .into()
+    }
+
+    pub fn settings(&self) -> Element<Message> {
+        let cosmic_theme::Spacing { space_xxs, .. } = theme::active().cosmic().spacing;
+
+        let download_row = widget::Row::new()
+            .push(
+                widget::column()
+                    .push(widget::text::text(fl!("download_all_images")))
+                    .push(widget::text::text(fl!("download_all_info")).size(10.0)),
+            )
+            .push(
+                widget::button(widget::text::text(fl!("download")))
+                    .on_press(Message::DownloadAllImages),
+            );
+
+        widget::column()
+            .push(download_row)
             .align_items(Alignment::Center)
             .spacing(space_xxs)
             .into()
@@ -444,6 +481,25 @@ async fn load_pokemon(pokemon_name: String) -> CustomPokemon {
     CustomPokemon {
         pokemon: pokemon,
         sprite_path: image_path, // Set default if image_path is None
+    }
+}
+
+async fn download_all_pokemon_sprites() {
+    let client = rustemon::client::RustemonClient::default();
+    let all_entries = rustemon::pokemon::pokemon::get_all_entries(&client)
+        .await
+        .unwrap_or_default();
+
+    for entry in all_entries {
+        let pokemon = rustemon::pokemon::pokemon::get_by_name(&entry.name, &client)
+            .await
+            .unwrap_or_default();
+
+        let _ = download_image(
+            pokemon.sprites.front_default.unwrap_or_default(),
+            pokemon.name.to_string(),
+        )
+        .await;
     }
 }
 
