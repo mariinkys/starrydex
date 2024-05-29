@@ -10,7 +10,6 @@ use cosmic::iced_widget::Column;
 use cosmic::widget::{self, menu};
 use cosmic::{cosmic_theme, theme, Application, ApplicationExt, Apply, Element};
 use rustemon::model::pokemon::{Pokemon, PokemonStat, PokemonType};
-use rustemon::model::resource::NamedApiResource;
 
 const REPOSITORY: &str = "https://github.com/mariinkys/cosmicdex";
 
@@ -25,10 +24,8 @@ pub struct CosmicDex {
     key_binds: HashMap<menu::KeyBind, MenuAction>,
     /// Currently selected Page
     current_page: Page,
-    /// The rustemon client for interacting with PokeApi
-    //rustemon_client: rustemon::client::RustemonClient,
     /// Contains the list of all Pokémon
-    pokemon_list: Vec<NamedApiResource<Pokemon>>,
+    pokemon_list: Vec<CustomPokemon>,
     /// Currently viewing Pokémon
     selected_pokemon: Option<CustomPokemon>,
 }
@@ -37,7 +34,7 @@ pub struct CosmicDex {
 pub enum Message {
     LaunchUrl(String),
     ToggleContextPage(ContextPage),
-    LoadedPokemonList(Vec<NamedApiResource<Pokemon>>),
+    LoadedPokemonList(Vec<CustomPokemon>),
     LoadPokemon(String),
     LoadedPokemon(CustomPokemon),
     ReturnToLandingPage,
@@ -119,7 +116,7 @@ impl Application for CosmicDex {
             key_binds: HashMap::new(),
             current_page: Page::LandingPage,
             //rustemon_client: rustemon::client::RustemonClient::default(),
-            pokemon_list: Vec::<NamedApiResource<Pokemon>>::new(),
+            pokemon_list: Vec::<CustomPokemon>::new(),
             selected_pokemon: None,
         };
 
@@ -208,6 +205,7 @@ impl Application for CosmicDex {
                     cosmic::app::message::app(Message::DownloadedAllImages)
                 });
             }
+            //TODO:
             Message::DownloadedAllImages => todo!(),
         }
         Command::none()
@@ -277,15 +275,27 @@ impl CosmicDex {
     pub fn landing(&self) -> Element<Message> {
         let space_xxs = theme::active().cosmic().spacing.space_xxs;
 
-        let children = self.pokemon_list.iter().map(|pokemon| {
-            widget::button(
-                widget::text::text(pokemon.name.to_string())
-                    .width(Length::Shrink)
-                    .height(Length::Shrink)
-                    .horizontal_alignment(Horizontal::Center),
-            )
-            .on_press_down(Message::LoadPokemon(pokemon.name.to_string()))
-            .into()
+        let children = self.pokemon_list.iter().map(|custom_pokemon| {
+            let pokemon_image = if let Some(path) = &custom_pokemon.sprite_path {
+                widget::Image::new(path).content_fit(cosmic::iced::ContentFit::Fill)
+            } else {
+                widget::Image::new("resources/fallback.png")
+                    .content_fit(cosmic::iced::ContentFit::Fill)
+            };
+
+            let pokemon_column = widget::Column::new().push(pokemon_image).push(
+                widget::button(
+                    widget::text::text(&custom_pokemon.pokemon.name)
+                        .width(Length::Shrink)
+                        .height(Length::Shrink)
+                        .horizontal_alignment(Horizontal::Center),
+                )
+                .on_press_down(Message::LoadPokemon(
+                    custom_pokemon.pokemon.name.to_string(),
+                )),
+            );
+
+            widget::container(pokemon_column).into()
         });
 
         widget::scrollable(
@@ -311,7 +321,7 @@ impl CosmicDex {
                 let pokemon_image = if let Some(path) = &custom_pokemon.sprite_path {
                     widget::Image::new(path).content_fit(cosmic::iced::ContentFit::Fill)
                 } else {
-                    widget::Image::new("tmp/fallback.png")
+                    widget::Image::new("resources/fallback.png")
                         .content_fit(cosmic::iced::ContentFit::Fill)
                 };
 
@@ -454,11 +464,28 @@ pub struct CustomPokemon {
     sprite_path: Option<String>,
 }
 
-async fn load_all_pokemon() -> Vec<NamedApiResource<Pokemon>> {
+async fn load_all_pokemon() -> Vec<CustomPokemon> {
     let client = rustemon::client::RustemonClient::default();
-    rustemon::pokemon::pokemon::get_all_entries(&client)
+    let all_entries = rustemon::pokemon::pokemon::get_all_entries(&client)
         .await
-        .unwrap_or_default()
+        .unwrap_or_default();
+
+    let mut result = Vec::<CustomPokemon>::new();
+
+    for entry in all_entries {
+        let image_filename = format!("{}_front.png", entry.name);
+        let image_path = format!("resources/{}/{}", entry.name, image_filename);
+
+        result.push(CustomPokemon {
+            pokemon: Pokemon {
+                name: entry.name,
+                ..Default::default()
+            },
+            sprite_path: Some(image_path),
+        })
+    }
+
+    result
 }
 
 async fn load_pokemon(pokemon_name: String) -> CustomPokemon {
@@ -530,7 +557,7 @@ async fn download_image(
     pokemon_name: String,
 ) -> Result<String, Box<dyn std::error::Error>> {
     let image_filename = format!("{}_front.png", pokemon_name);
-    let image_path = format!("tmp/{}/{}", pokemon_name, image_filename);
+    let image_path = format!("resources/{}/{}", pokemon_name, image_filename);
 
     // file already downloaded?
     if tokio::fs::metadata(&image_path).await.is_ok() {
