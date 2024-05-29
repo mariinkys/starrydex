@@ -30,7 +30,7 @@ pub struct CosmicDex {
     /// Contains the list of all Pokémon
     pokemon_list: Vec<NamedApiResource<Pokemon>>,
     /// Currently viewing Pokémon
-    selected_pokemon: Option<Pokemon>,
+    selected_pokemon: Option<CustomPokemon>,
 }
 
 #[derive(Debug, Clone)]
@@ -39,7 +39,7 @@ pub enum Message {
     ToggleContextPage(ContextPage),
     LoadedPokemonList(Vec<NamedApiResource<Pokemon>>),
     LoadPokemon(String),
-    LoadedPokemon(Pokemon),
+    LoadedPokemon(CustomPokemon),
     ReturnToLandingPage,
 }
 
@@ -260,31 +260,23 @@ impl CosmicDex {
         .into()
     }
 
-    // pub fn testing_error_page(&self) -> Element<Message> {
-    //     widget::text::title1(fl!("generic_error"))
-    //         .apply(widget::container)
-    //         .width(Length::Fill)
-    //         .height(Length::Fill)
-    //         .align_x(Horizontal::Center)
-    //         .align_y(Vertical::Center)
-    //         .into()
-    // }
-
     pub fn pokemon_page(&self) -> Element<Message> {
         let spacing = theme::active().cosmic().spacing;
 
         let content: widget::Column<_> = match &self.selected_pokemon {
-            Some(pokemon) => {
-                let page_title = widget::text::title1(capitalize_string(pokemon.name.as_str()))
-                    .width(Length::Fill)
-                    .horizontal_alignment(Horizontal::Center);
+            Some(custom_pokemon) => {
+                let page_title =
+                    widget::text::title1(capitalize_string(custom_pokemon.pokemon.name.as_str()))
+                        .width(Length::Fill)
+                        .horizontal_alignment(Horizontal::Center);
 
-                // TODO: Load the pokemon image having the URL
-                // let pokemon_image_url = pokemon.sprites.front_default.clone().unwrap_or_default();
-                // let pokemon_image = widget::Image::new(pokemon_image_url)
-                //     .content_fit(cosmic::iced::ContentFit::Fill);
-                let pokemon_image = widget::Image::new("tmp/ditto_front.png")
-                    .content_fit(cosmic::iced::ContentFit::Fill);
+                //TODO: Fallback image
+                let pokemon_image = if let Some(path) = &custom_pokemon.sprite_path {
+                    widget::Image::new(path).content_fit(cosmic::iced::ContentFit::Fill)
+                } else {
+                    widget::Image::new("tmp/fallback.png")
+                        .content_fit(cosmic::iced::ContentFit::Fill)
+                };
 
                 let pokemon_weight = widget::container::Container::new(
                     widget::Column::new()
@@ -292,7 +284,7 @@ impl CosmicDex {
                         .push(
                             widget::text::text(format!(
                                 "{} Kg",
-                                scale_numbers(pokemon.weight).to_string()
+                                scale_numbers(custom_pokemon.pokemon.weight).to_string()
                             ))
                             .size(15.0),
                         )
@@ -307,7 +299,7 @@ impl CosmicDex {
                         .push(
                             widget::text::text(format!(
                                 "{} m",
-                                scale_numbers(pokemon.height).to_string()
+                                scale_numbers(custom_pokemon.pokemon.height).to_string()
                             ))
                             .size(15.0),
                         )
@@ -316,7 +308,8 @@ impl CosmicDex {
                 .style(theme::Container::ContextDrawer)
                 .padding([spacing.space_none, spacing.space_xxs]);
 
-                let parsed_pokemon_types = self.parse_pokemon_types(&pokemon.types, &spacing);
+                let parsed_pokemon_types =
+                    self.parse_pokemon_types(&custom_pokemon.pokemon.types, &spacing);
 
                 let pokemon_first_row = widget::Row::new()
                     .push(pokemon_weight)
@@ -325,7 +318,8 @@ impl CosmicDex {
                     .spacing(8.0)
                     .align_items(Alignment::Center);
 
-                let parsed_pokemon_stats = self.parse_pokemon_stats(&pokemon.stats, &spacing);
+                let parsed_pokemon_stats =
+                    self.parse_pokemon_stats(&custom_pokemon.pokemon.stats, &spacing);
 
                 widget::Column::new()
                     .push(page_title)
@@ -417,6 +411,12 @@ impl CosmicDex {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct CustomPokemon {
+    pokemon: Pokemon,
+    sprite_path: Option<String>,
+}
+
 async fn load_all_pokemon() -> Vec<NamedApiResource<Pokemon>> {
     let client = rustemon::client::RustemonClient::default();
     rustemon::pokemon::pokemon::get_all_entries(&client)
@@ -424,11 +424,27 @@ async fn load_all_pokemon() -> Vec<NamedApiResource<Pokemon>> {
         .unwrap_or_default()
 }
 
-async fn load_pokemon(pokemon_name: String) -> Pokemon {
+async fn load_pokemon(pokemon_name: String) -> CustomPokemon {
     let client = rustemon::client::RustemonClient::default();
-    rustemon::pokemon::pokemon::get_by_name(pokemon_name.as_str(), &client)
+    let pokemon = rustemon::pokemon::pokemon::get_by_name(pokemon_name.as_str(), &client)
         .await
-        .unwrap_or_default()
+        .unwrap_or_default();
+
+    let image_path = if let Some(front_default_sprite) = &pokemon.sprites.front_default {
+        // Only download the image if front_default sprite is available
+        Some(
+            download_image(front_default_sprite.to_string(), pokemon.name.to_string())
+                .await
+                .unwrap_or_else(|_| String::new()),
+        )
+    } else {
+        None
+    };
+
+    CustomPokemon {
+        pokemon: pokemon,
+        sprite_path: image_path, // Set default if image_path is None
+    }
 }
 
 fn capitalize_string(input: &str) -> String {
@@ -451,4 +467,42 @@ fn capitalize_string(input: &str) -> String {
 
 fn scale_numbers(num: i64) -> f64 {
     (num as f64) / 10.0
+}
+
+async fn download_image(
+    image_url: String,
+    pokemon_name: String,
+) -> Result<String, Box<dyn std::error::Error>> {
+    let image_filename = format!("{}_front.png", pokemon_name);
+    let image_path = format!("tmp/{}/{}", pokemon_name, image_filename);
+
+    // file already downloaded?
+    if tokio::fs::metadata(&image_path).await.is_ok() {
+        return Ok(image_path);
+    }
+
+    let response = reqwest::get(&image_url).await?;
+
+    if response.status().is_success() {
+        let bytes = response.bytes().await?;
+
+        let path = std::path::PathBuf::from(&image_path);
+        if let Some(parent) = path.parent() {
+            tokio::fs::create_dir_all(parent).await?;
+        }
+
+        save_image(&image_path, &bytes).await?;
+        Ok(image_path)
+    } else {
+        Err(Box::new(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!("Failed to download image. Status: {}", response.status()),
+        )))
+    }
+}
+
+async fn save_image(path: &str, bytes: &[u8]) -> std::io::Result<()> {
+    let mut file = tokio::fs::File::create(path).await?;
+    tokio::io::AsyncWriteExt::write_all(&mut file, bytes).await?;
+    Ok(())
 }
