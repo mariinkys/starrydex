@@ -241,11 +241,17 @@ impl CosmicDex {
             .on_press(Message::LaunchUrl(REPOSITORY.to_string()))
             .padding(0);
 
+        let pokeapi_text = widget::text::text(fl!("pokeapi_text"));
+
+        let nintendo_text = widget::text::text(fl!("nintendo_text"));
+
         widget::column()
             .push(icon)
             .push(title)
             .push(app_info)
             .push(link)
+            .push(pokeapi_text)
+            .push(nintendo_text)
             .align_items(Alignment::Center)
             .spacing(space_xxs)
             .into()
@@ -262,7 +268,8 @@ impl CosmicDex {
             )
             .push(
                 widget::button(widget::text::text(fl!("download")))
-                    .on_press(Message::DownloadAllImages),
+                    .on_press(Message::DownloadAllImages)
+                    .style(theme::Button::Suggested),
             );
 
         widget::column()
@@ -276,12 +283,15 @@ impl CosmicDex {
         let space_xxs = theme::active().cosmic().spacing.space_xxs;
 
         let children = self.pokemon_list.iter().map(|custom_pokemon| {
-            let pokemon_image = if let Some(path) = &custom_pokemon.sprite_path {
-                widget::Image::new(path).content_fit(cosmic::iced::ContentFit::Fill)
-            } else {
-                widget::Image::new("resources/fallback.png")
-                    .content_fit(cosmic::iced::ContentFit::Fill)
-            };
+            //TODO: This is temporal to reduce lag while not on release mode.
+            // let pokemon_image = if let Some(path) = &custom_pokemon.sprite_path {
+            //     widget::Image::new(path).content_fit(cosmic::iced::ContentFit::Fill)
+            // } else {
+            //     widget::Image::new("resources/fallback.png")
+            //         .content_fit(cosmic::iced::ContentFit::Fill)
+            // };
+            let pokemon_image = widget::Image::new("resources/fallback.png")
+                .content_fit(cosmic::iced::ContentFit::Fill);
 
             let pokemon_column = widget::Column::new().push(pokemon_image).push(
                 widget::button(
@@ -474,7 +484,7 @@ async fn load_all_pokemon() -> Vec<CustomPokemon> {
 
     for entry in all_entries {
         let image_filename = format!("{}_front.png", entry.name);
-        let image_path = format!("resources/{}/{}", entry.name, image_filename);
+        let image_path = format!("resources/sprites/{}/{}", entry.name, image_filename);
 
         result.push(CustomPokemon {
             pokemon: Pokemon {
@@ -557,7 +567,7 @@ async fn download_image(
     pokemon_name: String,
 ) -> Result<String, Box<dyn std::error::Error>> {
     let image_filename = format!("{}_front.png", pokemon_name);
-    let image_path = format!("resources/{}/{}", pokemon_name, image_filename);
+    let image_path = format!("resources/sprites/{}/{}", pokemon_name, image_filename);
 
     // file already downloaded?
     if tokio::fs::metadata(&image_path).await.is_ok() {
