@@ -7,7 +7,7 @@ use cosmic::app::{Command, Core};
 use cosmic::iced::alignment::{Horizontal, Vertical};
 use cosmic::iced::{Alignment, Length};
 use cosmic::iced_widget::Column;
-use cosmic::widget::{self, menu, Widget};
+use cosmic::widget::{self, menu};
 use cosmic::{cosmic_theme, theme, Application, ApplicationExt, Apply, Element};
 use rustemon::model::pokemon::{Pokemon, PokemonStat, PokemonType};
 
@@ -264,12 +264,14 @@ impl CosmicDex {
             .push(
                 widget::column()
                     .push(widget::text::text(fl!("download_all_images")))
-                    .push(widget::text::text(fl!("download_all_info")).size(10.0)),
+                    .push(widget::text::text(fl!("download_all_info")).size(10.0))
+                    .width(Length::Fill),
             )
             .push(
                 widget::button(widget::text::text(fl!("download")))
                     .on_press(Message::DownloadAllImages)
-                    .style(theme::Button::Suggested),
+                    .style(theme::Button::Suggested)
+                    .width(Length::Shrink),
             );
 
         widget::column()
@@ -280,10 +282,10 @@ impl CosmicDex {
     }
 
     pub fn landing(&self) -> Element<Message> {
-        let space_xxs = theme::active().cosmic().spacing.space_xxs;
+        let space_s = theme::active().cosmic().spacing.space_s;
         let spacing = theme::active().cosmic().spacing;
 
-        let children = self.pokemon_list.iter().map(|custom_pokemon| {
+        let pokemon_children = self.pokemon_list.iter().map(|custom_pokemon| {
             let pokemon_image = if let Some(path) = &custom_pokemon.sprite_path {
                 widget::Image::new(path).content_fit(cosmic::iced::ContentFit::Fill)
             } else {
@@ -303,16 +305,18 @@ impl CosmicDex {
                 custom_pokemon.pokemon.name.to_string(),
             ))
             .style(theme::Button::Image)
-            .padding([spacing.space_none, spacing.space_xxs]);
+            .padding([spacing.space_none, spacing.space_s]);
 
             pokemon_container.into()
         });
 
+        //TODO: This should not be a column, how canI have some kind of responsive grid?
+        //The grid widget does not have ::with_children, how can I push my content?
         widget::scrollable(
-            Column::with_children(children)
+            Column::with_children(pokemon_children)
                 .align_items(Alignment::Center)
                 .width(Length::Fill)
-                .spacing(space_xxs),
+                .spacing(space_s),
         )
         .into()
     }
