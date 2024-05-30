@@ -7,7 +7,7 @@ use cosmic::app::{Command, Core};
 use cosmic::iced::alignment::{Horizontal, Vertical};
 use cosmic::iced::{Alignment, Length};
 use cosmic::iced_widget::Column;
-use cosmic::widget::{self, menu};
+use cosmic::widget::{self, menu, Widget};
 use cosmic::{cosmic_theme, theme, Application, ApplicationExt, Apply, Element};
 use rustemon::model::pokemon::{Pokemon, PokemonStat, PokemonType};
 
@@ -281,31 +281,31 @@ impl CosmicDex {
 
     pub fn landing(&self) -> Element<Message> {
         let space_xxs = theme::active().cosmic().spacing.space_xxs;
+        let spacing = theme::active().cosmic().spacing;
 
         let children = self.pokemon_list.iter().map(|custom_pokemon| {
-            //TODO: This is temporal to reduce lag while not on release mode.
-            // let pokemon_image = if let Some(path) = &custom_pokemon.sprite_path {
-            //     widget::Image::new(path).content_fit(cosmic::iced::ContentFit::Fill)
-            // } else {
-            //     widget::Image::new("resources/fallback.png")
-            //         .content_fit(cosmic::iced::ContentFit::Fill)
-            // };
-            let pokemon_image = widget::Image::new("resources/fallback.png")
-                .content_fit(cosmic::iced::ContentFit::Fill);
+            let pokemon_image = if let Some(path) = &custom_pokemon.sprite_path {
+                widget::Image::new(path).content_fit(cosmic::iced::ContentFit::Fill)
+            } else {
+                widget::Image::new("resources/fallback.png")
+                    .content_fit(cosmic::iced::ContentFit::Fill)
+            };
 
-            let pokemon_column = widget::Column::new().push(pokemon_image).push(
-                widget::button(
-                    widget::text::text(&custom_pokemon.pokemon.name)
-                        .width(Length::Shrink)
-                        .height(Length::Shrink)
-                        .horizontal_alignment(Horizontal::Center),
-                )
-                .on_press_down(Message::LoadPokemon(
-                    custom_pokemon.pokemon.name.to_string(),
-                )),
-            );
+            let pokemon_container = widget::button(
+                widget::Column::new()
+                    .push(pokemon_image)
+                    .push(widget::text::text(capitalize_string(
+                        &custom_pokemon.pokemon.name,
+                    )))
+                    .align_items(Alignment::Center),
+            )
+            .on_press_down(Message::LoadPokemon(
+                custom_pokemon.pokemon.name.to_string(),
+            ))
+            .style(theme::Button::Image)
+            .padding([spacing.space_none, spacing.space_xxs]);
 
-            widget::container(pokemon_column).into()
+            pokemon_container.into()
         });
 
         widget::scrollable(
