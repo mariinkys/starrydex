@@ -11,3 +11,4 @@ download_all_images = Download all sprites
 download_all_info = This will only download not yet downloaded sprites
 pokeapi_text = This application uses PokeApi and it's resources. PokeApi resources comply with PokeApi's LICENSE.
 nintendo_text = Pokémon and Pokémon character names are trademarks of Nintendo.
+pokemon_page = Pokémon

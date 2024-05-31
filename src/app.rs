@@ -37,7 +37,6 @@ pub enum Message {
     LoadedPokemonList(Vec<CustomPokemon>),
     LoadPokemon(String),
     LoadedPokemon(CustomPokemon),
-    ReturnToLandingPage,
     DownloadAllImages,
     DownloadedAllImages,
 }
@@ -45,7 +44,6 @@ pub enum Message {
 /// Identifies a page in the application.
 pub enum Page {
     LandingPage,
-    PokemonPage,
 }
 
 /// Identifies a context page to display in the context drawer.
@@ -54,6 +52,7 @@ pub enum ContextPage {
     #[default]
     About,
     Settings,
+    PokemonPage,
 }
 
 impl ContextPage {
@@ -61,6 +60,7 @@ impl ContextPage {
         match self {
             Self::About => fl!("about"),
             Self::Settings => fl!("settings"),
+            Self::PokemonPage => fl!("pokemon_page"),
         }
     }
 }
@@ -69,7 +69,6 @@ impl ContextPage {
 pub enum MenuAction {
     About,
     Settings,
-    Back,
 }
 
 impl menu::action::MenuAction for MenuAction {
@@ -79,7 +78,6 @@ impl menu::action::MenuAction for MenuAction {
         match self {
             MenuAction::About => Message::ToggleContextPage(ContextPage::About),
             MenuAction::Settings => Message::ToggleContextPage(ContextPage::Settings),
-            MenuAction::Back => Message::ReturnToLandingPage,
         }
     }
 }
@@ -115,7 +113,6 @@ impl Application for CosmicDex {
             context_page: ContextPage::default(),
             key_binds: HashMap::new(),
             current_page: Page::LandingPage,
-            //rustemon_client: rustemon::client::RustemonClient::default(),
             pokemon_list: Vec::<CustomPokemon>::new(),
             selected_pokemon: None,
         };
@@ -130,26 +127,16 @@ impl Application for CosmicDex {
 
     /// Elements to pack at the start of the header bar.
     fn header_start(&self) -> Vec<Element<Self::Message>> {
-        let menu_bar = menu::bar(vec![
-            menu::Tree::with_children(
-                menu::root(fl!("view")),
-                menu::items(
-                    &self.key_binds,
-                    vec![
-                        menu::Item::Button(fl!("about"), MenuAction::About),
-                        menu::Item::Button(fl!("settings"), MenuAction::Settings),
-                    ],
-                ),
+        let menu_bar = menu::bar(vec![menu::Tree::with_children(
+            menu::root(fl!("view")),
+            menu::items(
+                &self.key_binds,
+                vec![
+                    menu::Item::Button(fl!("about"), MenuAction::About),
+                    menu::Item::Button(fl!("settings"), MenuAction::Settings),
+                ],
             ),
-            //TODO: This should be a button that allows to go back?
-            menu::Tree::with_children(
-                menu::root(fl!("back")),
-                menu::items(
-                    &self.key_binds,
-                    vec![menu::Item::Button(fl!("back"), MenuAction::Back)],
-                ),
-            ),
-        ]);
+        )]);
 
         vec![menu_bar.into()]
     }
@@ -157,7 +144,6 @@ impl Application for CosmicDex {
     fn view(&self) -> Element<Self::Message> {
         let content = match self.current_page {
             Page::LandingPage => self.landing(),
-            Page::PokemonPage => self.pokemon_page(),
         };
 
         widget::container(content)
@@ -191,15 +177,24 @@ impl Application for CosmicDex {
             }
             Message::LoadedPokemon(pokemon) => {
                 self.selected_pokemon = Some(pokemon);
-                self.current_page = Page::PokemonPage;
-                let _ = self.update_titles();
+
+                if self.context_page == ContextPage::PokemonPage {
+                    // Close the context drawer if the toggled context page is the same.
+                    self.core.window.show_context = !self.core.window.show_context;
+                } else {
+                    // Open the context drawer to display the requested context page.
+                    self.context_page = ContextPage::PokemonPage;
+                    self.core.window.show_context = true;
+                }
+
+                // Set the title of the context drawer.
+                self.set_context_title(ContextPage::PokemonPage.title());
             }
             Message::LoadPokemon(pokemon_name) => {
                 return cosmic::app::Command::perform(load_pokemon(pokemon_name), |pokemon| {
                     cosmic::app::message::app(Message::LoadedPokemon(pokemon))
                 });
             }
-            Message::ReturnToLandingPage => self.current_page = Page::LandingPage,
             Message::DownloadAllImages => {
                 return cosmic::app::Command::perform(download_all_pokemon_sprites(), |_| {
                     cosmic::app::message::app(Message::DownloadedAllImages)
@@ -220,6 +215,7 @@ impl Application for CosmicDex {
         Some(match self.context_page {
             ContextPage::About => self.about(),
             ContextPage::Settings => self.settings(),
+            ContextPage::PokemonPage => self.pokemon_page(),
         })
     }
 }
@@ -415,11 +411,6 @@ impl CosmicDex {
                 window_title.push_str(" — ");
                 window_title.push_str("All Pokémon");
                 header_title.push_str("All Pokémon");
-            }
-            Page::PokemonPage => {
-                window_title.push_str(" — ");
-                window_title.push_str("Pokémon");
-                header_title.push_str("Pokémon");
             }
         }
 
