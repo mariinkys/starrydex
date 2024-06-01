@@ -27,6 +27,8 @@ pub struct CosmicDex {
     key_binds: HashMap<menu::KeyBind, MenuAction>,
     /// Currently selected Page
     current_page: Page,
+    /// Page Status
+    page_status: PageStatus,
     /// Contains the list of all Pokémon
     pokemon_list: Vec<CustomPokemon>,
     /// Currently viewing Pokémon
@@ -47,6 +49,12 @@ pub enum Message {
 /// Identifies a page in the application.
 pub enum Page {
     LandingPage,
+}
+
+/// Identifies the status of a page in the application.
+pub enum PageStatus {
+    Loaded,
+    Loading,
 }
 
 /// Identifies a context page to display in the context drawer.
@@ -124,6 +132,7 @@ impl Application for CosmicDex {
             current_page: Page::LandingPage,
             pokemon_list: Vec::<CustomPokemon>::new(),
             selected_pokemon: None,
+            page_status: PageStatus::Loading,
         };
 
         let cmd = cosmic::app::Command::perform(load_all_pokemon(), |pokemon_list| {
@@ -183,6 +192,7 @@ impl Application for CosmicDex {
             }
             Message::LoadedPokemonList(pokemons) => {
                 self.pokemon_list = pokemons;
+                self.page_status = PageStatus::Loaded;
             }
             Message::LoadedPokemon(pokemon) => {
                 self.selected_pokemon = Some(pokemon);
@@ -290,40 +300,50 @@ impl CosmicDex {
         let space_s = theme::active().cosmic().spacing.space_s;
         let spacing = theme::active().cosmic().spacing;
 
-        let pokemon_children = self.pokemon_list.iter().map(|custom_pokemon| {
-            let pokemon_image = if let Some(path) = &custom_pokemon.sprite_path {
-                widget::Image::new(path).content_fit(cosmic::iced::ContentFit::Fill)
-            } else {
-                widget::Image::new("resources/fallback.png")
-                    .content_fit(cosmic::iced::ContentFit::Fill)
-            };
+        match self.page_status {
+            PageStatus::Loaded => {
+                let pokemon_children = self.pokemon_list.iter().map(|custom_pokemon| {
+                    let pokemon_image = if let Some(path) = &custom_pokemon.sprite_path {
+                        widget::Image::new(path).content_fit(cosmic::iced::ContentFit::Fill)
+                    } else {
+                        widget::Image::new("resources/fallback.png")
+                            .content_fit(cosmic::iced::ContentFit::Fill)
+                    };
 
-            let pokemon_container = widget::button(
-                widget::Column::new()
-                    .push(pokemon_image)
-                    .push(widget::text::text(capitalize_string(
-                        &custom_pokemon.pokemon.name,
-                    )))
-                    .align_items(Alignment::Center),
-            )
-            .on_press_down(Message::LoadPokemon(
-                custom_pokemon.pokemon.name.to_string(),
-            ))
-            .style(theme::Button::Image)
-            .padding([spacing.space_none, spacing.space_s]);
+                    let pokemon_container = widget::button(
+                        widget::Column::new()
+                            .push(pokemon_image)
+                            .push(widget::text::text(capitalize_string(
+                                &custom_pokemon.pokemon.name,
+                            )))
+                            .align_items(Alignment::Center),
+                    )
+                    .on_press_down(Message::LoadPokemon(
+                        custom_pokemon.pokemon.name.to_string(),
+                    ))
+                    .style(theme::Button::Image)
+                    .padding([spacing.space_none, spacing.space_s]);
 
-            pokemon_container.into()
-        });
+                    pokemon_container.into()
+                });
 
-        //TODO: This should not be a column, how canI have some kind of responsive grid?
-        //The grid widget does not have ::with_children, how can I push my content?
-        widget::scrollable(
-            Column::with_children(pokemon_children)
+                //TODO: This should not be a column, how canI have some kind of responsive grid?
+                //The grid widget does not have ::with_children, how can I push my content?
+                widget::scrollable(
+                    Column::with_children(pokemon_children)
+                        .align_items(Alignment::Center)
+                        .width(Length::Fill)
+                        .spacing(space_s),
+                )
+                .into()
+            }
+            PageStatus::Loading => Column::new()
+                .push(widget::text::text("Loading..."))
                 .align_items(Alignment::Center)
                 .width(Length::Fill)
-                .spacing(space_s),
-        )
-        .into()
+                .spacing(space_s)
+                .into(),
+        }
     }
 
     pub fn pokemon_page(&self) -> Element<Message> {
