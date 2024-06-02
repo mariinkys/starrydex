@@ -13,3 +13,6 @@ pokeapi_text = This application uses PokeApi and it's resources. PokeApi resourc
 nintendo_text = Pokémon and Pokémon character names are trademarks of Nintendo.
 pokemon_page = Pokémon
 search = Search
+fix = Fix Sprites
+fix_all_images = Fix Sprites
+fix_all_info = This will take a really long time, only use it if necessary.

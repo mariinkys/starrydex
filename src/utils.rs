@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use rustemon::model::pokemon::Pokemon;
 
 use crate::app::CustomPokemon;
@@ -65,6 +67,18 @@ pub async fn download_all_pokemon_sprites() {
             pokemon.name.to_string(),
         )
         .await;
+    }
+}
+
+pub async fn fix_all_sprites() -> bool {
+    let path = Path::new("resources/sprites");
+    let remove_operation = std::fs::remove_dir_all(path);
+    match remove_operation {
+        Ok(_) => {
+            download_all_pokemon_sprites().await;
+            true
+        }
+        Err(_) => false,
     }
 }
 

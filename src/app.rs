@@ -4,7 +4,8 @@ use std::collections::HashMap;
 
 use crate::fl;
 use crate::utils::{
-    capitalize_string, download_all_pokemon_sprites, load_all_pokemon, load_pokemon, scale_numbers,
+    capitalize_string, download_all_pokemon_sprites, fix_all_sprites, load_all_pokemon,
+    load_pokemon, scale_numbers,
 };
 use cosmic::app::{Command, Core};
 use cosmic::iced::alignment::{Horizontal, Vertical};
@@ -49,6 +50,8 @@ pub enum Message {
     DownloadAllImages,
     DownloadedAllImages,
     Search(String),
+    FixAllImages,
+    AllImagesFixed,
 }
 
 /// Identifies a page in the application.
@@ -222,13 +225,6 @@ impl Application for CosmicDex {
                     cosmic::app::message::app(Message::LoadedPokemon(pokemon))
                 });
             }
-            Message::DownloadAllImages => {
-                return cosmic::app::Command::perform(download_all_pokemon_sprites(), |_| {
-                    cosmic::app::message::app(Message::DownloadedAllImages)
-                });
-            }
-            //TODO:
-            Message::DownloadedAllImages => todo!(),
             Message::Search(new_value) => {
                 self.search = new_value;
                 self.filtered_pokemon_list = self
@@ -238,6 +234,19 @@ impl Application for CosmicDex {
                     .filter(|pokemon| pokemon.pokemon.name.contains(&self.search))
                     .collect();
             }
+            Message::DownloadAllImages => {
+                return cosmic::app::Command::perform(download_all_pokemon_sprites(), |_| {
+                    cosmic::app::message::app(Message::DownloadedAllImages)
+                });
+            }
+            Message::FixAllImages => {
+                return cosmic::app::Command::perform(fix_all_sprites(), |_res| {
+                    cosmic::app::message::app(Message::AllImagesFixed)
+                });
+            }
+            //TODO:
+            Message::DownloadedAllImages => todo!(),
+            Message::AllImagesFixed => todo!(),
         }
         Command::none()
     }
@@ -306,8 +315,23 @@ impl CosmicDex {
                     .width(Length::Shrink),
             );
 
+        let fix_row = widget::Row::new()
+            .push(
+                widget::column()
+                    .push(widget::text::text(fl!("fix_all_images")))
+                    .push(widget::text::text(fl!("fix_all_info")).size(10.0))
+                    .width(Length::Fill),
+            )
+            .push(
+                widget::button(widget::text::text(fl!("fix")))
+                    .on_press(Message::FixAllImages)
+                    .style(theme::Button::Destructive)
+                    .width(Length::Shrink),
+            );
+
         widget::column()
             .push(download_row)
+            .push(fix_row)
             .align_items(Alignment::Center)
             .spacing(space_xxs)
             .into()
