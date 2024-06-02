@@ -347,8 +347,6 @@ impl CosmicDex {
                 let search = widget::search_input(fl!("search"), &self.search)
                     .on_input(Message::Search)
                     .on_clear(Message::Search(String::new()))
-                    // .id(self.text_input_id.clone())
-                    // .on_submit(Message::Enter)
                     .width(Length::Fill);
 
                 let search_row = widget::Row::new()
