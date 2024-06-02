@@ -31,8 +31,12 @@ pub struct CosmicDex {
     page_status: PageStatus,
     /// Contains the list of all Pokémon
     pokemon_list: Vec<CustomPokemon>,
+    /// Contains the list of pokemon after searching
+    filtered_pokemon_list: Vec<CustomPokemon>,
     /// Currently viewing Pokémon
     selected_pokemon: Option<CustomPokemon>,
+    /// Holds the search input value
+    search: String,
 }
 
 #[derive(Debug, Clone)]
@@ -44,6 +48,7 @@ pub enum Message {
     LoadedPokemon(CustomPokemon),
     DownloadAllImages,
     DownloadedAllImages,
+    Search(String),
 }
 
 /// Identifies a page in the application.
@@ -131,8 +136,10 @@ impl Application for CosmicDex {
             key_binds: HashMap::new(),
             current_page: Page::LandingPage,
             pokemon_list: Vec::<CustomPokemon>::new(),
+            filtered_pokemon_list: Vec::<CustomPokemon>::new(),
             selected_pokemon: None,
             page_status: PageStatus::Loading,
+            search: String::new(),
         };
 
         let cmd = cosmic::app::Command::perform(load_all_pokemon(), |pokemon_list| {
@@ -191,7 +198,8 @@ impl Application for CosmicDex {
                 self.set_context_title(context_page.title());
             }
             Message::LoadedPokemonList(pokemons) => {
-                self.pokemon_list = pokemons;
+                self.pokemon_list = pokemons.clone();
+                self.filtered_pokemon_list = pokemons;
                 self.page_status = PageStatus::Loaded;
             }
             Message::LoadedPokemon(pokemon) => {
@@ -221,6 +229,15 @@ impl Application for CosmicDex {
             }
             //TODO:
             Message::DownloadedAllImages => todo!(),
+            Message::Search(new_value) => {
+                self.search = new_value;
+                self.filtered_pokemon_list = self
+                    .pokemon_list
+                    .clone()
+                    .into_iter()
+                    .filter(|pokemon| pokemon.pokemon.name.contains(&self.search))
+                    .collect();
+            }
         }
         Command::none()
     }
@@ -302,7 +319,7 @@ impl CosmicDex {
 
         match self.page_status {
             PageStatus::Loaded => {
-                let pokemon_children = self.pokemon_list.iter().map(|custom_pokemon| {
+                let pokemon_children = self.filtered_pokemon_list.iter().map(|custom_pokemon| {
                     let pokemon_image = if let Some(path) = &custom_pokemon.sprite_path {
                         widget::Image::new(path).content_fit(cosmic::iced::ContentFit::Fill)
                     } else {
@@ -327,15 +344,33 @@ impl CosmicDex {
                     pokemon_container.into()
                 });
 
+                let search = widget::search_input(fl!("search"), &self.search)
+                    .on_input(Message::Search)
+                    .on_clear(Message::Search(String::new()))
+                    // .id(self.text_input_id.clone())
+                    // .on_submit(Message::Enter)
+                    .width(Length::Fill);
+
+                let search_row = widget::Row::new()
+                    .push(search)
+                    .width(Length::Fill)
+                    .padding(5.0);
+
                 //TODO: This should not be a column, how canI have some kind of responsive grid?
                 //The grid widget does not have ::with_children, how can I push my content?
-                widget::scrollable(
-                    Column::with_children(pokemon_children)
-                        .align_items(Alignment::Center)
-                        .width(Length::Fill)
-                        .spacing(space_s),
-                )
-                .into()
+                let pokemon_list = Column::with_children(pokemon_children)
+                    .align_items(Alignment::Center)
+                    .width(Length::Fill)
+                    .spacing(space_s);
+
+                //TODO: The searchbar should not scroll with the pokemon_list but if I try to put it outisde of the scrollable it disappears.
+                let content = widget::Column::new()
+                    .push(search_row)
+                    .push(pokemon_list)
+                    .width(Length::Fill)
+                    .spacing(5.0);
+
+                widget::scrollable(content).into()
             }
             PageStatus::Loading => Column::new()
                 .push(widget::text::text("Loading..."))
