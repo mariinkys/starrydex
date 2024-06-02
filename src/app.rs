@@ -409,7 +409,8 @@ impl CosmicDex {
                             ))
                             .size(15.0),
                         )
-                        .align_items(Alignment::Center),
+                        .align_items(Alignment::Center)
+                        .width(Length::Fill),
                 )
                 .style(theme::Container::ContextDrawer)
                 .padding([spacing.space_none, spacing.space_xxs]);
@@ -424,7 +425,8 @@ impl CosmicDex {
                             ))
                             .size(15.0),
                         )
-                        .align_items(Alignment::Center),
+                        .align_items(Alignment::Center)
+                        .width(Length::Fill),
                 )
                 .style(theme::Container::ContextDrawer)
                 .padding([spacing.space_none, spacing.space_xxs]);
@@ -448,6 +450,7 @@ impl CosmicDex {
                     .push(pokemon_first_row)
                     .push(parsed_pokemon_stats)
                     .align_items(Alignment::Center)
+                    .spacing(10.0)
                     .into()
             }
             None => {
@@ -491,18 +494,18 @@ impl CosmicDex {
 
         let children = stats.iter().map(|pokemon_stats| {
             widget::Row::new()
-                .push(widget::text(capitalize_string(&pokemon_stats.stat.name)))
-                .push(widget::text(pokemon_stats.base_stat.to_string()))
-                .spacing(10.0)
+                .push(widget::text(capitalize_string(&pokemon_stats.stat.name)).width(Length::Fill))
+                .push(
+                    widget::text(pokemon_stats.base_stat.to_string())
+                        .horizontal_alignment(Horizontal::Left),
+                )
                 .into()
         });
 
-        widget::container::Container::new(
-            Column::with_children(children).align_items(Alignment::Center),
-        )
-        .style(theme::Container::ContextDrawer)
-        .padding([spacing.space_none, spacing.space_xxs])
-        .into()
+        widget::container::Container::new(Column::with_children(children))
+            .style(theme::Container::ContextDrawer)
+            .padding([spacing.space_none, spacing.space_xxs])
+            .into()
     }
 
     pub fn parse_pokemon_types(
@@ -510,19 +513,20 @@ impl CosmicDex {
         types: &Vec<PokemonType>,
         spacing: &cosmic_theme::Spacing,
     ) -> Element<Message> {
-        //TODO: Missing card title
-
         let children = types.iter().map(|pokemon_types| {
             widget::Row::new()
-                .push(widget::text(pokemon_types.type_.name.to_uppercase()))
+                .push(
+                    widget::text(pokemon_types.type_.name.to_uppercase())
+                        .width(Length::Fill)
+                        .horizontal_alignment(Horizontal::Center),
+                )
+                .width(Length::Fill)
                 .into()
         });
 
-        widget::container::Container::new(
-            Column::with_children(children).align_items(Alignment::Center),
-        )
-        .style(theme::Container::ContextDrawer)
-        .padding([spacing.space_none, spacing.space_xxs])
-        .into()
+        widget::container::Container::new(Column::with_children(children))
+            .style(theme::Container::ContextDrawer)
+            .padding([spacing.space_none, spacing.space_xxs])
+            .into()
     }
 }
