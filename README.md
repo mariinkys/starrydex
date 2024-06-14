@@ -1,16 +1,16 @@
 <p align="center">
- <img src="https://raw.githubusercontent.com/mariinkys/cosmicdex/5546d9d50c7d99a3cb3fc882a955a8eb274d0949/res/icons/hicolor/256x256/apps/dev.mariinkys.CosmicDex.svg?token=AO2BUSPXV272EVQCF7C4ILTGLWFIU">
+ <img src="https://raw.githubusercontent.com/mariinkys/starrydex/5546d9d50c7d99a3cb3fc882a955a8eb274d0949/res/icons/hicolor/256x256/apps/dev.mariinkys.StarryDex.svg?token=AO2BUSPXV272EVQCF7C4ILTGLWFIU">
 </p>
 
-<h1 align="center">CosmicDex</h1>
+<h1 align="center">StarryDex</h1>
 
 <p align="center">
- This project contains a small Pokédex application written in Rust with <a href="https://github.com/pop-os/libcosmic" target="_blank">libcosmic</a>.
+ This project contains a small Pokédex application for the COSMIC™ desktop written in Rust with <a href="https://github.com/pop-os/libcosmic" target="_blank">libcosmic</a>.
 </p>
 
 <p align="center">
- <img src="https://raw.githubusercontent.com/mariinkys/cosmicdex/main/screenshots/main.png" width=450>
- <img src="https://raw.githubusercontent.com/mariinkys/cosmicdex/main/screenshots/pokemon.png" width=450>
+ <img src="https://raw.githubusercontent.com/mariinkys/starrydex/main/screenshots/main.png" width=450>
+ <img src="https://raw.githubusercontent.com/mariinkys/starrydex/main/screenshots/pokemon.png" width=450>
 </p>
 
 ## Information
@@ -21,7 +21,7 @@
 
 Created by [mariinkys](https://github.com/mariinkys). Pokémon and Pokémon character names are trademarks of Nintendo.
 
-This application uses [PokeApi](https://github.com/PokeAPI/) and it's resources. [PokeApi](https://github.com/PokeAPI/) resources comply with [PokeApi](https://github.com/PokeAPI/)'s [LICENSE](https://github.com/mariinkys/cosmicdex/blob/main/resources/LICENSE.md)
+This application uses [PokeApi](https://github.com/PokeAPI/) and it's resources. [PokeApi](https://github.com/PokeAPI/) resources comply with [PokeApi](https://github.com/PokeAPI/)'s [LICENSE](https://github.com/mariinkys/starrydex/blob/main/resources/LICENSE.md)
 
 ## Install
 

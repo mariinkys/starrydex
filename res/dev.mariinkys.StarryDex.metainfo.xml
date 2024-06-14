@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>dev.mariinkys.CosmicDex</id>
+  <id>dev.mariinkys.StarryDex</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-only</project_license>
   <project_group>COSMIC</project_group>
   <developer_name>mariinkys</developer_name>
   <update_contact>kysdev.owjga@aleeas.com</update_contact>
-  <url type="homepage">https://github.com/mariinkys/cosmicdex</url>
-  <url type="bugtracker">https://github.com/mariinkys/cosmicdex/issues</url>
-  <name>CosmicDex</name>
+  <url type="homepage">https://github.com/mariinkys/starrydex</url>
+  <url type="bugtracker">https://github.com/mariinkys/starrydex/issues</url>
+  <name>StarryDex</name>
   <summary>A simple Pokedex application</summary>
   <description>
     <p>A simple Pokedex application</p>
   </description>
-  <launchable type="desktop-id">dev.mariinkys.CosmicDex.desktop</launchable>
+  <launchable type="desktop-id">dev.mariinkys.StarryDex.desktop</launchable>
   <icon type="remote" height="256" width="256">https://raw.githubusercontent.com/edfloreshz/cosmic-app-template/master/res/icons/hicolor/256x256/apps/com.example.CosmicAppTemplate.svg</icon>
   <screenshots>
   </screenshots>
@@ -22,7 +22,7 @@
       <mimetype>text/plain</mimetype>
     </mimetypes>
     <binaries>
-      <binary>cosmic-dex</binary>
+      <binary>starry-dex</binary>
     </binaries>
   </provides>
 </component>

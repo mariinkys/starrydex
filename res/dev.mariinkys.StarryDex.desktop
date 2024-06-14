@@ -1,10 +1,10 @@
 [Desktop Entry]
-Name=CosmicDex
-Exec=cosmic-dex %F
+Name=StarryDex
+Exec=starry-dex %F
 Terminal=false
 Type=Application
 StartupNotify=true
-Icon=dev.mariinkys.CosmicDex
+Icon=dev.mariinkys.StarryDex
 Categories=COSMIC;Utility;
 Keywords=Folder;Manager;
 MimeType=inode/directory;

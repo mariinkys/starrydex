@@ -1,5 +1,5 @@
-name := 'cosmic-dex'
-export APPID := 'dev.mariinkys.CosmicDex'
+name := 'starry-dex'
+export APPID := 'dev.mariinkys.StarryDex'
 
 rootdir := ''
 prefix := '/usr'

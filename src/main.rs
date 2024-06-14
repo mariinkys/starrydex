@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-use app::CosmicDex;
+use app::StarryDex;
 /// The `app` module is used by convention to indicate the main component of our application.
 mod app;
 mod core;
@@ -13,5 +13,5 @@ mod utils;
 ///  If your app does not need any flags, you can pass in `()`.
 fn main() -> cosmic::iced::Result {
     let settings = cosmic::app::Settings::default();
-    cosmic::app::run::<CosmicDex>(settings, ())
+    cosmic::app::run::<StarryDex>(settings, ())
 }

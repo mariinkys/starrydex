@@ -1,4 +1,4 @@
-app-title = CosmicDex
+app-title = StarryDex
 about = About
 settings = Settings
 view = View

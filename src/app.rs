@@ -15,12 +15,12 @@ use cosmic::widget::{self, menu};
 use cosmic::{cosmic_theme, theme, Application, ApplicationExt, Apply, Element};
 use rustemon::model::pokemon::{Pokemon, PokemonStat, PokemonType};
 
-const REPOSITORY: &str = "https://github.com/mariinkys/cosmicdex";
+const REPOSITORY: &str = "https://github.com/mariinkys/starrydex";
 const POKEMON_PER_ROW: usize = 3;
 
 /// This is the struct that represents your application.
 /// It is used to define the data that will be used by your application.
-pub struct CosmicDex {
+pub struct StarryDex {
     /// Application state which is managed by the COSMIC runtime.
     core: Core,
     /// Display a context drawer with the designated page if defined.
@@ -116,14 +116,14 @@ pub struct CustomPokemon {
 /// - `Flags` is the data that your application needs to use before it starts.
 /// - `Message` is the enum that contains all the possible variants that your application will need to transmit messages.
 /// - `APP_ID` is the unique identifier of your application.
-impl Application for CosmicDex {
+impl Application for StarryDex {
     type Executor = cosmic::executor::Default;
 
     type Flags = ();
 
     type Message = Message;
 
-    const APP_ID: &'static str = "dev.mariinkys.CosmicDex";
+    const APP_ID: &'static str = "dev.mariinkys.StarryDex";
 
     fn core(&self) -> &Core {
         &self.core
@@ -134,7 +134,7 @@ impl Application for CosmicDex {
     }
 
     fn init(core: Core, _flags: Self::Flags) -> (Self, Command<Self::Message>) {
-        let mut app = CosmicDex {
+        let mut app = StarryDex {
             core,
             context_page: ContextPage::default(),
             key_binds: HashMap::new(),
@@ -266,13 +266,13 @@ impl Application for CosmicDex {
     }
 }
 
-impl CosmicDex {
+impl StarryDex {
     /// The about page for this app.
     pub fn about(&self) -> Element<Message> {
         let cosmic_theme::Spacing { space_xxs, .. } = theme::active().cosmic().spacing;
 
         let icon = widget::svg(widget::svg::Handle::from_memory(
-            &include_bytes!("../res/icons/hicolor/128x128/apps/dev.mariinkys.CosmicDex.svg")[..],
+            &include_bytes!("../res/icons/hicolor/128x128/apps/dev.mariinkys.StarryDex.svg")[..],
         ));
 
         let title = widget::text::title3(fl!("app-title"));
