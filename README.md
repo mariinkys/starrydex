@@ -1,5 +1,5 @@
 <p align="center">
- <img src="https://raw.githubusercontent.com/mariinkys/starrydex/5546d9d50c7d99a3cb3fc882a955a8eb274d0949/res/icons/hicolor/256x256/apps/dev.mariinkys.StarryDex.svg?token=AO2BUSPXV272EVQCF7C4ILTGLWFIU">
+ <img src="https://raw.githubusercontent.com/mariinkys/starrydex/main/res/icons/hicolor/256x256/apps/dev.mariinkys.StarryDex.svg">
 </p>
 
 <h1 align="center">StarryDex</h1>
