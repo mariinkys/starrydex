@@ -16,6 +16,7 @@ use cosmic::{cosmic_theme, theme, Application, ApplicationExt, Apply, Element};
 use rustemon::model::pokemon::{Pokemon, PokemonStat, PokemonType};
 
 const REPOSITORY: &str = "https://github.com/mariinkys/cosmicdex";
+const POKEMON_PER_ROW: usize = 3;
 
 /// This is the struct that represents your application.
 /// It is used to define the data that will be used by your application.
@@ -299,6 +300,8 @@ impl CosmicDex {
     }
 
     pub fn settings(&self) -> Element<Message> {
+        //TODO: Right now if you entered a Pokémon and open the settings afterwards for some reason the Pokémon image still shows under the text.
+
         let cosmic_theme::Spacing { space_xxs, .. } = theme::active().cosmic().spacing;
 
         let download_row = widget::Row::new()
@@ -343,8 +346,12 @@ impl CosmicDex {
 
         match self.page_status {
             PageStatus::Loaded => {
-                let pokemon_children = self.filtered_pokemon_list.iter().map(|custom_pokemon| {
-                    let pokemon_image = if let Some(path) = &custom_pokemon.sprite_path {
+                //TODO: Center Pokémon
+                let mut pokemon_grid = widget::Grid::new().width(Length::Fill);
+                //.justify_content(cosmic::widget::JustifyContent::Center);
+
+                for (index, pokemon) in self.filtered_pokemon_list.iter().enumerate() {
+                    let pokemon_image = if let Some(path) = &pokemon.sprite_path {
                         widget::Image::new(path).content_fit(cosmic::iced::ContentFit::Fill)
                     } else {
                         widget::Image::new("resources/fallback.png")
@@ -354,19 +361,19 @@ impl CosmicDex {
                     let pokemon_container = widget::button(
                         widget::Column::new()
                             .push(pokemon_image)
-                            .push(widget::text::text(capitalize_string(
-                                &custom_pokemon.pokemon.name,
-                            )))
+                            .push(widget::text::text(capitalize_string(&pokemon.pokemon.name)))
                             .align_items(Alignment::Center),
                     )
-                    .on_press_down(Message::LoadPokemon(
-                        custom_pokemon.pokemon.name.to_string(),
-                    ))
+                    .on_press_down(Message::LoadPokemon(pokemon.pokemon.name.to_string()))
                     .style(theme::Button::Image)
                     .padding([spacing.space_none, spacing.space_s]);
 
-                    pokemon_container.into()
-                });
+                    if index % POKEMON_PER_ROW == 0 {
+                        pokemon_grid = pokemon_grid.insert_row();
+                    }
+
+                    pokemon_grid = pokemon_grid.push(pokemon_container);
+                }
 
                 let search = widget::search_input(fl!("search"), &self.search)
                     .on_input(Message::Search)
@@ -378,21 +385,12 @@ impl CosmicDex {
                     .width(Length::Fill)
                     .padding(5.0);
 
-                //TODO: This should not be a column, how canI have some kind of responsive grid?
-                //The grid widget does not have ::with_children, how can I push my content?
-                let pokemon_list = Column::with_children(pokemon_children)
-                    .align_items(Alignment::Center)
-                    .width(Length::Fill)
-                    .spacing(space_s);
-
-                //TODO: The searchbar should not scroll with the pokemon_list but if I try to put it outisde of the scrollable it disappears.
-                let content = widget::Column::new()
+                widget::Column::new()
                     .push(search_row)
-                    .push(pokemon_list)
+                    .push(widget::scrollable(pokemon_grid).width(Length::Fill))
                     .width(Length::Fill)
-                    .spacing(5.0);
-
-                widget::scrollable(content).into()
+                    .spacing(5.0)
+                    .into()
             }
             PageStatus::Loading => Column::new()
                 .push(widget::text::text("Loading..."))
@@ -413,7 +411,6 @@ impl CosmicDex {
                         .width(Length::Fill)
                         .horizontal_alignment(Horizontal::Center);
 
-                //TODO: Fallback image
                 let pokemon_image = if let Some(path) = &custom_pokemon.sprite_path {
                     widget::Image::new(path).content_fit(cosmic::iced::ContentFit::Fill)
                 } else {
@@ -512,8 +509,6 @@ impl CosmicDex {
         stats: &Vec<PokemonStat>,
         spacing: &cosmic_theme::Spacing,
     ) -> Element<Message> {
-        //TODO: Missing card title
-
         let children = stats.iter().map(|pokemon_stats| {
             widget::Row::new()
                 .push(widget::text(capitalize_string(&pokemon_stats.stat.name)).width(Length::Fill))
