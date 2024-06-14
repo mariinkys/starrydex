@@ -346,9 +346,7 @@ impl CosmicDex {
 
         match self.page_status {
             PageStatus::Loaded => {
-                //TODO: Center Pokémon
                 let mut pokemon_grid = widget::Grid::new().width(Length::Fill);
-                //.justify_content(cosmic::widget::JustifyContent::Center);
 
                 for (index, pokemon) in self.filtered_pokemon_list.iter().enumerate() {
                     let pokemon_image = if let Some(path) = &pokemon.sprite_path {
@@ -387,7 +385,12 @@ impl CosmicDex {
 
                 widget::Column::new()
                     .push(search_row)
-                    .push(widget::scrollable(pokemon_grid).width(Length::Fill))
+                    .push(
+                        widget::scrollable(
+                            widget::Container::new(pokemon_grid).align_x(Horizontal::Center),
+                        )
+                        .width(Length::Fill),
+                    )
                     .width(Length::Fill)
                     .spacing(5.0)
                     .into()
