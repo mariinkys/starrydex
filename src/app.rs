@@ -307,12 +307,12 @@ impl StarryDex {
         let download_row = widget::Row::new()
             .push(
                 widget::column()
-                    .push(widget::text::text(fl!("download_all_images")))
+                    .push(widget::text::text(fl!("download_all_title")))
                     .push(widget::text::text(fl!("download_all_info")).size(10.0))
                     .width(Length::Fill),
             )
             .push(
-                widget::button(widget::text::text(fl!("download")))
+                widget::button(widget::text::text(fl!("download_button_text")))
                     .on_press(Message::DownloadAllImages)
                     .style(theme::Button::Suggested)
                     .width(Length::Shrink),
@@ -321,12 +321,12 @@ impl StarryDex {
         let fix_row = widget::Row::new()
             .push(
                 widget::column()
-                    .push(widget::text::text(fl!("fix_all_images")))
+                    .push(widget::text::text(fl!("fix_all_title")))
                     .push(widget::text::text(fl!("fix_all_info")).size(10.0))
                     .width(Length::Fill),
             )
             .push(
-                widget::button(widget::text::text(fl!("fix")))
+                widget::button(widget::text::text(fl!("fix_button_text")))
                     .on_press(Message::FixAllImages)
                     .style(theme::Button::Destructive)
                     .width(Length::Shrink),
@@ -423,7 +423,7 @@ impl StarryDex {
 
                 let pokemon_weight = widget::container::Container::new(
                     widget::Column::new()
-                        .push(widget::text::title3("WEIGHT"))
+                        .push(widget::text::title3(fl!("weight")))
                         .push(
                             widget::text::text(format!(
                                 "{} Kg",
@@ -439,7 +439,7 @@ impl StarryDex {
 
                 let pokemon_height = widget::container::Container::new(
                     widget::Column::new()
-                        .push(widget::text::title3("HEIGHT"))
+                        .push(widget::text::title3(fl!("height")))
                         .push(
                             widget::text::text(format!(
                                 "{} m",
@@ -498,8 +498,8 @@ impl StarryDex {
         match self.current_page {
             Page::LandingPage => {
                 window_title.push_str(" — ");
-                window_title.push_str("All Pokémon");
-                header_title.push_str("All Pokémon");
+                window_title.push_str(fl!("landing_page_title").as_str());
+                header_title.push_str(fl!("landing_page_title").as_str());
             }
         }
 
