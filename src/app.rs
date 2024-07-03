@@ -2,11 +2,9 @@
 
 use std::collections::HashMap;
 
+use crate::core::api::Api;
 use crate::fl;
-use crate::utils::{
-    capitalize_string, download_all_pokemon_sprites, fix_all_sprites, load_all_pokemon,
-    load_pokemon, scale_numbers,
-};
+use crate::utils::{capitalize_string, scale_numbers};
 use cosmic::app::{Command, Core};
 use cosmic::iced::alignment::{Horizontal, Vertical};
 use cosmic::iced::{Alignment, Length};
@@ -27,6 +25,8 @@ pub struct StarryDex {
     context_page: ContextPage,
     /// Key bindings for the application's menu bar.
     key_binds: HashMap<menu::KeyBind, MenuAction>,
+    /// Api and Client
+    api: Api,
     /// Currently selected Page
     current_page: Page,
     /// Page Status
@@ -138,6 +138,7 @@ impl Application for StarryDex {
             core,
             context_page: ContextPage::default(),
             key_binds: HashMap::new(),
+            api: Api::new(Self::APP_ID),
             current_page: Page::LandingPage,
             pokemon_list: Vec::<CustomPokemon>::new(),
             filtered_pokemon_list: Vec::<CustomPokemon>::new(),
@@ -146,11 +147,15 @@ impl Application for StarryDex {
             search: String::new(),
         };
 
-        let cmd = cosmic::app::Command::perform(load_all_pokemon(), |pokemon_list| {
-            cosmic::app::message::app(Message::LoadedPokemonList(pokemon_list))
-        });
-        let commands = Command::batch(vec![app.update_titles(), cmd]);
+        // Clone the Api instance
+        let api_clone = app.api.clone();
 
+        let cmd = cosmic::app::Command::perform(
+            async move { api_clone.load_all_pokemon().await },
+            |pokemon_list| cosmic::app::message::app(Message::LoadedPokemonList(pokemon_list)),
+        );
+
+        let commands = Command::batch(vec![app.update_titles(), cmd]);
         (app, commands)
     }
 
@@ -222,9 +227,11 @@ impl Application for StarryDex {
                 self.set_context_title(ContextPage::PokemonPage.title());
             }
             Message::LoadPokemon(pokemon_name) => {
-                return cosmic::app::Command::perform(load_pokemon(pokemon_name), |pokemon| {
-                    cosmic::app::message::app(Message::LoadedPokemon(pokemon))
-                });
+                let api_clone = self.api.clone();
+                return cosmic::app::Command::perform(
+                    async move { api_clone.load_pokemon(pokemon_name).await },
+                    |pokemon| cosmic::app::message::app(Message::LoadedPokemon(pokemon)),
+                );
             }
             Message::Search(new_value) => {
                 self.search = new_value;
@@ -236,14 +243,18 @@ impl Application for StarryDex {
                     .collect();
             }
             Message::DownloadAllImages => {
-                return cosmic::app::Command::perform(download_all_pokemon_sprites(), |_| {
-                    cosmic::app::message::app(Message::DownloadedAllImages)
-                });
+                let api_clone = self.api.clone();
+                return cosmic::app::Command::perform(
+                    async move { api_clone.download_all_pokemon_sprites().await },
+                    |_| cosmic::app::message::app(Message::DownloadedAllImages),
+                );
             }
             Message::FixAllImages => {
-                return cosmic::app::Command::perform(fix_all_sprites(), |_res| {
-                    cosmic::app::message::app(Message::AllImagesFixed)
-                });
+                let api_clone = self.api.clone();
+                return cosmic::app::Command::perform(
+                    async move { api_clone.fix_all_sprites().await },
+                    |_res| cosmic::app::message::app(Message::AllImagesFixed),
+                );
             }
             //TODO:
             Message::DownloadedAllImages => todo!(),
