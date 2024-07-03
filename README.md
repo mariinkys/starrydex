@@ -9,15 +9,15 @@
 </p>
 
 <p align="center">
- <img src="https://raw.githubusercontent.com/mariinkys/starrydex/main/screenshots/main.png" width=450>
- <img src="https://raw.githubusercontent.com/mariinkys/starrydex/main/screenshots/pokemon.png" width=450>
+ <img src="https://raw.githubusercontent.com/mariinkys/starrydex/main/screenshots/main.png" width=350>
+ <img src="https://raw.githubusercontent.com/mariinkys/starrydex/main/screenshots/pokemon.png" width=350>
 </p>
 
 ## Information
 
-<b>Due to health issues and time constrains, development may be slow for a while.</b>
-
-<b>This application is being developed for learning purposes and it may or may not be usable.</b>
+> [!WARNING]
+> This application is being developed for learning purposes and it may or may not be usable.
+> Due to health issues and time constrains, development may be slow for a while.
 
 Created by [mariinkys](https://github.com/mariinkys). Pokémon and Pokémon character names are trademarks of Nintendo.
 
@@ -25,7 +25,8 @@ This application uses [PokeApi](https://github.com/PokeAPI/) and it's resources.
 
 ## Install
 
-*Note that for now, the resources folder that should be installed alongside the application is not being installed, which means that the application may not function correctly.
+> [!CAUTION]
+> For now, the resources folder that should be installed alongside the application is not being installed, which means that the application may not function correctly.
 
 To install your COSMIC application, you will need [just](https://github.com/casey/just), if you're on Pop!\_OS, you can install it with the following command:
 
