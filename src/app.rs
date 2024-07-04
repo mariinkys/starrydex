@@ -47,13 +47,15 @@ pub struct StarryDex {
 pub enum Message {
     LaunchUrl(String),
     ToggleContextPage(ContextPage),
-    LoadedPokemonList(Vec<CustomPokemon>),
-    LoadPokemon(String),
-    LoadedPokemon(CustomPokemon),
-    DownloadAllImages,
-    DownloadedAllImages,
     Search(String),
+
+    LoadPokemon(String),
     FixAllImages,
+    DownloadAllImages,
+
+    LoadedPokemon(CustomPokemon),
+    LoadedPokemonList(Vec<CustomPokemon>),
+    DownloadedAllImages,
     AllImagesFixed,
 }
 
@@ -267,8 +269,32 @@ impl Application for StarryDex {
                     |_res| cosmic::app::message::app(Message::AllImagesFixed),
                 );
             }
-            Message::DownloadedAllImages => self.settings_status = SettingsStatus::NotDownloading,
-            Message::AllImagesFixed => self.settings_status = SettingsStatus::NotDownloading,
+            Message::DownloadedAllImages => {
+                let api_clone = self.api.clone();
+
+                self.settings_status = SettingsStatus::NotDownloading;
+                self.page_status = PageStatus::Loading;
+
+                return cosmic::app::Command::perform(
+                    async move { api_clone.load_all_pokemon().await },
+                    |pokemon_list| {
+                        cosmic::app::message::app(Message::LoadedPokemonList(pokemon_list))
+                    },
+                );
+            }
+            Message::AllImagesFixed => {
+                let api_clone = self.api.clone();
+
+                self.settings_status = SettingsStatus::NotDownloading;
+                self.page_status = PageStatus::Loading;
+
+                return cosmic::app::Command::perform(
+                    async move { api_clone.load_all_pokemon().await },
+                    |pokemon_list| {
+                        cosmic::app::message::app(Message::LoadedPokemonList(pokemon_list))
+                    },
+                );
+            }
         }
         Command::none()
     }
