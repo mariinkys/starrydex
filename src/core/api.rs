@@ -61,7 +61,11 @@ impl Api {
                     name: entry.name,
                     ..Default::default()
                 },
-                sprite_path: Some(image_path),
+                sprite_path: if Path::new(&image_path).exists() {
+                    Some(image_path)
+                } else {
+                    None
+                },
             })
         }
 

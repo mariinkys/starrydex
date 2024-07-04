@@ -311,8 +311,6 @@ impl StarryDex {
     }
 
     pub fn settings(&self) -> Element<Message> {
-        //TODO: Right now if you entered a Pokémon and open the settings afterwards for some reason the Pokémon image still shows under the text.
-
         let cosmic_theme::Spacing { space_xxs, .. } = theme::active().cosmic().spacing;
 
         let download_row = widget::Row::new()
