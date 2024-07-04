@@ -31,6 +31,8 @@ pub struct StarryDex {
     current_page: Page,
     /// Page Status
     page_status: PageStatus,
+    /// Settings Status
+    settings_status: SettingsStatus,
     /// Contains the list of all Pokémon
     pokemon_list: Vec<CustomPokemon>,
     /// Contains the list of pokemon after searching
@@ -64,6 +66,12 @@ pub enum Page {
 pub enum PageStatus {
     Loaded,
     Loading,
+}
+
+/// Identifies the status the settings context page in the application.
+pub enum SettingsStatus {
+    NotDownloading,
+    Downloading,
 }
 
 /// Identifies a context page to display in the context drawer.
@@ -145,6 +153,7 @@ impl Application for StarryDex {
             selected_pokemon: None,
             page_status: PageStatus::Loading,
             search: String::new(),
+            settings_status: SettingsStatus::NotDownloading,
         };
 
         // Clone the Api instance
@@ -243,6 +252,7 @@ impl Application for StarryDex {
                     .collect();
             }
             Message::DownloadAllImages => {
+                self.settings_status = SettingsStatus::Downloading;
                 let api_clone = self.api.clone();
                 return cosmic::app::Command::perform(
                     async move { api_clone.download_all_pokemon_sprites().await },
@@ -250,15 +260,15 @@ impl Application for StarryDex {
                 );
             }
             Message::FixAllImages => {
+                self.settings_status = SettingsStatus::Downloading;
                 let api_clone = self.api.clone();
                 return cosmic::app::Command::perform(
                     async move { api_clone.fix_all_sprites().await },
                     |_res| cosmic::app::message::app(Message::AllImagesFixed),
                 );
             }
-            //TODO:
-            Message::DownloadedAllImages => todo!(),
-            Message::AllImagesFixed => todo!(),
+            Message::DownloadedAllImages => self.settings_status = SettingsStatus::NotDownloading,
+            Message::AllImagesFixed => self.settings_status = SettingsStatus::NotDownloading,
         }
         Command::none()
     }
@@ -311,7 +321,7 @@ impl StarryDex {
     }
 
     pub fn settings(&self) -> Element<Message> {
-        let cosmic_theme::Spacing { space_xxs, .. } = theme::active().cosmic().spacing;
+        let spacing = theme::active().cosmic().spacing;
 
         let download_row = widget::Row::new()
             .push(
@@ -320,12 +330,21 @@ impl StarryDex {
                     .push(widget::text::text(fl!("download_all_info")).size(10.0))
                     .width(Length::Fill),
             )
-            .push(
-                widget::button(widget::text::text(fl!("download_button_text")))
-                    .on_press(Message::DownloadAllImages)
-                    .style(theme::Button::Suggested)
-                    .width(Length::Shrink),
-            );
+            .push(match self.settings_status {
+                SettingsStatus::NotDownloading => {
+                    widget::button(widget::text::text(fl!("download_button_text")))
+                        .on_press(Message::DownloadAllImages)
+                        .style(theme::Button::Suggested)
+                        .width(Length::Shrink)
+                }
+                SettingsStatus::Downloading => {
+                    widget::button(widget::text::text(fl!("download_button_text")))
+                        .style(theme::Button::Suggested)
+                        .width(Length::Shrink)
+                }
+            })
+            .spacing(spacing.space_xxs)
+            .padding([0, 5, 0, 5]);
 
         let fix_row = widget::Row::new()
             .push(
@@ -334,19 +353,48 @@ impl StarryDex {
                     .push(widget::text::text(fl!("fix_all_info")).size(10.0))
                     .width(Length::Fill),
             )
-            .push(
-                widget::button(widget::text::text(fl!("fix_button_text")))
-                    .on_press(Message::FixAllImages)
-                    .style(theme::Button::Destructive)
-                    .width(Length::Shrink),
-            );
+            .push(match self.settings_status {
+                SettingsStatus::NotDownloading => {
+                    widget::button(widget::text::text(fl!("fix_button_text")))
+                        .on_press(Message::FixAllImages)
+                        .style(theme::Button::Destructive)
+                        .width(Length::Shrink)
+                }
+                SettingsStatus::Downloading => {
+                    widget::button(widget::text::text(fl!("fix_button_text")))
+                        .style(theme::Button::Destructive)
+                        .width(Length::Shrink)
+                }
+            })
+            .spacing(spacing.space_xxs)
+            .padding([0, 5, 0, 5]);
 
-        widget::column()
-            .push(download_row)
-            .push(fix_row)
-            .align_items(Alignment::Center)
-            .spacing(space_xxs)
-            .into()
+        match self.settings_status {
+            SettingsStatus::NotDownloading => {
+                widget::settings::view_column(vec![widget::settings::view_section(fl!("settings"))
+                    .add(download_row)
+                    .add(fix_row)
+                    .into()])
+                .into()
+            }
+            SettingsStatus::Downloading => {
+                widget::settings::view_column(vec![widget::settings::view_section(fl!("settings"))
+                    .add(download_row)
+                    .add(fix_row)
+                    .add(
+                        widget::row()
+                            .push(
+                                widget::text("Downloading...")
+                                    .width(Length::Fill)
+                                    .horizontal_alignment(Horizontal::Center),
+                            )
+                            .align_items(Alignment::Center)
+                            .width(Length::Fill),
+                    )
+                    .into()])
+                .into()
+            }
+        }
     }
 
     pub fn landing(&self) -> Element<Message> {
