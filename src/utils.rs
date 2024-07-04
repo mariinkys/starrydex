@@ -21,39 +21,31 @@ pub fn scale_numbers(num: i64) -> f64 {
 }
 
 pub async fn download_image(
+    client: &reqwest::Client,
     image_url: String,
     pokemon_name: String,
-) -> Result<String, Box<dyn std::error::Error>> {
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let image_filename = format!("{}_front.png", pokemon_name);
     let image_path = format!("resources/sprites/{}/{}", pokemon_name, image_filename);
 
-    // file already downloaded?
+    // Check if file already exists
     if tokio::fs::metadata(&image_path).await.is_ok() {
-        return Ok(image_path);
+        return Ok(());
     }
 
-    let response = reqwest::get(&image_url).await?;
-
+    let response = client.get(&image_url).send().await?;
     if response.status().is_success() {
         let bytes = response.bytes().await?;
-
         let path = std::path::PathBuf::from(&image_path);
         if let Some(parent) = path.parent() {
             tokio::fs::create_dir_all(parent).await?;
         }
-
-        save_image(&image_path, &bytes).await?;
-        Ok(image_path)
+        tokio::fs::write(&image_path, &bytes).await?;
+        Ok(())
     } else {
         Err(Box::new(std::io::Error::new(
             std::io::ErrorKind::Other,
             format!("Failed to download image. Status: {}", response.status()),
         )))
     }
-}
-
-async fn save_image(path: &str, bytes: &[u8]) -> std::io::Result<()> {
-    let mut file = tokio::fs::File::create(path).await?;
-    tokio::io::AsyncWriteExt::write_all(&mut file, bytes).await?;
-    Ok(())
 }

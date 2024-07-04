@@ -1,9 +1,11 @@
 use std::{fs, path::Path, sync::Arc};
 
+use futures::StreamExt;
 use rustemon::{
     client::{CACacheManager, RustemonClient, RustemonClientBuilder},
     model::pokemon::Pokemon,
 };
+use tokio::sync::Semaphore;
 
 use crate::{app::CustomPokemon, utils::download_image};
 
@@ -78,38 +80,74 @@ impl Api {
             .unwrap_or_default();
 
         let image_path = if let Some(front_default_sprite) = &pokemon.sprites.front_default {
+            // Create a reqwest client
+            let client = reqwest::Client::new();
+
             // Only download the image if front_default sprite is available
-            Some(
-                download_image(front_default_sprite.to_string(), pokemon.name.to_string())
-                    .await
-                    .unwrap_or_else(|_| String::new()),
+            match download_image(
+                &client,
+                front_default_sprite.to_string(),
+                pokemon.name.to_string(),
             )
+            .await
+            {
+                Ok(()) => Some(format!(
+                    "resources/sprites/{}/{}_front.png",
+                    pokemon.name, pokemon.name
+                )),
+                Err(_) => None,
+            }
         } else {
             None
         };
 
         CustomPokemon {
             pokemon: pokemon,
-            sprite_path: image_path, // Set default if image_path is None
+            sprite_path: image_path,
         }
     }
 
-    pub async fn download_all_pokemon_sprites(&self) {
+    pub async fn download_all_pokemon_sprites(
+        &self,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let all_entries = rustemon::pokemon::pokemon::get_all_entries(&self.client)
             .await
             .unwrap_or_default();
 
-        for entry in all_entries {
-            let pokemon = rustemon::pokemon::pokemon::get_by_name(&entry.name, &self.client)
-                .await
-                .unwrap_or_default();
+        let client = reqwest::Client::builder()
+            .pool_max_idle_per_host(10)
+            .build()?;
 
-            let _ = download_image(
-                pokemon.sprites.front_default.unwrap_or_default(),
-                pokemon.name.to_string(),
-            )
+        let semaphore = Arc::new(Semaphore::new(20));
+
+        let results = futures::stream::iter(all_entries)
+            .map(|entry| {
+                let client = client.clone();
+                let semaphore = Arc::clone(&semaphore);
+                async move {
+                    let _permit = semaphore.acquire().await.unwrap();
+                    let pokemon =
+                        rustemon::pokemon::pokemon::get_by_name(&entry.name, &self.client)
+                            .await
+                            .unwrap_or_default();
+                    if let Some(sprite_url) = pokemon.sprites.front_default {
+                        download_image(&client, sprite_url, pokemon.name.to_string()).await
+                    } else {
+                        Ok(())
+                    }
+                }
+            })
+            .buffer_unordered(20) // Adjust the number of concurrent tasks
+            .collect::<Vec<_>>()
             .await;
+
+        for result in results {
+            if let Err(e) = result {
+                eprintln!("Error downloading sprite: {}", e);
+            }
         }
+
+        Ok(())
     }
 
     //
@@ -118,13 +156,19 @@ impl Api {
 
     pub async fn fix_all_sprites(&self) -> bool {
         let path = Path::new("resources/sprites");
-        let remove_operation = std::fs::remove_dir_all(path);
-        match remove_operation {
-            Ok(_) => {
-                self.download_all_pokemon_sprites().await;
-                true
+
+        match tokio::fs::remove_dir_all(path).await {
+            Ok(_) => match self.download_all_pokemon_sprites().await {
+                Ok(_) => true,
+                Err(e) => {
+                    eprintln!("Error downloading sprites: {}", e);
+                    false
+                }
+            },
+            Err(e) => {
+                eprintln!("Error removing directory: {}", e);
+                false
             }
-            Err(_) => false,
         }
     }
 }
