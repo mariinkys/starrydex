@@ -1,3 +1,7 @@
+use std::fs;
+
+const APP_ID: &'static str = "dev.mariinkys.StarryDex";
+
 pub fn capitalize_string(input: &str) -> String {
     let words: Vec<&str> = input.split('-').collect();
 
@@ -25,8 +29,18 @@ pub async fn download_image(
     image_url: String,
     pokemon_name: String,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let resources_path = dirs::data_dir()
+        .unwrap()
+        .join(APP_ID)
+        .join("resources")
+        .join("sprites");
+
+    if !resources_path.exists() {
+        fs::create_dir_all(&resources_path).expect("Failed to create the resources path");
+    }
+
     let image_filename = format!("{}_front.png", pokemon_name);
-    let image_path = format!("resources/sprites/{}/{}", pokemon_name, image_filename);
+    let image_path = resources_path.join(&pokemon_name).join(&image_filename);
 
     // Check if file already exists
     if tokio::fs::metadata(&image_path).await.is_ok() {

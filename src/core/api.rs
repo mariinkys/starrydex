@@ -9,6 +9,8 @@ use tokio::sync::Semaphore;
 
 use crate::{app::CustomPokemon, utils::download_image};
 
+const APP_ID: &'static str = "dev.mariinkys.StarryDex";
+
 #[derive(Debug)]
 pub struct Api {
     app_id: String,
@@ -55,8 +57,18 @@ impl Api {
         let mut result = Vec::<CustomPokemon>::new();
 
         for entry in all_entries {
+            let resources_path = dirs::data_dir()
+                .unwrap()
+                .join(APP_ID)
+                .join("resources")
+                .join("sprites");
+
+            if !resources_path.exists() {
+                fs::create_dir_all(&resources_path).expect("Failed to create the resources path");
+            }
+
             let image_filename = format!("{}_front.png", entry.name);
-            let image_path = format!("resources/sprites/{}/{}", entry.name, image_filename);
+            let image_path = resources_path.join(&entry.name).join(&image_filename);
 
             result.push(CustomPokemon {
                 pokemon: Pokemon {
@@ -64,7 +76,7 @@ impl Api {
                     ..Default::default()
                 },
                 sprite_path: if Path::new(&image_path).exists() {
-                    Some(image_path)
+                    image_path.to_str().map(String::from)
                 } else {
                     None
                 },
@@ -83,6 +95,14 @@ impl Api {
             // Create a reqwest client
             let client = reqwest::Client::new();
 
+            let resources_path = dirs::data_dir()
+                .unwrap()
+                .join(APP_ID)
+                .join("resources")
+                .join("sprites");
+            let image_filename = format!("{}_front.png", pokemon.name);
+            let full_image_path = resources_path.join(&pokemon.name).join(&image_filename);
+
             // Only download the image if front_default sprite is available
             match download_image(
                 &client,
@@ -91,10 +111,7 @@ impl Api {
             )
             .await
             {
-                Ok(()) => Some(format!(
-                    "resources/sprites/{}/{}_front.png",
-                    pokemon.name, pokemon.name
-                )),
+                Ok(()) => full_image_path.to_str().map(String::from),
                 Err(_) => None,
             }
         } else {
@@ -155,7 +172,11 @@ impl Api {
     //
 
     pub async fn fix_all_sprites(&self) -> bool {
-        let path = Path::new("resources/sprites");
+        let path = dirs::data_dir()
+            .unwrap()
+            .join(APP_ID)
+            .join("resources")
+            .join("sprites");
 
         match tokio::fs::remove_dir_all(path).await {
             Ok(_) => match self.download_all_pokemon_sprites().await {

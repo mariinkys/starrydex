@@ -16,8 +16,6 @@ use rustemon::model::pokemon::{Pokemon, PokemonStat, PokemonType};
 const REPOSITORY: &str = "https://github.com/mariinkys/starrydex";
 const POKEMON_PER_ROW: usize = 3;
 
-/// This is the struct that represents your application.
-/// It is used to define the data that will be used by your application.
 pub struct StarryDex {
     /// Application state which is managed by the COSMIC runtime.
     core: Core,
@@ -118,14 +116,6 @@ pub struct CustomPokemon {
     pub sprite_path: Option<String>,
 }
 
-/// Implement the `Application` trait for your application.
-/// This is where you define the behavior of your application.
-///
-/// The `Application` trait requires you to define the following types and constants:
-/// - `Executor` is the async executor that will be used to run your application's commands.
-/// - `Flags` is the data that your application needs to use before it starts.
-/// - `Message` is the enum that contains all the possible variants that your application will need to transmit messages.
-/// - `APP_ID` is the unique identifier of your application.
 impl Application for StarryDex {
     type Executor = cosmic::executor::Default;
 
@@ -158,7 +148,6 @@ impl Application for StarryDex {
             settings_status: SettingsStatus::NotDownloading,
         };
 
-        // Clone the Api instance
         let api_clone = app.api.clone();
 
         let cmd = cosmic::app::Command::perform(
@@ -239,6 +228,7 @@ impl Application for StarryDex {
             }
             Message::LoadPokemon(pokemon_name) => {
                 let api_clone = self.api.clone();
+
                 return cosmic::app::Command::perform(
                     async move { api_clone.load_pokemon(pokemon_name).await },
                     |pokemon| cosmic::app::message::app(Message::LoadedPokemon(pokemon)),
@@ -254,16 +244,20 @@ impl Application for StarryDex {
                     .collect();
             }
             Message::DownloadAllImages => {
-                self.settings_status = SettingsStatus::Downloading;
                 let api_clone = self.api.clone();
+
+                self.settings_status = SettingsStatus::Downloading;
+
                 return cosmic::app::Command::perform(
                     async move { api_clone.download_all_pokemon_sprites().await },
                     |_| cosmic::app::message::app(Message::DownloadedAllImages),
                 );
             }
             Message::FixAllImages => {
-                self.settings_status = SettingsStatus::Downloading;
                 let api_clone = self.api.clone();
+
+                self.settings_status = SettingsStatus::Downloading;
+
                 return cosmic::app::Command::perform(
                     async move { api_clone.fix_all_sprites().await },
                     |_res| cosmic::app::message::app(Message::AllImagesFixed),
