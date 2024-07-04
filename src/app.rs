@@ -51,6 +51,7 @@ pub enum Message {
     FixAllImages,
     DownloadAllImages,
 
+    FirstRunSetupCompleted,
     LoadedPokemon(CustomPokemon),
     LoadedPokemonList(Vec<CustomPokemon>),
     DownloadedAllImages,
@@ -64,6 +65,7 @@ pub enum Page {
 
 /// Identifies the status of a page in the application.
 pub enum PageStatus {
+    FirstRun,
     Loaded,
     Loading,
 }
@@ -134,6 +136,8 @@ impl Application for StarryDex {
     }
 
     fn init(core: Core, _flags: Self::Flags) -> (Self, Command<Self::Message>) {
+        let mut commands = vec![];
+
         let mut app = StarryDex {
             core,
             context_page: ContextPage::default(),
@@ -147,16 +151,31 @@ impl Application for StarryDex {
             search: String::new(),
             settings_status: SettingsStatus::NotDownloading,
         };
+        commands.push(app.update_titles());
 
         let api_clone = app.api.clone();
 
-        let cmd = cosmic::app::Command::perform(
-            async move { api_clone.load_all_pokemon().await },
-            |pokemon_list| cosmic::app::message::app(Message::LoadedPokemonList(pokemon_list)),
-        );
+        let app_data_dir = dirs::data_dir().unwrap().join(Self::APP_ID);
+        std::fs::create_dir_all(&app_data_dir).expect("Failed to create the app data directory");
 
-        let commands = Command::batch(vec![app.update_titles(), cmd]);
-        (app, commands)
+        let first_run_file = app_data_dir.join("first_run.txt");
+        if !first_run_file.exists() {
+            let _file =
+                std::fs::File::create(&first_run_file).expect("Failed to create first_run.txt");
+
+            app.page_status = PageStatus::FirstRun;
+            commands.push(cosmic::app::Command::perform(
+                async move { api_clone.download_all_pokemon_sprites().await },
+                |_| cosmic::app::message::app(Message::FirstRunSetupCompleted),
+            ));
+        } else {
+            commands.push(cosmic::app::Command::perform(
+                async move { api_clone.load_all_pokemon().await },
+                |pokemon_list| cosmic::app::message::app(Message::LoadedPokemonList(pokemon_list)),
+            ));
+        }
+
+        (app, Command::batch(commands))
     }
 
     /// Elements to pack at the start of the header bar.
@@ -280,6 +299,18 @@ impl Application for StarryDex {
                 let api_clone = self.api.clone();
 
                 self.settings_status = SettingsStatus::NotDownloading;
+                self.page_status = PageStatus::Loading;
+
+                return cosmic::app::Command::perform(
+                    async move { api_clone.load_all_pokemon().await },
+                    |pokemon_list| {
+                        cosmic::app::message::app(Message::LoadedPokemonList(pokemon_list))
+                    },
+                );
+            }
+            Message::FirstRunSetupCompleted => {
+                let api_clone = self.api.clone();
+
                 self.page_status = PageStatus::Loading;
 
                 return cosmic::app::Command::perform(
@@ -474,6 +505,14 @@ impl StarryDex {
             }
             PageStatus::Loading => Column::new()
                 .push(widget::text::text("Loading..."))
+                .align_items(Alignment::Center)
+                .width(Length::Fill)
+                .spacing(space_s)
+                .into(),
+            PageStatus::FirstRun => Column::new()
+                .push(widget::text::text("Downloading Sprites"))
+                .push(widget::text::text("It may take a minute"))
+                .push(widget::text::text("This will only happen once"))
                 .align_items(Alignment::Center)
                 .width(Length::Fill)
                 .spacing(space_s)
