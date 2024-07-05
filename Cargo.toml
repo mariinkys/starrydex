@@ -1,7 +1,11 @@
 [package]
 name = "starry-dex"
 version = "0.1.0"
+authors = ["mariinkys (kysdev.owjga@aleeas.com)"]
 edition = "2021"
+description = "A Pokédex application for the COSMIC™ desktop written in Rust"
+readme = "https://github.com/mariinkys/starrydex/blob/main/README.md"
+repository = "https://github.com/mariinkys/starrydex"
 license = "GPL-3.0"
 
 [dependencies]
