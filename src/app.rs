@@ -41,6 +41,8 @@ pub struct StarryDex {
     selected_pokemon: Option<CustomPokemon>,
     /// Holds the search input value
     search: String,
+    /// Wants the pokemon details in the pokémon page?
+    wants_pokemon_details: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -48,6 +50,7 @@ pub enum Message {
     LaunchUrl(String),
     ToggleContextPage(ContextPage),
     Search(String),
+    TogglePokemonDetails(bool),
 
     LoadPokemon(String),
     FixAllImages,
@@ -153,6 +156,7 @@ impl Application for StarryDex {
             page_status: PageStatus::Loading,
             search: String::new(),
             settings_status: SettingsStatus::NotDownloading,
+            wants_pokemon_details: false,
         };
         commands.push(app.update_titles());
 
@@ -329,6 +333,7 @@ impl Application for StarryDex {
                     },
                 );
             }
+            Message::TogglePokemonDetails(value) => self.wants_pokemon_details = value,
         }
         Command::none()
     }
@@ -603,6 +608,12 @@ impl StarryDex {
                 let parsed_pokemon_stats =
                     self.parse_pokemon_stats(&custom_pokemon.pokemon.stats, &spacing);
 
+                let show_details = widget::Checkbox::new(
+                    "Show Encounter Details",
+                    self.wants_pokemon_details,
+                    Message::TogglePokemonDetails,
+                );
+
                 let encounter_info = match &custom_pokemon.encounter_info {
                     Some(info) => self.parse_encounter_info(info, &spacing),
                     None => widget::Container::new(widget::Text::new("No encounter info."))
@@ -610,15 +621,26 @@ impl StarryDex {
                         .into(),
                 };
 
-                widget::Column::new()
+                let mut result_col = widget::Column::new()
                     .push(page_title)
                     .push(pokemon_image)
                     .push(pokemon_first_row)
                     .push(parsed_pokemon_stats)
-                    .push(encounter_info)
+                    // .push(show_details)
+                    // .push(encounter_info)
                     .align_items(Alignment::Center)
-                    .spacing(10.0)
-                    .into()
+                    .spacing(10.0);
+
+                if custom_pokemon.encounter_info.is_some() {
+                    if custom_pokemon.encounter_info.clone().unwrap().is_empty() == false {
+                        result_col = result_col.push(show_details);
+                        if self.wants_pokemon_details {
+                            result_col = result_col.push(encounter_info);
+                        }
+                    }
+                }
+
+                return result_col.into();
             }
             None => {
                 let error = widget::text::title1(fl!("generic-error"))
