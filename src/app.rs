@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 
 use crate::core::api::Api;
+use crate::core::icon_cache::IconCache;
 use crate::core::image_cache::ImageCache;
 use crate::fl;
 use crate::utils::{capitalize_string, scale_numbers};
@@ -41,6 +42,8 @@ pub struct StarryDex {
     selected_pokemon: Option<CustomPokemon>,
     /// Holds the search input value
     search: String,
+    /// Search widget Id
+    search_id: cosmic::widget::Id,
     /// Wants the pokemon details in the pokémon page?
     wants_pokemon_details: bool,
 }
@@ -50,6 +53,7 @@ pub enum Message {
     LaunchUrl(String),
     ToggleContextPage(ContextPage),
     Search(String),
+    SearchClear,
     TogglePokemonDetails(bool),
 
     LoadPokemon(String),
@@ -157,6 +161,7 @@ impl Application for StarryDex {
             search: String::new(),
             settings_status: SettingsStatus::NotDownloading,
             wants_pokemon_details: false,
+            search_id: cosmic::widget::Id::unique(),
         };
         commands.push(app.update_titles());
 
@@ -334,6 +339,10 @@ impl Application for StarryDex {
                 );
             }
             Message::TogglePokemonDetails(value) => self.wants_pokemon_details = value,
+            Message::SearchClear => {
+                self.search.clear();
+                self.filtered_pokemon_list = self.pokemon_list.clone();
+            }
         }
         Command::none()
     }
@@ -508,15 +517,17 @@ impl StarryDex {
                 }
 
                 let search = widget::search_input(fl!("search"), &self.search)
+                    .id(self.search_id.clone())
+                    .leading_icon(IconCache::get("edit-clear-symbolic", 18).into())
+                    .on_clear(Message::SearchClear)
+                    .trailing_icon(IconCache::get("system-search-symbolic", 18).into())
+                    //.on_submit(Message::SearchSubmit)
                     .style(theme::TextInput::Search)
                     .on_input(Message::Search)
-                    .on_clear(Message::Search(String::new()))
+                    .line_height(LineHeight::Absolute(Pixels(35.0)))
                     .width(Length::Fill);
 
-                let search_row = widget::Row::new()
-                    .push(search)
-                    .width(Length::Fill)
-                    .padding(5.0);
+                let search_row = widget::Row::new().push(search).width(Length::Fill);
 
                 widget::Column::new()
                     .push(search_row)

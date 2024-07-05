@@ -5,10 +5,14 @@ use cosmic::{
     iced::{Limits, Size},
 };
 
-use super::image_cache::{ImageCache, IMAGE_CACHE};
+use super::{
+    icon_cache::{IconCache, ICON_CACHE},
+    image_cache::{ImageCache, IMAGE_CACHE},
+};
 
 pub fn init() -> Settings {
     set_image_cache();
+    set_icon_cache();
 
     let settings = get_app_settings();
     settings
@@ -25,4 +29,8 @@ pub fn get_app_settings() -> Settings {
 
 pub fn set_image_cache() {
     IMAGE_CACHE.get_or_init(|| Mutex::new(ImageCache::new()));
+}
+
+pub fn set_icon_cache() {
+    ICON_CACHE.get_or_init(|| Mutex::new(IconCache::new()));
 }
