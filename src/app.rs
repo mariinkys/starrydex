@@ -261,7 +261,13 @@ impl Application for StarryDex {
                     .pokemon_list
                     .clone()
                     .into_iter()
-                    .filter(|pokemon| pokemon.pokemon.name.contains(&self.search))
+                    .filter(|pokemon| {
+                        pokemon
+                            .pokemon
+                            .name
+                            .to_lowercase()
+                            .contains(&self.search.to_lowercase())
+                    })
                     .collect();
             }
             Message::DownloadAllImages => {
@@ -496,6 +502,7 @@ impl StarryDex {
                 }
 
                 let search = widget::search_input(fl!("search"), &self.search)
+                    .style(theme::TextInput::Search)
                     .on_input(Message::Search)
                     .on_clear(Message::Search(String::new()))
                     .width(Length::Fill);
