@@ -24,6 +24,13 @@ pub fn scale_numbers(num: i64) -> f64 {
     (num as f64) / 10.0
 }
 
+pub fn remove_last(string: String) -> String {
+    match string.char_indices().next_back() {
+        Some((i, _)) => (string[..i]).to_string(),
+        None => string,
+    }
+}
+
 pub async fn download_image(
     client: &reqwest::Client,
     image_url: String,

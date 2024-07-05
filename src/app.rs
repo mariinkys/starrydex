@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use crate::core::api::Api;
 use crate::core::image_cache::ImageCache;
 use crate::fl;
-use crate::utils::{capitalize_string, scale_numbers};
+use crate::utils::{capitalize_string, remove_last, scale_numbers};
 use cosmic::app::{Command, Core};
 use cosmic::iced::alignment::{Horizontal, Vertical};
 use cosmic::iced::{Alignment, Length, Pixels};
@@ -13,7 +13,7 @@ use cosmic::iced_core::text::LineHeight;
 use cosmic::iced_widget::Column;
 use cosmic::widget::{self, menu};
 use cosmic::{cosmic_theme, theme, Application, ApplicationExt, Apply, Element};
-use rustemon::model::pokemon::{Pokemon, PokemonStat, PokemonType};
+use rustemon::model::pokemon::{LocationAreaEncounter, Pokemon, PokemonStat, PokemonType};
 
 const REPOSITORY: &str = "https://github.com/mariinkys/starrydex";
 const POKEMON_PER_ROW: usize = 3;
@@ -118,6 +118,7 @@ impl menu::action::MenuAction for MenuAction {
 pub struct CustomPokemon {
     pub pokemon: Pokemon,
     pub sprite_path: Option<String>,
+    pub encounter_info: Option<Vec<LocationAreaEncounter>>,
 }
 
 impl Application for StarryDex {
@@ -602,11 +603,19 @@ impl StarryDex {
                 let parsed_pokemon_stats =
                     self.parse_pokemon_stats(&custom_pokemon.pokemon.stats, &spacing);
 
+                let encounter_info = match &custom_pokemon.encounter_info {
+                    Some(info) => self.parse_encounter_info(info, &spacing),
+                    None => widget::Container::new(widget::Text::new("No encounter info."))
+                        .style(theme::Container::ContextDrawer)
+                        .into(),
+                };
+
                 widget::Column::new()
                     .push(page_title)
                     .push(pokemon_image)
                     .push(pokemon_first_row)
                     .push(parsed_pokemon_stats)
+                    .push(encounter_info)
                     .align_items(Alignment::Center)
                     .spacing(10.0)
                     .into()
@@ -678,6 +687,38 @@ impl StarryDex {
                 )
                 .width(Length::Fill)
                 .into()
+        });
+
+        widget::container::Container::new(Column::with_children(children))
+            .style(theme::Container::ContextDrawer)
+            .padding([spacing.space_none, spacing.space_xxs])
+            .into()
+    }
+
+    pub fn parse_encounter_info(
+        &self,
+        encounter_info: &Vec<LocationAreaEncounter>,
+        spacing: &cosmic_theme::Spacing,
+    ) -> Element<Message> {
+        let children = encounter_info.iter().map(|encounter_info| {
+            let mut version_column = widget::Column::new().width(Length::Fill);
+            let mut games_titles = String::new();
+
+            for version_details in &encounter_info.version_details {
+                games_titles =
+                    games_titles + &capitalize_string(&version_details.version.name) + ", ";
+            }
+            //TODO: This is kinda awful?
+            games_titles = remove_last(games_titles);
+            games_titles = remove_last(games_titles);
+
+            version_column =
+                version_column.push(widget::text(games_titles).style(theme::Text::Accent));
+            version_column = version_column.push(widget::text(capitalize_string(
+                &encounter_info.location_area.name,
+            )));
+
+            version_column.into()
         });
 
         widget::container::Container::new(Column::with_children(children))

@@ -80,6 +80,7 @@ impl Api {
                 } else {
                     None
                 },
+                encounter_info: None,
             })
         }
 
@@ -90,6 +91,15 @@ impl Api {
         let pokemon = rustemon::pokemon::pokemon::get_by_name(pokemon_name.as_str(), &self.client)
             .await
             .unwrap_or_default();
+
+        let encounter_info =
+            rustemon::pokemon::pokemon::encounters::get_by_id(pokemon.id, &self.client)
+                .await
+                // .map(|mut method| {
+                //     method.names.retain(|name| name.language.name == "en");
+                //     method
+                // })
+                .unwrap_or_default();
 
         let image_path = if let Some(front_default_sprite) = &pokemon.sprites.front_default {
             // Create a reqwest client
@@ -121,6 +131,7 @@ impl Api {
         CustomPokemon {
             pokemon: pokemon,
             sprite_path: image_path,
+            encounter_info: Some(encounter_info),
         }
     }
 
