@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use crate::core::api::Api;
 use crate::core::image_cache::ImageCache;
 use crate::fl;
-use crate::utils::{capitalize_string, remove_last, scale_numbers};
+use crate::utils::{capitalize_string, scale_numbers};
 use cosmic::app::{Command, Core};
 use cosmic::iced::alignment::{Horizontal, Vertical};
 use cosmic::iced::{Alignment, Length, Pixels};
@@ -702,21 +702,28 @@ impl StarryDex {
     ) -> Element<Message> {
         let children = encounter_info.iter().map(|encounter_info| {
             let mut version_column = widget::Column::new().width(Length::Fill);
-            let mut games_titles = String::new();
+            version_column = version_column.push(
+                widget::text(capitalize_string(&encounter_info.location_area.name))
+                    .style(theme::Text::Accent)
+                    .size(Pixels::from(15)),
+            );
 
-            for version_details in &encounter_info.version_details {
-                games_titles =
-                    games_titles + &capitalize_string(&version_details.version.name) + ", ";
+            for games_info in &encounter_info.version_details {
+                let game_name = capitalize_string(&games_info.version.name);
+                let mut method_name = String::new();
+                // let mut conditions = String::new();
+
+                for enc_details in &games_info.encounter_details {
+                    method_name = capitalize_string(&enc_details.method.name);
+
+                    // for condition in &enc_details.condition_values {
+                    //     conditions = conditions + &capitalize_string(&condition.name);
+                    // }
+                }
+
+                version_column =
+                    version_column.push(widget::text(format!("{}: {}", game_name, method_name)))
             }
-            //TODO: This is kinda awful?
-            games_titles = remove_last(games_titles);
-            games_titles = remove_last(games_titles);
-
-            version_column =
-                version_column.push(widget::text(games_titles).style(theme::Text::Accent));
-            version_column = version_column.push(widget::text(capitalize_string(
-                &encounter_info.location_area.name,
-            )));
 
             version_column.into()
         });
