@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 
 use crate::core::api::Api;
+use crate::core::image_cache::ImageCache;
 use crate::fl;
 use crate::utils::{capitalize_string, scale_numbers};
 use cosmic::app::{Command, Core};
@@ -460,7 +461,7 @@ impl StarryDex {
                     let pokemon_image = if let Some(path) = &pokemon.sprite_path {
                         widget::Image::new(path).content_fit(cosmic::iced::ContentFit::Fill)
                     } else {
-                        widget::Image::new("resources/fallback.png")
+                        widget::Image::new(ImageCache::get("fallback"))
                             .content_fit(cosmic::iced::ContentFit::Fill)
                     };
 
@@ -533,7 +534,7 @@ impl StarryDex {
                 let pokemon_image = if let Some(path) = &custom_pokemon.sprite_path {
                     widget::Image::new(path).content_fit(cosmic::iced::ContentFit::Fill)
                 } else {
-                    widget::Image::new("resources/fallback.png")
+                    widget::Image::new(ImageCache::get("fallback"))
                         .content_fit(cosmic::iced::ContentFit::Fill)
                 };
 
