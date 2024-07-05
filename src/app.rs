@@ -8,7 +8,8 @@ use crate::fl;
 use crate::utils::{capitalize_string, scale_numbers};
 use cosmic::app::{Command, Core};
 use cosmic::iced::alignment::{Horizontal, Vertical};
-use cosmic::iced::{Alignment, Length};
+use cosmic::iced::{Alignment, Length, Pixels};
+use cosmic::iced_core::text::LineHeight;
 use cosmic::iced_widget::Column;
 use cosmic::widget::{self, menu};
 use cosmic::{cosmic_theme, theme, Application, ApplicationExt, Apply, Element};
@@ -459,18 +460,30 @@ impl StarryDex {
 
                 for (index, pokemon) in self.filtered_pokemon_list.iter().enumerate() {
                     let pokemon_image = if let Some(path) = &pokemon.sprite_path {
-                        widget::Image::new(path).content_fit(cosmic::iced::ContentFit::Fill)
+                        widget::Image::new(path)
+                            .content_fit(cosmic::iced::ContentFit::None)
+                            .width(Length::Fixed(100.0))
+                            .height(Length::Fixed(100.0))
                     } else {
                         widget::Image::new(ImageCache::get("fallback"))
-                            .content_fit(cosmic::iced::ContentFit::Fill)
+                            .content_fit(cosmic::iced::ContentFit::None)
+                            .width(Length::Fixed(100.0))
+                            .height(Length::Fixed(100.0))
                     };
 
                     let pokemon_container = widget::button(
                         widget::Column::new()
-                            .push(pokemon_image)
-                            .push(widget::text::text(capitalize_string(&pokemon.pokemon.name)))
+                            .push(pokemon_image.width(Length::Shrink))
+                            .push(
+                                widget::text::text(capitalize_string(&pokemon.pokemon.name))
+                                    .width(Length::Shrink)
+                                    .line_height(LineHeight::Absolute(Pixels::from(15.0))),
+                            )
+                            .width(Length::Fill)
                             .align_items(Alignment::Center),
                     )
+                    .width(Length::Fixed(200.0))
+                    .height(Length::Fixed(135.0))
                     .on_press_down(Message::LoadPokemon(pokemon.pokemon.name.to_string()))
                     .style(theme::Button::Image)
                     .padding([spacing.space_none, spacing.space_s]);
