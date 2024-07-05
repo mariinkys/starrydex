@@ -91,7 +91,7 @@ impl ContextPage {
         match self {
             Self::About => fl!("about"),
             Self::Settings => fl!("settings"),
-            Self::PokemonPage => fl!("pokemon_page"),
+            Self::PokemonPage => fl!("pokemon-page"),
         }
     }
 }
@@ -350,15 +350,15 @@ impl StarryDex {
 
         let title = widget::text::title3(fl!("app-title"));
 
-        let app_info = widget::text::text(fl!("app_info"));
+        let app_info = widget::text::text(fl!("app-info"));
 
         let link = widget::button::link(REPOSITORY)
             .on_press(Message::LaunchUrl(REPOSITORY.to_string()))
             .padding(0);
 
-        let pokeapi_text = widget::text::text(fl!("pokeapi_text"));
+        let pokeapi_text = widget::text::text(fl!("pokeapi-text"));
 
-        let nintendo_text = widget::text::text(fl!("nintendo_text"));
+        let nintendo_text = widget::text::text(fl!("nintendo-text"));
 
         widget::column()
             .push(icon)
@@ -378,19 +378,19 @@ impl StarryDex {
         let download_row = widget::Row::new()
             .push(
                 widget::column()
-                    .push(widget::text::text(fl!("download_all_title")))
-                    .push(widget::text::text(fl!("download_all_info")).size(10.0))
+                    .push(widget::text::text(fl!("download-all-title")))
+                    .push(widget::text::text(fl!("download-all-info")).size(10.0))
                     .width(Length::Fill),
             )
             .push(match self.settings_status {
                 SettingsStatus::NotDownloading => {
-                    widget::button(widget::text::text(fl!("download_button_text")))
+                    widget::button(widget::text::text(fl!("download-button-text")))
                         .on_press(Message::DownloadAllImages)
                         .style(theme::Button::Suggested)
                         .width(Length::Shrink)
                 }
                 SettingsStatus::Downloading => {
-                    widget::button(widget::text::text(fl!("download_button_text")))
+                    widget::button(widget::text::text(fl!("download-button-text")))
                         .style(theme::Button::Suggested)
                         .width(Length::Shrink)
                 }
@@ -401,19 +401,19 @@ impl StarryDex {
         let fix_row = widget::Row::new()
             .push(
                 widget::column()
-                    .push(widget::text::text(fl!("fix_all_title")))
-                    .push(widget::text::text(fl!("fix_all_info")).size(10.0))
+                    .push(widget::text::text(fl!("fix-all-title")))
+                    .push(widget::text::text(fl!("fix-all-info")).size(10.0))
                     .width(Length::Fill),
             )
             .push(match self.settings_status {
                 SettingsStatus::NotDownloading => {
-                    widget::button(widget::text::text(fl!("fix_button_text")))
+                    widget::button(widget::text::text(fl!("fix-button-text")))
                         .on_press(Message::FixAllImages)
                         .style(theme::Button::Destructive)
                         .width(Length::Shrink)
                 }
                 SettingsStatus::Downloading => {
-                    widget::button(widget::text::text(fl!("fix_button_text")))
+                    widget::button(widget::text::text(fl!("fix-button-text")))
                         .style(theme::Button::Destructive)
                         .width(Length::Shrink)
                 }
@@ -436,7 +436,7 @@ impl StarryDex {
                     .add(
                         widget::row()
                             .push(
-                                widget::text("Downloading...")
+                                widget::text(fl!("downloading-text"))
                                     .width(Length::Fill)
                                     .horizontal_alignment(Horizontal::Center),
                             )
@@ -505,18 +505,17 @@ impl StarryDex {
                     .into()
             }
             PageStatus::Loading => Column::new()
-                .push(widget::text::text("Loading..."))
+                .push(widget::text::text(fl!("loading")))
                 .align_items(Alignment::Center)
                 .width(Length::Fill)
                 .spacing(space_s)
                 .into(),
             PageStatus::FirstRun => Column::new()
-                .push(widget::text::text("Downloading Sprites"))
-                .push(widget::text::text("It may take a minute"))
-                .push(widget::text::text("This will only happen once"))
+                .push(widget::text::text(fl!("downloading-sprites")))
+                .push(widget::text::text(fl!("estimate")))
+                .push(widget::text::text(fl!("once-message")))
                 .align_items(Alignment::Center)
                 .width(Length::Fill)
-                .spacing(space_s)
                 .into(),
         }
     }
@@ -593,7 +592,7 @@ impl StarryDex {
                     .into()
             }
             None => {
-                let error = widget::text::title1(fl!("generic_error"))
+                let error = widget::text::title1(fl!("generic-error"))
                     .apply(widget::container)
                     .width(Length::Fill)
                     .height(Length::Fill)
@@ -615,8 +614,8 @@ impl StarryDex {
         match self.current_page {
             Page::LandingPage => {
                 window_title.push_str(" — ");
-                window_title.push_str(fl!("landing_page_title").as_str());
-                header_title.push_str(fl!("landing_page_title").as_str());
+                window_title.push_str(fl!("landing-page-title").as_str());
+                header_title.push_str(fl!("landing-page-title").as_str());
             }
         }
 
