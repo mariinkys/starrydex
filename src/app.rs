@@ -3,17 +3,23 @@
 use std::collections::HashMap;
 
 use crate::core::api::Api;
+use crate::core::config::{self, AppTheme, CONFIG_VERSION};
 use crate::core::icon_cache::IconCache;
 use crate::core::image_cache::ImageCache;
+use crate::core::key_bind::key_binds;
 use crate::fl;
 use crate::utils::{capitalize_string, scale_numbers};
 use cosmic::app::{Command, Core};
 use cosmic::iced::alignment::{Horizontal, Vertical};
-use cosmic::iced::{Alignment, Length, Pixels};
+use cosmic::iced::{
+    event, keyboard::Event as KeyEvent, Alignment, Event, Length, Pixels, Subscription,
+};
+use cosmic::iced_core::keyboard::{Key, Modifiers};
 use cosmic::iced_core::text::LineHeight;
 use cosmic::iced_widget::Column;
+use cosmic::widget::menu::{action::MenuAction, key_bind::KeyBind};
 use cosmic::widget::{self, menu};
-use cosmic::{cosmic_theme, theme, Application, ApplicationExt, Apply, Element};
+use cosmic::{cosmic_config, cosmic_theme, theme, Application, ApplicationExt, Apply, Element};
 use rustemon::model::pokemon::{
     LocationAreaEncounter, Pokemon, PokemonAbility, PokemonStat, PokemonType,
 };
@@ -27,7 +33,15 @@ pub struct StarryDex {
     /// Display a context drawer with the designated page if defined.
     context_page: ContextPage,
     /// Key bindings for the application's menu bar.
-    key_binds: HashMap<menu::KeyBind, MenuAction>,
+    key_binds: HashMap<KeyBind, Action>,
+    /// Modifiers
+    modifiers: Modifiers,
+    /// Application Themes
+    app_themes: Vec<String>,
+    /// Application Config Handler
+    config_handler: Option<cosmic_config::Config>,
+    /// Application Config
+    config: config::StarryDexConfig,
     /// Api and Client
     api: Api,
     /// Currently selected Page
@@ -53,6 +67,11 @@ pub struct StarryDex {
 #[derive(Debug, Clone)]
 pub enum Message {
     LaunchUrl(String),
+    AppTheme(usize),
+    #[allow(dead_code)]
+    SystemThemeModeChange(cosmic_theme::ThemeMode),
+    Key(Modifiers, Key),
+    Modifiers(Modifiers),
     ToggleContextPage(ContextPage),
     Search(String),
     SearchClear,
@@ -107,20 +126,26 @@ impl ContextPage {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum MenuAction {
+pub enum Action {
     About,
     Settings,
 }
 
-impl menu::action::MenuAction for MenuAction {
+impl menu::action::MenuAction for Action {
     type Message = Message;
 
     fn message(&self) -> Self::Message {
         match self {
-            MenuAction::About => Message::ToggleContextPage(ContextPage::About),
-            MenuAction::Settings => Message::ToggleContextPage(ContextPage::Settings),
+            Action::About => Message::ToggleContextPage(ContextPage::About),
+            Action::Settings => Message::ToggleContextPage(ContextPage::Settings),
         }
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct Flags {
+    pub config_handler: Option<cosmic_config::Config>,
+    pub config: config::StarryDexConfig,
 }
 
 #[derive(Debug, Clone)]
@@ -133,7 +158,7 @@ pub struct CustomPokemon {
 impl Application for StarryDex {
     type Executor = cosmic::executor::Default;
 
-    type Flags = ();
+    type Flags = Flags;
 
     type Message = Message;
 
@@ -147,13 +172,17 @@ impl Application for StarryDex {
         &mut self.core
     }
 
-    fn init(core: Core, _flags: Self::Flags) -> (Self, Command<Self::Message>) {
+    fn init(core: Core, flags: Self::Flags) -> (Self, Command<Self::Message>) {
         let mut commands = vec![];
 
         let mut app = StarryDex {
             core,
             context_page: ContextPage::default(),
-            key_binds: HashMap::new(),
+            key_binds: key_binds(),
+            modifiers: Modifiers::empty(),
+            app_themes: vec![fl!("match-desktop"), fl!("dark"), fl!("light")],
+            config_handler: flags.config_handler,
+            config: flags.config,
             api: Api::new(Self::APP_ID),
             current_page: Page::LandingPage,
             pokemon_list: Vec::<CustomPokemon>::new(),
@@ -199,13 +228,65 @@ impl Application for StarryDex {
             menu::items(
                 &self.key_binds,
                 vec![
-                    menu::Item::Button(fl!("about"), MenuAction::About),
-                    menu::Item::Button(fl!("settings"), MenuAction::Settings),
+                    menu::Item::Button(fl!("about"), Action::About),
+                    menu::Item::Button(fl!("settings"), Action::Settings),
                 ],
             ),
         )]);
 
         vec![menu_bar.into()]
+    }
+
+    fn subscription(&self) -> Subscription<Self::Message> {
+        struct ConfigSubscription;
+        struct ThemeSubscription;
+
+        let subscriptions = vec![
+            cosmic::iced::event::listen_with(|event, status| match event {
+                Event::Keyboard(KeyEvent::KeyPressed { key, modifiers, .. }) => match status {
+                    event::Status::Ignored => Some(Message::Key(modifiers, key)),
+                    event::Status::Captured => None,
+                },
+                Event::Keyboard(KeyEvent::ModifiersChanged(modifiers)) => {
+                    Some(Message::Modifiers(modifiers))
+                }
+                _ => None,
+            }),
+            cosmic_config::config_subscription(
+                std::any::TypeId::of::<ConfigSubscription>(),
+                Self::APP_ID.into(),
+                CONFIG_VERSION,
+            )
+            .map(|update| {
+                if !update.errors.is_empty() {
+                    log::info!(
+                        "errors loading config {:?}: {:?}",
+                        update.keys,
+                        update.errors
+                    );
+                }
+                Message::SystemThemeModeChange(update.config)
+            }),
+            cosmic_config::config_subscription::<_, cosmic_theme::ThemeMode>(
+                std::any::TypeId::of::<ThemeSubscription>(),
+                cosmic_theme::THEME_MODE_ID.into(),
+                cosmic_theme::ThemeMode::version(),
+            )
+            .map(|update| {
+                if !update.errors.is_empty() {
+                    log::info!(
+                        "errors loading theme mode {:?}: {:?}",
+                        update.keys,
+                        update.errors
+                    );
+                }
+                Message::SystemThemeModeChange(update.config)
+            }),
+        ];
+
+        // subscriptions.push(self.content.subscription().map(Message::Content));
+
+        Subscription::batch(subscriptions)
     }
 
     fn view(&self) -> Element<Self::Message> {
@@ -222,6 +303,33 @@ impl Application for StarryDex {
     }
 
     fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
+        // Helper for updating config values efficiently
+        macro_rules! config_set {
+            ($name: ident, $value: expr) => {
+                match &self.config_handler {
+                    Some(config_handler) => {
+                        match paste::paste! { self.config.[<set_ $name>](config_handler, $value) } {
+                            Ok(_) => {}
+                            Err(err) => {
+                                log::warn!(
+                                    "failed to save config {:?}: {}",
+                                    stringify!($name),
+                                    err
+                                );
+                            }
+                        }
+                    }
+                    None => {
+                        self.config.$name = $value;
+                        log::warn!(
+                            "failed to save config {:?}: no config handler",
+                            stringify!($name)
+                        );
+                    }
+                }
+            };
+        }
+
         match message {
             Message::LaunchUrl(url) => {
                 let _result = open::that_detached(url);
@@ -345,6 +453,28 @@ impl Application for StarryDex {
                 self.search.clear();
                 self.filtered_pokemon_list = self.pokemon_list.clone();
             }
+            Message::AppTheme(index) => {
+                let app_theme = match index {
+                    1 => AppTheme::Dark,
+                    2 => AppTheme::Light,
+                    _ => AppTheme::System,
+                };
+                config_set!(app_theme, app_theme);
+                return self.update_config();
+            }
+            Message::SystemThemeModeChange(_) => {
+                return self.update_config();
+            }
+            Message::Key(modifiers, key) => {
+                for (key_bind, action) in self.key_binds.iter() {
+                    if key_bind.matches(modifiers, &key) {
+                        return self.update(action.message());
+                    }
+                }
+            }
+            Message::Modifiers(modifiers) => {
+                self.modifiers = modifiers;
+            }
         }
         Command::none()
     }
@@ -364,6 +494,10 @@ impl Application for StarryDex {
 }
 
 impl StarryDex {
+    fn update_config(&mut self) -> Command<Message> {
+        cosmic::app::command::set_theme(self.config.app_theme.theme())
+    }
+
     /// The about page for this app.
     pub fn about(&self) -> Element<Message> {
         let cosmic_theme::Spacing { space_xxs, .. } = theme::active().cosmic().spacing;
@@ -445,16 +579,31 @@ impl StarryDex {
             .spacing(spacing.space_xxs)
             .padding([0, 5, 0, 5]);
 
+        let app_theme_selected = match self.config.app_theme {
+            AppTheme::Dark => 1,
+            AppTheme::Light => 2,
+            AppTheme::System => 0,
+        };
+
         match self.settings_status {
-            SettingsStatus::NotDownloading => {
-                widget::settings::view_column(vec![widget::settings::view_section(fl!("settings"))
+            SettingsStatus::NotDownloading => widget::settings::view_column(vec![
+                widget::settings::view_section(fl!("settings"))
                     .add(download_row)
                     .add(fix_row)
-                    .into()])
-                .into()
-            }
-            SettingsStatus::Downloading => {
-                widget::settings::view_column(vec![widget::settings::view_section(fl!("settings"))
+                    .into(),
+                widget::settings::view_section(fl!("appearance"))
+                    .add(
+                        widget::settings::item::builder(fl!("theme")).control(widget::dropdown(
+                            &self.app_themes,
+                            Some(app_theme_selected),
+                            Message::AppTheme,
+                        )),
+                    )
+                    .into(),
+            ])
+            .into(),
+            SettingsStatus::Downloading => widget::settings::view_column(vec![
+                widget::settings::view_section(fl!("settings"))
                     .add(download_row)
                     .add(fix_row)
                     .add(
@@ -467,9 +616,18 @@ impl StarryDex {
                             .align_items(Alignment::Center)
                             .width(Length::Fill),
                     )
-                    .into()])
-                .into()
-            }
+                    .into(),
+                widget::settings::view_section(fl!("appearance"))
+                    .add(
+                        widget::settings::item::builder(fl!("theme")).control(widget::dropdown(
+                            &self.app_themes,
+                            Some(app_theme_selected),
+                            Message::AppTheme,
+                        )),
+                    )
+                    .into(),
+            ])
+            .into(),
         }
     }
 
