@@ -14,7 +14,7 @@ use cosmic::iced_core::text::LineHeight;
 use cosmic::iced_widget::Column;
 use cosmic::widget::{self, menu};
 use cosmic::{cosmic_theme, theme, Application, ApplicationExt, Apply, Element};
-use rustemon::model::pokemon::{LocationAreaEncounter, Pokemon, PokemonStat, PokemonType};
+use rustemon::model::pokemon::{LocationAreaEncounter, Pokemon, PokemonAbility, PokemonStat, PokemonType};
 
 const REPOSITORY: &str = "https://github.com/mariinkys/starrydex";
 const POKEMON_PER_ROW: usize = 3;
@@ -518,9 +518,9 @@ impl StarryDex {
 
                 let search = widget::search_input(fl!("search"), &self.search)
                     .id(self.search_id.clone())
-                    .leading_icon(IconCache::get("edit-clear-symbolic", 18).into())
+                    .leading_icon(IconCache::get("system-search-symbolic", 18).into())
                     .on_clear(Message::SearchClear)
-                    .trailing_icon(IconCache::get("system-search-symbolic", 18).into())
+                    .trailing_icon(IconCache::get("edit-clear-symbolic", 18).into())
                     //.on_submit(Message::SearchSubmit)
                     .style(theme::TextInput::Search)
                     .on_input(Message::Search)
@@ -616,6 +616,8 @@ impl StarryDex {
                     .spacing(8.0)
                     .align_items(Alignment::Center);
 
+                let pokemon_abilities = self.parse_pokemon_abilities(&custom_pokemon.pokemon.abilities, &spacing);
+
                 let parsed_pokemon_stats =
                     self.parse_pokemon_stats(&custom_pokemon.pokemon.stats, &spacing);
 
@@ -636,9 +638,8 @@ impl StarryDex {
                     .push(page_title)
                     .push(pokemon_image)
                     .push(pokemon_first_row)
+                    .push(pokemon_abilities)
                     .push(parsed_pokemon_stats)
-                    // .push(show_details)
-                    // .push(encounter_info)
                     .align_items(Alignment::Center)
                     .spacing(10.0);
 
@@ -717,6 +718,37 @@ impl StarryDex {
                     widget::text(pokemon_types.type_.name.to_uppercase())
                         .width(Length::Fill)
                         .horizontal_alignment(Horizontal::Center),
+                )
+                .width(Length::Fill)
+                .into()
+        });
+
+        widget::container::Container::new(Column::with_children(children))
+            .style(theme::Container::ContextDrawer)
+            .padding([spacing.space_none, spacing.space_xxs])
+            .into()
+    }
+
+    pub fn parse_pokemon_abilities(
+        &self,
+        abilities: &Vec<PokemonAbility>,
+        spacing: &cosmic_theme::Spacing,
+    ) -> Element<Message> {
+        let children = abilities.iter().map(|pokemon_abilities| {
+            widget::Row::new()
+                .push(
+                    match pokemon_abilities.is_hidden {
+                        true => {
+                            widget::text(format!("{} (HIDDEN)", capitalize_string(&pokemon_abilities.ability.name)))
+                                .width(Length::Fill)
+                                .horizontal_alignment(Horizontal::Center)
+                        },
+                        false => {
+                            widget::text(capitalize_string(&pokemon_abilities.ability.name))
+                                .width(Length::Fill)
+                                .horizontal_alignment(Horizontal::Center)
+                        }
+                    }
                 )
                 .width(Length::Fill)
                 .into()
