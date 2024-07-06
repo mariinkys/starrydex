@@ -6,6 +6,13 @@ back = Back
 generic-error = Oops, something has gone wrong...
 loading = Loading...
 
+<#-- Appearance -->
+appearance = Appearance
+theme = Theme
+match-desktop = Match desktop
+dark = Dark
+light = Light
+
 <#-- First Run -->
 downloading-sprites = Downloading Sprites...
 estimate = It may take a minute

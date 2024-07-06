@@ -17,8 +17,8 @@ mod utils;
 fn main() -> cosmic::iced::Result {
     init_localizer();
 
-    let settings = core::settings::init();
-    cosmic::app::run::<StarryDex>(settings, ())
+    let (settings, flags) = core::settings::init();
+    cosmic::app::run::<StarryDex>(settings, flags)
 }
 
 fn init_localizer() {
