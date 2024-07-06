@@ -33,3 +33,6 @@ search = Search
 pokemon-page = Pokémon
 height = HEIGHT
 weight = WEIGHT
+show-encounter-details = Show Encounter Details
+no-encounter-info = No encounter info...
+link-more-info = More Info

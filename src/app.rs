@@ -14,7 +14,9 @@ use cosmic::iced_core::text::LineHeight;
 use cosmic::iced_widget::Column;
 use cosmic::widget::{self, menu};
 use cosmic::{cosmic_theme, theme, Application, ApplicationExt, Apply, Element};
-use rustemon::model::pokemon::{LocationAreaEncounter, Pokemon, PokemonAbility, PokemonStat, PokemonType};
+use rustemon::model::pokemon::{
+    LocationAreaEncounter, Pokemon, PokemonAbility, PokemonStat, PokemonType,
+};
 
 const REPOSITORY: &str = "https://github.com/mariinkys/starrydex";
 const POKEMON_PER_ROW: usize = 3;
@@ -616,23 +618,31 @@ impl StarryDex {
                     .spacing(8.0)
                     .align_items(Alignment::Center);
 
-                let pokemon_abilities = self.parse_pokemon_abilities(&custom_pokemon.pokemon.abilities, &spacing);
+                let pokemon_abilities =
+                    self.parse_pokemon_abilities(&custom_pokemon.pokemon.abilities, &spacing);
 
                 let parsed_pokemon_stats =
                     self.parse_pokemon_stats(&custom_pokemon.pokemon.stats, &spacing);
 
                 let show_details = widget::Checkbox::new(
-                    "Show Encounter Details",
+                    fl!("show-encounter-details"),
                     self.wants_pokemon_details,
                     Message::TogglePokemonDetails,
                 );
 
                 let encounter_info = match &custom_pokemon.encounter_info {
                     Some(info) => self.parse_encounter_info(info, &spacing),
-                    None => widget::Container::new(widget::Text::new("No encounter info."))
+                    None => widget::Container::new(widget::Text::new(fl!("no-encounter-info")))
                         .style(theme::Container::ContextDrawer)
                         .into(),
                 };
+
+                let link = widget::button::link(fl!("link-more-info"))
+                    .on_press(Message::LaunchUrl(format!(
+                        "https://bulbapedia.bulbagarden.net/w/index.php?search={}",
+                        &custom_pokemon.pokemon.name
+                    )))
+                    .padding(0);
 
                 let mut result_col = widget::Column::new()
                     .push(page_title)
@@ -652,6 +662,7 @@ impl StarryDex {
                     }
                 }
 
+                result_col = result_col.push(link);
                 return result_col.into();
             }
             None => {
@@ -736,20 +747,17 @@ impl StarryDex {
     ) -> Element<Message> {
         let children = abilities.iter().map(|pokemon_abilities| {
             widget::Row::new()
-                .push(
-                    match pokemon_abilities.is_hidden {
-                        true => {
-                            widget::text(format!("{} (HIDDEN)", capitalize_string(&pokemon_abilities.ability.name)))
-                                .width(Length::Fill)
-                                .horizontal_alignment(Horizontal::Center)
-                        },
-                        false => {
-                            widget::text(capitalize_string(&pokemon_abilities.ability.name))
-                                .width(Length::Fill)
-                                .horizontal_alignment(Horizontal::Center)
-                        }
-                    }
-                )
+                .push(match pokemon_abilities.is_hidden {
+                    true => widget::text(format!(
+                        "{} (HIDDEN)",
+                        capitalize_string(&pokemon_abilities.ability.name)
+                    ))
+                    .width(Length::Fill)
+                    .horizontal_alignment(Horizontal::Center),
+                    false => widget::text(capitalize_string(&pokemon_abilities.ability.name))
+                        .width(Length::Fill)
+                        .horizontal_alignment(Horizontal::Center),
+                })
                 .width(Length::Fill)
                 .into()
         });
