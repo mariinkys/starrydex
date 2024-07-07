@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use crate::core::api::Api;
 use crate::core::config::{self, AppTheme, CONFIG_VERSION};
@@ -50,8 +50,8 @@ pub struct StarryDex {
     page_status: PageStatus,
     /// Settings Status
     settings_status: SettingsStatus,
-    /// Contains the list of all Pokémon
-    pokemon_list: Vec<CustomPokemon>,
+    /// Contains a btree with all pokémon where the key is the pokémon id
+    pokemon_list: BTreeMap<i64, CustomPokemon>,
     /// Contains the list of pokemon after searching
     filtered_pokemon_list: Vec<CustomPokemon>,
     /// Currently viewing Pokémon
@@ -77,13 +77,13 @@ pub enum Message {
     SearchClear,
     TogglePokemonDetails(bool),
 
-    LoadPokemon(String),
+    LoadPokemon(i64),
     FixAllImages,
     DownloadAllImages,
 
     FirstRunSetupCompleted,
     LoadedPokemon(CustomPokemon),
-    LoadedPokemonList(Vec<CustomPokemon>),
+    LoadedPokemonList(BTreeMap<i64, CustomPokemon>),
     DownloadedAllImages,
     AllImagesFixed,
 }
@@ -185,7 +185,7 @@ impl Application for StarryDex {
             config: flags.config,
             api: Api::new(Self::APP_ID),
             current_page: Page::LandingPage,
-            pokemon_list: Vec::<CustomPokemon>::new(),
+            pokemon_list: BTreeMap::new(),
             filtered_pokemon_list: Vec::<CustomPokemon>::new(),
             selected_pokemon: None,
             page_status: PageStatus::Loading,
@@ -348,8 +348,8 @@ impl Application for StarryDex {
                 self.set_context_title(context_page.title());
             }
             Message::LoadedPokemonList(pokemons) => {
-                self.pokemon_list = pokemons.clone();
-                self.filtered_pokemon_list = pokemons;
+                self.pokemon_list = pokemons;
+                self.filtered_pokemon_list = self.pokemon_list.values().cloned().collect();
                 self.page_status = PageStatus::Loaded;
             }
             Message::LoadedPokemon(pokemon) => {
@@ -367,20 +367,25 @@ impl Application for StarryDex {
                 // Set the title of the context drawer.
                 self.set_context_title(ContextPage::PokemonPage.title());
             }
-            Message::LoadPokemon(pokemon_name) => {
-                let api_clone = self.api.clone();
+            Message::LoadPokemon(pokemon_id) => {
+                let pokemon_clone = self.pokemon_list.get(&pokemon_id).cloned();
 
                 return cosmic::app::Command::perform(
-                    async move { api_clone.load_pokemon(pokemon_name).await },
-                    |pokemon| cosmic::app::message::app(Message::LoadedPokemon(pokemon)),
+                    async move {
+                        if let Some(pokemon) = pokemon_clone {
+                            cosmic::app::message::app(Message::LoadedPokemon(pokemon))
+                        } else {
+                            cosmic::app::message::none()
+                        }
+                    },
+                    |msg| msg,
                 );
             }
             Message::Search(new_value) => {
                 self.search = new_value;
                 self.filtered_pokemon_list = self
                     .pokemon_list
-                    .clone()
-                    .into_iter()
+                    .values()
                     .filter(|pokemon| {
                         pokemon
                             .pokemon
@@ -388,7 +393,8 @@ impl Application for StarryDex {
                             .to_lowercase()
                             .contains(&self.search.to_lowercase())
                     })
-                    .collect();
+                    .cloned()
+                    .collect::<Vec<CustomPokemon>>();
             }
             Message::DownloadAllImages => {
                 let api_clone = self.api.clone();
@@ -451,7 +457,7 @@ impl Application for StarryDex {
             Message::TogglePokemonDetails(value) => self.wants_pokemon_details = value,
             Message::SearchClear => {
                 self.search.clear();
-                self.filtered_pokemon_list = self.pokemon_list.clone();
+                self.filtered_pokemon_list = self.pokemon_list.values().cloned().collect();
             }
             Message::AppTheme(index) => {
                 let app_theme = match index {
@@ -665,7 +671,7 @@ impl StarryDex {
                     )
                     .width(Length::Fixed(200.0))
                     .height(Length::Fixed(135.0))
-                    .on_press_down(Message::LoadPokemon(pokemon.pokemon.name.to_string()))
+                    .on_press_down(Message::LoadPokemon(pokemon.pokemon.id))
                     .style(theme::Button::Image)
                     .padding([spacing.space_none, spacing.space_s]);
 

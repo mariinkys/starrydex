@@ -1,10 +1,7 @@
-use std::{fs, path::Path, sync::Arc};
+use std::{collections::BTreeMap, fs, sync::Arc};
 
-use futures::StreamExt;
-use rustemon::{
-    client::{CACacheManager, RustemonClient, RustemonClientBuilder},
-    model::pokemon::Pokemon,
-};
+use futures::{stream::iter, StreamExt};
+use rustemon::client::{CACacheManager, RustemonClient, RustemonClientBuilder};
 use tokio::sync::Semaphore;
 
 use crate::{app::CustomPokemon, utils::download_image};
@@ -49,73 +46,87 @@ impl Api {
     // API
     //
 
-    pub async fn load_all_pokemon(&self) -> Vec<CustomPokemon> {
+    // pub async fn load_all_pokemon(&self) -> HashMap<i64, CustomPokemon> {
+    //     let all_entries = rustemon::pokemon::pokemon::get_all_entries(&self.client)
+    //         .await
+    //         .unwrap_or_default();
+
+    //     let semaphore = Arc::new(Semaphore::new(30));
+
+    //     let pokemon_stream = iter(all_entries)
+    //         .map(|entry| {
+    //             let client = self.client.clone();
+    //             let sem = Arc::clone(&semaphore);
+    //             async move {
+    //                 let _permit = sem.acquire().await.unwrap();
+    //                 Self::fetch_pokemon_details(&entry.name, &client).await
+    //             }
+    //         })
+    //         .buffer_unordered(30);
+
+    //     pokemon_stream
+    //         .collect::<Vec<CustomPokemon>>()
+    //         .await
+    //         .into_iter()
+    //         .map(|pokemon| (pokemon.pokemon.id, pokemon))
+    //         .collect()
+    // }
+
+    pub async fn load_all_pokemon(&self) -> BTreeMap<i64, CustomPokemon> {
         let all_entries = rustemon::pokemon::pokemon::get_all_entries(&self.client)
             .await
             .unwrap_or_default();
 
-        let mut result = Vec::<CustomPokemon>::new();
+        let semaphore = Arc::new(Semaphore::new(30));
 
-        for entry in all_entries {
-            let resources_path = dirs::data_dir()
-                .unwrap()
-                .join(APP_ID)
-                .join("resources")
-                .join("sprites");
-
-            if !resources_path.exists() {
-                fs::create_dir_all(&resources_path).expect("Failed to create the resources path");
-            }
-
-            let image_filename = format!("{}_front.png", entry.name);
-            let image_path = resources_path.join(&entry.name).join(&image_filename);
-
-            result.push(CustomPokemon {
-                pokemon: Pokemon {
-                    name: entry.name,
-                    ..Default::default()
-                },
-                sprite_path: if Path::new(&image_path).exists() {
-                    image_path.to_str().map(String::from)
-                } else {
-                    None
-                },
-                encounter_info: None,
+        let pokemon_stream = iter(all_entries)
+            .map(|entry| {
+                let client = self.client.clone();
+                let sem = Arc::clone(&semaphore);
+                async move {
+                    let _permit = sem.acquire().await.unwrap();
+                    Self::fetch_pokemon_details(&entry.name, &client).await
+                }
             })
-        }
+            .buffer_unordered(30);
 
-        result
+        pokemon_stream
+            .collect::<Vec<CustomPokemon>>()
+            .await
+            .into_iter()
+            .map(|pokemon| (pokemon.pokemon.id as i64, pokemon))
+            .collect()
     }
 
-    pub async fn load_pokemon(&self, pokemon_name: String) -> CustomPokemon {
-        let pokemon = rustemon::pokemon::pokemon::get_by_name(pokemon_name.as_str(), &self.client)
+    async fn fetch_pokemon_details(
+        name: &str,
+        client: &rustemon::client::RustemonClient,
+    ) -> CustomPokemon {
+        let pokemon = rustemon::pokemon::pokemon::get_by_name(name, client)
             .await
             .unwrap_or_default();
 
-        let encounter_info =
-            rustemon::pokemon::pokemon::encounters::get_by_id(pokemon.id, &self.client)
-                .await
-                // .map(|mut method| {
-                //     method.names.retain(|name| name.language.name == "en");
-                //     method
-                // })
-                .unwrap_or_default();
+        let encounter_info = rustemon::pokemon::pokemon::encounters::get_by_id(pokemon.id, client)
+            .await
+            .unwrap_or_default();
+
+        let resources_path = dirs::data_dir()
+            .unwrap()
+            .join(APP_ID)
+            .join("resources")
+            .join("sprites");
+
+        if !resources_path.exists() {
+            fs::create_dir_all(&resources_path).expect("Failed to create the resources path");
+        }
 
         let image_path = if let Some(front_default_sprite) = &pokemon.sprites.front_default {
-            // Create a reqwest client
-            let client = reqwest::Client::new();
-
-            let resources_path = dirs::data_dir()
-                .unwrap()
-                .join(APP_ID)
-                .join("resources")
-                .join("sprites");
+            let reqwest_client = reqwest::Client::new();
             let image_filename = format!("{}_front.png", pokemon.name);
             let full_image_path = resources_path.join(&pokemon.name).join(&image_filename);
 
-            // Only download the image if front_default sprite is available
             match download_image(
-                &client,
+                &reqwest_client,
                 front_default_sprite.to_string(),
                 pokemon.name.to_string(),
             )
@@ -129,7 +140,7 @@ impl Api {
         };
 
         CustomPokemon {
-            pokemon: pokemon,
+            pokemon,
             sprite_path: image_path,
             encounter_info: Some(encounter_info),
         }
