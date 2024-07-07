@@ -15,10 +15,6 @@
 
 ## Information
 
-> [!WARNING]
-> This application is being developed for learning purposes and it may or may not be usable.
-> Due to time constrains, development may be slow for a while.
-
 Created by [mariinkys](https://github.com/mariinkys). Pokémon and Pokémon character names are trademarks of Nintendo.
 
 This application uses [PokeApi](https://github.com/PokeAPI/) and it's resources. 
