@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, fs, sync::Arc};
 
 use futures::{stream::iter, StreamExt};
-use rustemon::client::{CACacheManager, RustemonClient, RustemonClientBuilder};
+use rustemon::client::{CACacheManager, CacheMode, RustemonClient, RustemonClientBuilder};
 use tokio::sync::Semaphore;
 
 use crate::{app::CustomPokemon, utils::download_image};
@@ -35,6 +35,7 @@ impl Api {
             client: Arc::new(
                 RustemonClientBuilder::default()
                     .with_manager(CACacheManager { path: cache_path })
+                    .with_mode(CacheMode::ForceCache)
                     .try_build()
                     .unwrap(),
             ),
