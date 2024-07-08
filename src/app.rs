@@ -80,12 +80,14 @@ pub enum Message {
     LoadPokemon(i64),
     FixAllImages,
     DownloadAllImages,
+    RenewCache,
 
     FirstRunSetupCompleted,
     LoadedPokemon(CustomPokemon),
     LoadedPokemonList(BTreeMap<i64, CustomPokemon>),
     DownloadedAllImages,
     AllImagesFixed,
+    CacheRenewed,
 }
 
 /// Identifies a page in the application.
@@ -351,6 +353,7 @@ impl Application for StarryDex {
                 self.pokemon_list = pokemons;
                 self.filtered_pokemon_list = self.pokemon_list.values().cloned().collect();
                 self.page_status = PageStatus::Loaded;
+                self.settings_status = SettingsStatus::NotDownloading;
             }
             Message::LoadedPokemon(pokemon) => {
                 self.selected_pokemon = Some(pokemon);
@@ -481,6 +484,28 @@ impl Application for StarryDex {
             Message::Modifiers(modifiers) => {
                 self.modifiers = modifiers;
             }
+            Message::RenewCache => {
+                let api_clone = self.api.clone();
+
+                self.page_status = PageStatus::Loading;
+                self.settings_status = SettingsStatus::Downloading;
+
+                return cosmic::app::Command::perform(
+                    async move { api_clone.delete_rustemon_cache().await },
+                    |_| cosmic::app::message::app(Message::CacheRenewed),
+                );
+            }
+            Message::CacheRenewed => {
+                self.api = Api::new(Self::APP_ID);
+                let api_clone = self.api.clone();
+
+                return cosmic::app::Command::perform(
+                    async move { api_clone.load_all_pokemon().await },
+                    |pokemon_list| {
+                        cosmic::app::message::app(Message::LoadedPokemonList(pokemon_list))
+                    },
+                );
+            }
         }
         Command::none()
     }
@@ -585,6 +610,29 @@ impl StarryDex {
             .spacing(spacing.space_xxs)
             .padding([0, 5, 0, 5]);
 
+        let renew_cache_row = widget::Row::new()
+            .push(
+                widget::column()
+                    .push(widget::text::text(fl!("renew-cache-title")))
+                    .push(widget::text::text(fl!("renew-cache-info")).size(10.0))
+                    .width(Length::Fill),
+            )
+            .push(match self.settings_status {
+                SettingsStatus::NotDownloading => {
+                    widget::button(widget::text::text(fl!("renew-cache-button-text")))
+                        .on_press(Message::RenewCache)
+                        .style(theme::Button::Destructive)
+                        .width(Length::Shrink)
+                }
+                SettingsStatus::Downloading => {
+                    widget::button(widget::text::text(fl!("renew-cache-button-text")))
+                        .style(theme::Button::Destructive)
+                        .width(Length::Shrink)
+                }
+            })
+            .spacing(spacing.space_xxs)
+            .padding([0, 5, 0, 5]);
+
         let app_theme_selected = match self.config.app_theme {
             AppTheme::Dark => 1,
             AppTheme::Light => 2,
@@ -596,6 +644,7 @@ impl StarryDex {
                 widget::settings::view_section(fl!("settings"))
                     .add(download_row)
                     .add(fix_row)
+                    .add(renew_cache_row)
                     .into(),
                 widget::settings::view_section(fl!("appearance"))
                     .add(
@@ -612,6 +661,7 @@ impl StarryDex {
                 widget::settings::view_section(fl!("settings"))
                     .add(download_row)
                     .add(fix_row)
+                    .add(renew_cache_row)
                     .add(
                         widget::row()
                             .push(

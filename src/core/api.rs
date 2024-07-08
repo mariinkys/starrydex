@@ -1,7 +1,9 @@
-use std::{collections::BTreeMap, fs, sync::Arc};
+use std::{collections::BTreeMap, fs, sync::Arc, time::Duration};
 
 use futures::{stream::iter, StreamExt};
-use rustemon::client::{CACacheManager, CacheMode, RustemonClient, RustemonClientBuilder};
+use rustemon::client::{
+    CACacheManager, CacheMode, CacheOptions, RustemonClient, RustemonClientBuilder,
+};
 use tokio::sync::Semaphore;
 
 use crate::{app::CustomPokemon, utils::download_image};
@@ -36,6 +38,12 @@ impl Api {
                 RustemonClientBuilder::default()
                     .with_manager(CACacheManager { path: cache_path })
                     .with_mode(CacheMode::ForceCache)
+                    .with_options(CacheOptions {
+                        shared: false,
+                        cache_heuristic: 100.0,
+                        immutable_min_time_to_live: Duration::from_secs(3600),
+                        ignore_cargo_cult: true,
+                    })
                     .try_build()
                     .unwrap(),
             ),
@@ -214,5 +222,13 @@ impl Api {
                 false
             }
         }
+    }
+
+    pub async fn delete_rustemon_cache(&self) {
+        let path = dirs::data_dir().unwrap().join(APP_ID).join("api_cache");
+
+        tokio::fs::remove_dir_all(path)
+            .await
+            .expect("Cannot remove cache dir");
     }
 }
