@@ -14,7 +14,7 @@ dark = Dark
 light = Light
 
 <#-- First Run -->
-downloading-sprites = Downloading Sprites...
+downloading-sprites = Downloading Sprites & Constructing Cache...
 estimate = It may take a minute
 once-message = This will only happen once
 
@@ -30,6 +30,9 @@ download-button-text = Download
 fix-all-title = Fix Sprites
 fix-all-info = This will take a really long time, only use it if necessary.
 fix-button-text = Fix Sprites
+renew-cache-title = Renew Cache
+renew-cache-info = This will refresh all data.
+renew-cache-button-text = Renew
 downloading-text = Downloading...
 
 <#-- Landing (Main) Page -->

@@ -13,7 +13,7 @@ use super::{
 };
 
 pub fn init() -> (Settings, Flags) {
-    set_logger();
+    //set_logger();
     set_image_cache();
     set_icon_cache();
 
@@ -32,6 +32,7 @@ pub fn get_app_settings() -> Settings {
     settings
 }
 
+#[allow(dead_code)]
 pub fn set_logger() {
     tracing_subscriber::fmt().json().init();
 }

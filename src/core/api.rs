@@ -1,8 +1,8 @@
-use std::{fs, path::Path, sync::Arc};
+use std::{fs, path::Path, sync::Arc, time::Duration};
 
 use futures::StreamExt;
 use rustemon::{
-    client::{CACacheManager, RustemonClient, RustemonClientBuilder},
+    client::{CACacheManager, CacheMode, CacheOptions, RustemonClient, RustemonClientBuilder},
     model::pokemon::Pokemon,
 };
 use tokio::sync::Semaphore;
@@ -38,6 +38,13 @@ impl Api {
             client: Arc::new(
                 RustemonClientBuilder::default()
                     .with_manager(CACacheManager { path: cache_path })
+                    .with_mode(CacheMode::ForceCache)
+                    .with_options(CacheOptions {
+                        shared: false,
+                        cache_heuristic: 100.0,
+                        immutable_min_time_to_live: Duration::from_secs(3600),
+                        ignore_cargo_cult: true,
+                    })
                     .try_build()
                     .unwrap(),
             ),
@@ -178,6 +185,42 @@ impl Api {
         Ok(())
     }
 
+    pub async fn load_all_pokemon_data(&self, download_sprites: bool) {
+        //Download Sprites
+        if download_sprites {
+            let _ = Self::download_all_pokemon_sprites(&self).await;
+        }
+
+        let all_entries = rustemon::pokemon::pokemon::get_all_entries(&self.client)
+            .await
+            .unwrap_or_default();
+
+        let semaphore = Arc::new(Semaphore::new(30));
+
+        let _ = futures::stream::iter(all_entries)
+            .map(|entry| {
+                let client = self.client.clone();
+                let sem = Arc::clone(&semaphore);
+                async move {
+                    let _permit = sem.acquire().await.unwrap();
+                    Self::fetch_pokemon_details(&entry.name, &client).await
+                }
+            })
+            .buffer_unordered(30)
+            .collect::<Vec<_>>()
+            .await;
+    }
+
+    async fn fetch_pokemon_details(name: &str, client: &rustemon::client::RustemonClient) {
+        let pokemon = rustemon::pokemon::pokemon::get_by_name(name, client)
+            .await
+            .unwrap_or_default();
+
+        let _ = rustemon::pokemon::pokemon::encounters::get_by_id(pokemon.id, client)
+            .await
+            .unwrap_or_default();
+    }
+
     //
     // HELPERS
     //
@@ -202,5 +245,13 @@ impl Api {
                 false
             }
         }
+    }
+
+    pub async fn delete_rustemon_cache(&self) {
+        let path = dirs::data_dir().unwrap().join(APP_ID).join("api_cache");
+
+        tokio::fs::remove_dir_all(path)
+            .await
+            .expect("Cannot remove cache dir");
     }
 }

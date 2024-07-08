@@ -80,12 +80,14 @@ pub enum Message {
     LoadPokemon(String),
     FixAllImages,
     DownloadAllImages,
+    RenewCache,
 
     FirstRunSetupCompleted,
     LoadedPokemon(CustomPokemon),
     LoadedPokemonList(Vec<CustomPokemon>),
     DownloadedAllImages,
     AllImagesFixed,
+    CacheRenewed,
 }
 
 /// Identifies a page in the application.
@@ -207,8 +209,9 @@ impl Application for StarryDex {
                 std::fs::File::create(&first_run_file).expect("Failed to create first_run.txt");
 
             app.page_status = PageStatus::FirstRun;
+
             commands.push(cosmic::app::Command::perform(
-                async move { api_clone.download_all_pokemon_sprites().await },
+                async move { api_clone.clone().load_all_pokemon_data(true).await },
                 |_| cosmic::app::message::app(Message::FirstRunSetupCompleted),
             ));
         } else {
@@ -351,6 +354,7 @@ impl Application for StarryDex {
                 self.pokemon_list = pokemons.clone();
                 self.filtered_pokemon_list = pokemons;
                 self.page_status = PageStatus::Loaded;
+                self.settings_status = SettingsStatus::NotDownloading;
             }
             Message::LoadedPokemon(pokemon) => {
                 self.selected_pokemon = Some(pokemon);
@@ -475,6 +479,26 @@ impl Application for StarryDex {
             Message::Modifiers(modifiers) => {
                 self.modifiers = modifiers;
             }
+            Message::RenewCache => {
+                let api_clone = self.api.clone();
+
+                self.page_status = PageStatus::Loading;
+                self.settings_status = SettingsStatus::Downloading;
+
+                return cosmic::app::Command::perform(
+                    async move { api_clone.delete_rustemon_cache().await },
+                    |_| cosmic::app::message::app(Message::CacheRenewed),
+                );
+            }
+            Message::CacheRenewed => {
+                self.api = Api::new(Self::APP_ID);
+                let api_clone = self.api.clone();
+
+                return cosmic::app::Command::perform(
+                    async move { api_clone.load_all_pokemon_data(false).await },
+                    |_| cosmic::app::message::app(Message::FirstRunSetupCompleted),
+                );
+            }
         }
         Command::none()
     }
@@ -579,6 +603,29 @@ impl StarryDex {
             .spacing(spacing.space_xxs)
             .padding([0, 5, 0, 5]);
 
+        let renew_cache_row = widget::Row::new()
+            .push(
+                widget::column()
+                    .push(widget::text::text(fl!("renew-cache-title")))
+                    .push(widget::text::text(fl!("renew-cache-info")).size(10.0))
+                    .width(Length::Fill),
+            )
+            .push(match self.settings_status {
+                SettingsStatus::NotDownloading => {
+                    widget::button(widget::text::text(fl!("renew-cache-button-text")))
+                        .on_press(Message::RenewCache)
+                        .style(theme::Button::Destructive)
+                        .width(Length::Shrink)
+                }
+                SettingsStatus::Downloading => {
+                    widget::button(widget::text::text(fl!("renew-cache-button-text")))
+                        .style(theme::Button::Destructive)
+                        .width(Length::Shrink)
+                }
+            })
+            .spacing(spacing.space_xxs)
+            .padding([0, 5, 0, 5]);
+
         let app_theme_selected = match self.config.app_theme {
             AppTheme::Dark => 1,
             AppTheme::Light => 2,
@@ -590,6 +637,7 @@ impl StarryDex {
                 widget::settings::view_section(fl!("settings"))
                     .add(download_row)
                     .add(fix_row)
+                    .add(renew_cache_row)
                     .into(),
                 widget::settings::view_section(fl!("appearance"))
                     .add(
@@ -606,6 +654,7 @@ impl StarryDex {
                 widget::settings::view_section(fl!("settings"))
                     .add(download_row)
                     .add(fix_row)
+                    .add(renew_cache_row)
                     .add(
                         widget::row()
                             .push(
