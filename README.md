@@ -15,6 +15,13 @@
 
 ## Information
 
+> [!TIP]
+> The application can work offline after initial setup is completed.
+
+> [!WARNING]
+> Beware there are some visual bugs when COSMIC is not installed on the system.
+> (It seems like you do not need to be using COSMIC, but you need to have it installed to avoid visual issues with libcosmic).
+
 Created by [mariinkys](https://github.com/mariinkys). Pokémon and Pokémon character names are trademarks of Nintendo.
 
 This application uses [PokeApi](https://github.com/PokeAPI/) and it's resources. 
