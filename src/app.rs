@@ -542,6 +542,12 @@ impl StarryDex {
 
         let nintendo_text = widget::text::text(fl!("nintendo-text"));
 
+        let version_link = widget::button::link(format!("v{}", env!("CARGO_PKG_VERSION")))
+            .on_press(Message::LaunchUrl(
+                "https://github.com/mariinkys/starrydex/releases".to_string(),
+            ))
+            .padding(0);
+
         widget::column()
             .push(icon)
             .push(title)
@@ -549,6 +555,7 @@ impl StarryDex {
             .push(link)
             .push(pokeapi_text)
             .push(nintendo_text)
+            .push(version_link)
             .align_items(Alignment::Center)
             .spacing(space_xxs)
             .into()
