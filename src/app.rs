@@ -235,7 +235,10 @@ impl Application for StarryDex {
                     menu::Item::Button(fl!("settings"), Action::Settings),
                 ],
             ),
-        )]);
+        )])
+        .item_height(menu::ItemHeight::Dynamic(40))
+        .item_width(menu::ItemWidth::Uniform(270))
+        .spacing(4.0);
 
         vec![menu_bar.into()]
     }
