@@ -1,17 +1,24 @@
-<p align="center">
- <img src="https://raw.githubusercontent.com/mariinkys/starrydex/main/res/icons/hicolor/256x256/apps/dev.mariinkys.StarryDex.svg">
-</p>
-
+<div align="center">
+<br>
+<img src="https://raw.githubusercontent.com/mariinkys/starrydex/main/res/icons/hicolor/256x256/apps/dev.mariinkys.StarryDex.svg">
 <h1 align="center">StarryDex</h1>
 
-<p align="center">
- This project contains a small Pokédex application for the COSMIC™ desktop written in Rust with <a href="https://github.com/pop-os/libcosmic" target="_blank">libcosmic</a>.
-</p>
+![Flathub Version](https://img.shields.io/flathub/v/dev.mariinkys.StarryDex)
+![Flathub Downloads](https://img.shields.io/flathub/downloads/dev.mariinkys.StarryDex)
+![GitHub License](https://img.shields.io/github/license/mariinkys/starrydex)
+![GitHub Repo stars](https://img.shields.io/github/stars/mariinkys/starrydex)
 
-<p align="center">
- <img src="https://raw.githubusercontent.com/mariinkys/starrydex/main/screenshots/main.png" width=350>
- <img src="https://raw.githubusercontent.com/mariinkys/starrydex/main/screenshots/pokemon.png" width=350>
-</p>
+<h3>A Pokédex application for the COSMIC™ desktop</h3>
+
+<img src="https://raw.githubusercontent.com/mariinkys/starrydex/main/screenshots/main.png" width=350>
+<img src="https://raw.githubusercontent.com/mariinkys/starrydex/main/screenshots/pokemon.png" width=350>
+
+<br><br>
+
+<a href="https://flathub.org/apps/dev.mariinkys.StarryDex">
+   <img width='240' alt='Download on Flathub' src='https://flathub.org/api/badge?locale=en'/>
+ </a>
+ </div>
 
 ## Information
 
