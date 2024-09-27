@@ -9,11 +9,6 @@ mod app;
 mod core;
 mod utils;
 
-/// The `cosmic::app::run()` function is the starting point of your application.
-/// It takes two arguments:
-/// - `settings` is a structure that contains everything relevant with your app's configuration, such as antialiasing, themes, icons, etc...
-/// - `()` is the flags that your app needs to use before it starts.
-///  If your app does not need any flags, you can pass in `()`.
 fn main() -> cosmic::iced::Result {
     init_localizer();
 
@@ -26,6 +21,6 @@ fn init_localizer() {
     let requested_languages = DesktopLanguageRequester::requested_languages();
 
     if let Err(why) = localizer.select(&requested_languages) {
-        panic!("can't load localizations: {}", why.to_string());
+        panic!("can't load localizations: {}", why);
     }
 }

@@ -9,6 +9,7 @@ use tokio::sync::Semaphore;
 
 use crate::{app::CustomPokemon, utils::download_image};
 
+#[allow(clippy::redundant_static_lifetimes)]
 const APP_ID: &'static str = "dev.mariinkys.StarryDex";
 
 #[derive(Debug)]
@@ -136,7 +137,7 @@ impl Api {
         };
 
         CustomPokemon {
-            pokemon: pokemon,
+            pokemon,
             sprite_path: image_path,
             encounter_info: Some(encounter_info),
         }
@@ -188,7 +189,7 @@ impl Api {
     pub async fn load_all_pokemon_data(&self, download_sprites: bool) {
         //Download Sprites
         if download_sprites {
-            let _ = Self::download_all_pokemon_sprites(&self).await;
+            let _ = Self::download_all_pokemon_sprites(self).await;
         }
 
         let all_entries = rustemon::pokemon::pokemon::get_all_entries(&self.client)

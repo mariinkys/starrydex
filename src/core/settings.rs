@@ -48,9 +48,8 @@ pub fn set_icon_cache() {
 pub fn get_flags() -> Flags {
     let (config_handler, config) = (StarryDexConfig::config_handler(), StarryDexConfig::config());
 
-    let flags = Flags {
+    Flags {
         config_handler,
         config,
-    };
-    flags
+    }
 }
