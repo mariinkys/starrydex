@@ -64,6 +64,7 @@ pub struct StarryDex {
     wants_pokemon_details: bool,
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum Message {
     LaunchUrl(String),
@@ -575,17 +576,13 @@ impl StarryDex {
                     .width(Length::Fill),
             )
             .push(match self.settings_status {
-                SettingsStatus::NotDownloading => {
-                    widget::button(widget::text::text(fl!("download-button-text")))
-                        .on_press(Message::DownloadAllImages)
-                        .style(theme::Button::Suggested)
-                        .width(Length::Shrink)
-                }
-                SettingsStatus::Downloading => {
-                    widget::button(widget::text::text(fl!("download-button-text")))
-                        .style(theme::Button::Suggested)
-                        .width(Length::Shrink)
-                }
+                SettingsStatus::NotDownloading => widget::button::text(fl!("download-button-text"))
+                    .on_press(Message::DownloadAllImages)
+                    .style(theme::Button::Suggested)
+                    .width(Length::Shrink),
+                SettingsStatus::Downloading => widget::button::text(fl!("download-button-text"))
+                    .style(theme::Button::Suggested)
+                    .width(Length::Shrink),
             })
             .spacing(spacing.space_xxs)
             .padding([0, 5, 0, 5]);
@@ -598,17 +595,13 @@ impl StarryDex {
                     .width(Length::Fill),
             )
             .push(match self.settings_status {
-                SettingsStatus::NotDownloading => {
-                    widget::button(widget::text::text(fl!("fix-button-text")))
-                        .on_press(Message::FixAllImages)
-                        .style(theme::Button::Destructive)
-                        .width(Length::Shrink)
-                }
-                SettingsStatus::Downloading => {
-                    widget::button(widget::text::text(fl!("fix-button-text")))
-                        .style(theme::Button::Destructive)
-                        .width(Length::Shrink)
-                }
+                SettingsStatus::NotDownloading => widget::button::text(fl!("fix-button-text"))
+                    .on_press(Message::FixAllImages)
+                    .style(theme::Button::Destructive)
+                    .width(Length::Shrink),
+                SettingsStatus::Downloading => widget::button::text(fl!("fix-button-text"))
+                    .style(theme::Button::Destructive)
+                    .width(Length::Shrink),
             })
             .spacing(spacing.space_xxs)
             .padding([0, 5, 0, 5]);
@@ -622,16 +615,14 @@ impl StarryDex {
             )
             .push(match self.settings_status {
                 SettingsStatus::NotDownloading => {
-                    widget::button(widget::text::text(fl!("renew-cache-button-text")))
+                    widget::button::text(fl!("renew-cache-button-text"))
                         .on_press(Message::RenewCache)
                         .style(theme::Button::Destructive)
                         .width(Length::Shrink)
                 }
-                SettingsStatus::Downloading => {
-                    widget::button(widget::text::text(fl!("renew-cache-button-text")))
-                        .style(theme::Button::Destructive)
-                        .width(Length::Shrink)
-                }
+                SettingsStatus::Downloading => widget::button::text(fl!("renew-cache-button-text"))
+                    .style(theme::Button::Destructive)
+                    .width(Length::Shrink),
             })
             .spacing(spacing.space_xxs)
             .padding([0, 5, 0, 5]);
@@ -644,12 +635,14 @@ impl StarryDex {
 
         match self.settings_status {
             SettingsStatus::NotDownloading => widget::settings::view_column(vec![
-                widget::settings::view_section(fl!("settings"))
+                widget::settings::section()
+                    .title(fl!("settings"))
                     .add(download_row)
                     .add(fix_row)
                     .add(renew_cache_row)
                     .into(),
-                widget::settings::view_section(fl!("appearance"))
+                widget::settings::section()
+                    .title(fl!("appearance"))
                     .add(
                         widget::settings::item::builder(fl!("theme")).control(widget::dropdown(
                             &self.app_themes,
@@ -661,7 +654,8 @@ impl StarryDex {
             ])
             .into(),
             SettingsStatus::Downloading => widget::settings::view_column(vec![
-                widget::settings::view_section(fl!("settings"))
+                widget::settings::section()
+                    .title(fl!("settings"))
                     .add(download_row)
                     .add(fix_row)
                     .add(renew_cache_row)
@@ -676,7 +670,8 @@ impl StarryDex {
                             .width(Length::Fill),
                     )
                     .into(),
-                widget::settings::view_section(fl!("appearance"))
+                widget::settings::section()
+                    .title(fl!("appearance"))
                     .add(
                         widget::settings::item::builder(fl!("theme")).control(widget::dropdown(
                             &self.app_themes,
@@ -711,7 +706,7 @@ impl StarryDex {
                             .height(Length::Fixed(100.0))
                     };
 
-                    let pokemon_container = widget::button(
+                    let pokemon_container = widget::button::custom(
                         widget::Column::new()
                             .push(pokemon_image.width(Length::Shrink))
                             .push(
@@ -799,7 +794,7 @@ impl StarryDex {
                         .push(
                             widget::text::text(format!(
                                 "{} Kg",
-                                scale_numbers(custom_pokemon.pokemon.weight).to_string()
+                                scale_numbers(custom_pokemon.pokemon.weight)
                             ))
                             .size(15.0),
                         )
@@ -815,7 +810,7 @@ impl StarryDex {
                         .push(
                             widget::text::text(format!(
                                 "{} m",
-                                scale_numbers(custom_pokemon.pokemon.height).to_string()
+                                scale_numbers(custom_pokemon.pokemon.height)
                             ))
                             .size(15.0),
                         )
@@ -870,12 +865,12 @@ impl StarryDex {
                     .align_items(Alignment::Center)
                     .spacing(10.0);
 
-                if custom_pokemon.encounter_info.is_some() {
-                    if custom_pokemon.encounter_info.clone().unwrap().is_empty() == false {
-                        result_col = result_col.push(show_details);
-                        if self.wants_pokemon_details {
-                            result_col = result_col.push(encounter_info);
-                        }
+                if custom_pokemon.encounter_info.is_some()
+                    && !custom_pokemon.encounter_info.clone().unwrap().is_empty()
+                {
+                    result_col = result_col.push(show_details);
+                    if self.wants_pokemon_details {
+                        result_col = result_col.push(encounter_info);
                     }
                 }
 
@@ -890,7 +885,7 @@ impl StarryDex {
                     .align_x(Horizontal::Center)
                     .align_y(Vertical::Center);
 
-                widget::Column::new().push(error).into()
+                widget::Column::new().push(error)
             }
         };
 
@@ -914,6 +909,7 @@ impl StarryDex {
         self.set_window_title(window_title)
     }
 
+    #[allow(clippy::ptr_arg)]
     pub fn parse_pokemon_stats(
         &self,
         stats: &Vec<PokemonStat>,
@@ -935,6 +931,7 @@ impl StarryDex {
             .into()
     }
 
+    #[allow(clippy::ptr_arg)]
     pub fn parse_pokemon_types(
         &self,
         types: &Vec<PokemonType>,
@@ -957,6 +954,7 @@ impl StarryDex {
             .into()
     }
 
+    #[allow(clippy::ptr_arg)]
     pub fn parse_pokemon_abilities(
         &self,
         abilities: &Vec<PokemonAbility>,
@@ -985,6 +983,7 @@ impl StarryDex {
             .into()
     }
 
+    #[allow(clippy::ptr_arg)]
     pub fn parse_encounter_info(
         &self,
         encounter_info: &Vec<LocationAreaEncounter>,
