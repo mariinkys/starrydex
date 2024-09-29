@@ -13,7 +13,7 @@ use cosmic::iced_core::text::LineHeight;
 use cosmic::widget::{self, menu, Column};
 use cosmic::{cosmic_theme, theme, Application, ApplicationExt, Element};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 const REPOSITORY: &str = "https://github.com/mariinkys/starrydex";
 const APP_ICON: &[u8] =
@@ -46,6 +46,8 @@ pub struct StarryDex {
     wants_pokemon_details: bool,
     // Holds the search input value
     search: String,
+    // Holds the currently applied filters if there are any
+    filters: Filters,
 }
 
 /// Messages emitted by the application and its widgets.
@@ -59,9 +61,12 @@ pub enum Message {
     LoadPokemon(i64),
     TogglePokemonDetails(bool),
     Search(String),
+    ApplyCurrentFilters,
+    ClearFilters,
 
     CompletedFirstRun(Config, BTreeMap<i64, StarryPokemon>),
     LoadedPokemonList(BTreeMap<i64, StarryPokemon>),
+    TypeFilterToggled(bool, String),
 }
 
 /// Represents a Pokémon in the application
@@ -99,6 +104,10 @@ pub struct StarryPokemonStats {
 pub struct StarryPokemonEncounterInfo {
     pub city: String,
     pub games_method: Vec<String>,
+}
+
+pub struct Filters {
+    pub selected_types: HashSet<String>,
 }
 
 /// Identifies the status of a page in the application.
@@ -167,6 +176,9 @@ impl Application for StarryDex {
             selected_pokemon: None,
             wants_pokemon_details: false,
             search: String::new(),
+            filters: Filters {
+                selected_types: HashSet::new(),
+            },
         };
         // Startup command that sets the window title.
         commands.push(app.update_title());
@@ -231,6 +243,7 @@ impl Application for StarryDex {
             ContextPage::About => self.about(),
             ContextPage::Settings => self.settings(),
             ContextPage::PokemonPage => self.single_pokemon_page(),
+            ContextPage::FiltersPage => self.filters_page(),
         })
     }
 
@@ -359,7 +372,7 @@ impl Application for StarryDex {
             }
             Message::TogglePokemonDetails(value) => self.wants_pokemon_details = value,
             Message::Search(value) => {
-                // TODO: Improve search speed? Search by id...
+                // TODO: Improve search speed? Search by id...Search shouldn't erase filters
                 self.search = value;
                 self.filtered_pokemon_list = self
                     .pokemon_list
@@ -373,6 +386,50 @@ impl Application for StarryDex {
                     })
                     .map(|(_, pokemon)| pokemon.clone())
                     .collect();
+            }
+            Message::TypeFilterToggled(value, type_name) => {
+                if value {
+                    // Add the selected type to the filter
+                    self.filters.selected_types.insert(type_name);
+                } else {
+                    // Remove the deselected type from the filter
+                    self.filters.selected_types.remove(&type_name);
+                }
+                //self.apply_filters();
+            }
+            Message::ApplyCurrentFilters => {
+                //TODO: Revisit how to do this without this being necessary, search does not need to be lost?
+                self.search = String::new();
+
+                let selected_types_lowercase: HashSet<String> = self
+                    .filters
+                    .selected_types
+                    .iter()
+                    .map(|t| t.to_lowercase())
+                    .collect();
+
+                self.filtered_pokemon_list = self
+                    .pokemon_list
+                    .values()
+                    .filter(|pokemon| {
+                        selected_types_lowercase.is_empty()
+                            || pokemon
+                                .pokemon
+                                .types
+                                .iter()
+                                .any(|t| selected_types_lowercase.contains(&t.to_lowercase()))
+                    })
+                    .cloned()
+                    .collect();
+
+                self.core.window.show_context = false;
+            }
+            Message::ClearFilters => {
+                self.filtered_pokemon_list = self.pokemon_list.values().cloned().collect();
+                self.filters = Filters {
+                    selected_types: HashSet::new(),
+                };
+                self.current_page_status = PageStatus::Loaded;
             }
         }
         Command::none()
@@ -489,7 +546,24 @@ impl StarryDex {
             .line_height(LineHeight::Absolute(Pixels(35.0)))
             .width(Length::Fill);
 
-        let search_row = widget::Row::new().push(search).width(Length::Fill);
+        // TODO: Fix Styling, set same line height as search?
+        let filters = widget::button::standard(fl!("filter"))
+            .style(theme::Button::Suggested)
+            .on_press(Message::ToggleContextPage(ContextPage::FiltersPage))
+            .width(Length::Shrink);
+
+        // TODO: Fix Styling, set same line height as search?
+        let clear_filters = widget::button::standard(fl!("clear-filters"))
+            .style(theme::Button::Destructive)
+            .on_press(Message::ClearFilters)
+            .width(Length::Shrink);
+
+        let search_row = widget::Row::new()
+            .push(search)
+            .push(filters)
+            .push(clear_filters)
+            .spacing(Pixels::from(spacing.space_xxxs))
+            .width(Length::Fill);
 
         widget::Column::new()
             .push(search_row)
@@ -504,7 +578,7 @@ impl StarryDex {
             .into()
     }
 
-    /// The about context page for this app.
+    /// The pokemon details context page for this app.
     pub fn single_pokemon_page(&self) -> Element<Message> {
         let spacing = theme::active().cosmic().spacing;
 
@@ -588,7 +662,7 @@ impl StarryDex {
                     Column::new()
                         .push(
                             widget::Row::new()
-                                .push(widget::text("HP").width(Length::Fill))
+                                .push(widget::text(fl!("hp")).width(Length::Fill))
                                 .push(
                                     widget::text(starry_pokemon.pokemon.stats.hp.to_string())
                                         .horizontal_alignment(Horizontal::Left),
@@ -596,7 +670,7 @@ impl StarryDex {
                         )
                         .push(
                             widget::Row::new()
-                                .push(widget::text("Attack").width(Length::Fill))
+                                .push(widget::text(fl!("attack")).width(Length::Fill))
                                 .push(
                                     widget::text(starry_pokemon.pokemon.stats.attack.to_string())
                                         .horizontal_alignment(Horizontal::Left),
@@ -604,7 +678,7 @@ impl StarryDex {
                         )
                         .push(
                             widget::Row::new()
-                                .push(widget::text("Defense").width(Length::Fill))
+                                .push(widget::text(fl!("defense")).width(Length::Fill))
                                 .push(
                                     widget::text(starry_pokemon.pokemon.stats.defense.to_string())
                                         .horizontal_alignment(Horizontal::Left),
@@ -612,7 +686,7 @@ impl StarryDex {
                         )
                         .push(
                             widget::Row::new()
-                                .push(widget::text("Special Attack").width(Length::Fill))
+                                .push(widget::text(fl!("sp-a")).width(Length::Fill))
                                 .push(
                                     widget::text(
                                         starry_pokemon.pokemon.stats.sp_attack.to_string(),
@@ -622,7 +696,7 @@ impl StarryDex {
                         )
                         .push(
                             widget::Row::new()
-                                .push(widget::text("Special Defense").width(Length::Fill))
+                                .push(widget::text(fl!("sp-d")).width(Length::Fill))
                                 .push(
                                     widget::text(
                                         starry_pokemon.pokemon.stats.sp_defense.to_string(),
@@ -632,7 +706,7 @@ impl StarryDex {
                         )
                         .push(
                             widget::Row::new()
-                                .push(widget::text("Speed").width(Length::Fill))
+                                .push(widget::text(fl!("spd")).width(Length::Fill))
                                 .push(
                                     widget::text(starry_pokemon.pokemon.stats.speed.to_string())
                                         .horizontal_alignment(Horizontal::Left),
@@ -725,6 +799,87 @@ impl StarryDex {
         widget::container(content).into()
     }
 
+    /// The filters context page for this app.
+    pub fn filters_page(&self) -> Element<Message> {
+        // TODO: Pokémon Types can't be transated because they need to match so the filtering works.
+        //let all_pokemon_types = vec![
+        //    fl!("normal"),
+        //    fl!("fire"),
+        //    fl!("water"),
+        //    fl!("electric"),
+        //    fl!("grass"),
+        //    fl!("ice"),
+        //    fl!("fighting"),
+        //    fl!("poison"),
+        //    fl!("ground"),
+        //    fl!("flying"),
+        //    fl!("psychic"),
+        //    fl!("bug"),
+        //    fl!("rock"),
+        //    fl!("ghost"),
+        //    fl!("dragon"),
+        //    fl!("dark"),
+        //    fl!("steel"),
+        //    fl!("fairy"),
+        //];
+        let all_pokemon_types = vec![
+            "Normal", "Fire", "Water", "Electric", "Grass", "Ice", "Fighting", "Poison", "Ground",
+            "Flying", "Psychic", "Bug", "Rock", "Ghost", "Dragon", "Dark", "Steel", "Fairy",
+        ];
+
+        let type_checkboxes: Vec<Element<Message>> = all_pokemon_types
+            .into_iter()
+            .map(|pokemon_type| {
+                let is_checked = self.filters.selected_types.contains(pokemon_type);
+                let checkbox: Element<Message> =
+                    widget::checkbox::Checkbox::new(pokemon_type, is_checked, move |value| {
+                        Message::TypeFilterToggled(value, pokemon_type.to_string())
+                    })
+                    .into();
+
+                widget::Container::new(checkbox).width(Length::Fill).into()
+            })
+            .collect();
+
+        let mut types_column = widget::Column::new()
+            .push(widget::text::title3(fl!("type-filters")))
+            .spacing(5)
+            .width(Length::Fill);
+        let mut current_row = widget::Row::new();
+        let mut count = 0;
+
+        for t_checkbox in type_checkboxes {
+            current_row = current_row.push(t_checkbox);
+            count += 1;
+
+            if count % 2 == 0 {
+                types_column = types_column.push(current_row);
+                current_row = widget::Row::new();
+            }
+        }
+
+        // If there's an odd number of checkboxes, add the last row
+        if count % 2 != 0 {
+            types_column = types_column.push(current_row);
+        }
+
+        let result_column = widget::Column::new()
+            .width(Length::Fill)
+            .push(types_column)
+            .push(
+                widget::Container::new(
+                    widget::button::suggested(fl!("apply-filters"))
+                        .on_press(Message::ApplyCurrentFilters)
+                        .width(Length::Shrink),
+                )
+                .width(Length::Fill)
+                .align_x(Horizontal::Center),
+            )
+            .spacing(Pixels::from(30.0));
+
+        widget::Container::new(result_column).into()
+    }
+
     /// Updates the header and window titles.
     pub fn update_title(&mut self) -> Command<Message> {
         let window_title = fl!("app-title");
@@ -745,6 +900,7 @@ pub enum ContextPage {
     About,
     Settings,
     PokemonPage,
+    FiltersPage,
 }
 
 impl ContextPage {
@@ -753,6 +909,7 @@ impl ContextPage {
             Self::About => fl!("about"),
             Self::Settings => fl!("settings"),
             Self::PokemonPage => fl!("pokemon-page"),
+            Self::FiltersPage => fl!("filters-page"),
         }
     }
 }

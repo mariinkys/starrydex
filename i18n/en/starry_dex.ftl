@@ -28,6 +28,8 @@ nintendo-text = Pokémon and Pokémon character names are trademarks of Nintendo
 <#-- Landing (Main) Page -->
 landing-page-title = All Pokémon
 search = Search
+filter = Filter
+clear-filters = Clear
 
 <#-- Pokemon Details Page -->
 pokemon-page = Pokémon
@@ -36,3 +38,37 @@ weight = WEIGHT
 show-encounter-details = Show Encounter Details
 no-encounter-info = No encounter info...
 link-more-info = More Info
+
+<#-- Filters Page -->
+filters-page = Filters
+apply-filters = Apply Filters
+type-filters = Filter by Type
+
+<#-- Pokemon Types -->
+normal = Normal
+fire = Fire
+water = Water
+electric = Electric
+grass = Grass
+ice = Ice
+fighting = Fighting
+poison = Poison
+ground = Ground
+flying = Flying
+psychic = Psychic
+bug = Bug
+rock = Rock
+ghost = Ghost
+dragon = Dragon
+dark = Dark
+steel = Steel
+fairy = Fairy
+
+
+<#-- Pokemon Stats -->
+hp = HP
+attack = Attack
+defense = Defense
+sp-a = Special Attack
+sp-d = Special Defense
+spd = Speed
