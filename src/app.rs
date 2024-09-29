@@ -4,7 +4,7 @@ use crate::api::Api;
 use crate::config::{AppTheme, Config, TypeFilteringMode};
 use crate::fl;
 use crate::image_cache::ImageCache;
-use crate::utils::{capitalize_string, scale_numbers};
+use crate::utils::{capitalize_string, remove_dir_contents, scale_numbers};
 use cosmic::app::{Command, Core};
 use cosmic::cosmic_config::{self, CosmicConfigEntry};
 use cosmic::iced::alignment::{Horizontal, Vertical};
@@ -67,6 +67,7 @@ pub enum Message {
     Search(String),
     ApplyCurrentFilters,
     ClearFilters,
+    DeleteCache,
 
     CompletedFirstRun(Config, BTreeMap<i64, StarryPokemon>),
     LoadedPokemonList(BTreeMap<i64, StarryPokemon>),
@@ -483,6 +484,25 @@ impl Application for StarryDex {
                     app_theme: old_config.app_theme,
                 };
             }
+            Message::DeleteCache => {
+                self.current_page_status = PageStatus::FirstRun;
+                self.set_show_context(false);
+
+                let data_dir = dirs::data_dir().unwrap().join(Self::APP_ID);
+                if let Err(e) = remove_dir_contents(&data_dir) {
+                    eprintln!("Error deleting cache: {}", e);
+                }
+
+                // Reset the API
+                self.api = Api::new(Self::APP_ID);
+                let api_clone = self.api.clone();
+                return cosmic::app::Command::perform(
+                    async move { api_clone.load_all_pokemon().await },
+                    |pokemon_list| {
+                        cosmic::app::message::app(Message::LoadedPokemonList(pokemon_list))
+                    },
+                );
+            }
         }
         Command::none()
     }
@@ -577,6 +597,12 @@ impl StarryDex {
                             Some(type_filter_mode_selected),
                             Message::UpdateTypeFilterMode,
                         ),
+                    ),
+                )
+                .add(
+                    widget::settings::item::builder(fl!("renew-cache")).control(
+                        widget::button::destructive(fl!("renew-cache-button"))
+                            .on_press(Message::DeleteCache),
                     ),
                 )
                 .into(),
