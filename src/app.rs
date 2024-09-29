@@ -543,16 +543,14 @@ impl StarryDex {
         let search = widget::search_input(fl!("search"), &self.search)
             .style(theme::TextInput::Search)
             .on_input(Message::Search)
-            .line_height(LineHeight::Absolute(Pixels(35.0)))
+            .line_height(LineHeight::Absolute(Pixels(30.0)))
             .width(Length::Fill);
 
-        // TODO: Fix Styling, set same line height as search?
         let filters = widget::button::standard(fl!("filter"))
             .style(theme::Button::Suggested)
             .on_press(Message::ToggleContextPage(ContextPage::FiltersPage))
             .width(Length::Shrink);
 
-        // TODO: Fix Styling, set same line height as search?
         let clear_filters = widget::button::standard(fl!("clear-filters"))
             .style(theme::Button::Destructive)
             .on_press(Message::ClearFilters)
