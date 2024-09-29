@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 use futures::StreamExt;
 use rustemon::client::{
     CacheMode, CacheOptions, MokaManager, RustemonClient, RustemonClientBuilder,

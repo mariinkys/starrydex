@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: {{LICENSE}}
+// SPDX-License-Identifier: GPL-3.0-only
 
 //! Provides localization support for this crate.
 
