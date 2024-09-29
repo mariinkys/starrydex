@@ -44,6 +44,8 @@ pub struct StarryDex {
     selected_pokemon: Option<StarryPokemon>,
     // Controls the Pokémon Details Toggle of the Pokémon Context Page
     wants_pokemon_details: bool,
+    // Holds the search input value
+    search: String,
 }
 
 /// Messages emitted by the application and its widgets.
@@ -56,6 +58,7 @@ pub enum Message {
 
     LoadPokemon(i64),
     TogglePokemonDetails(bool),
+    Search(String),
 
     CompletedFirstRun(Config, BTreeMap<i64, StarryPokemon>),
     LoadedPokemonList(BTreeMap<i64, StarryPokemon>),
@@ -163,6 +166,7 @@ impl Application for StarryDex {
             filtered_pokemon_list: Vec::new(),
             selected_pokemon: None,
             wants_pokemon_details: false,
+            search: String::new(),
         };
         // Startup command that sets the window title.
         commands.push(app.update_title());
@@ -354,6 +358,22 @@ impl Application for StarryDex {
                 self.set_context_title(ContextPage::PokemonPage.title());
             }
             Message::TogglePokemonDetails(value) => self.wants_pokemon_details = value,
+            Message::Search(value) => {
+                // TODO: Improve search speed? Search by id...
+                self.search = value;
+                self.filtered_pokemon_list = self
+                    .pokemon_list
+                    .iter()
+                    .filter(|(&_id, pokemon)| {
+                        pokemon
+                            .pokemon
+                            .name
+                            .to_lowercase()
+                            .contains(&self.search.to_lowercase())
+                    })
+                    .map(|(_, pokemon)| pokemon.clone())
+                    .collect();
+            }
         }
         Command::none()
     }
@@ -463,8 +483,16 @@ impl StarryDex {
             pokemon_grid = pokemon_grid.push(pokemon_container);
         }
 
+        let search = widget::search_input(fl!("search"), &self.search)
+            .style(theme::TextInput::Search)
+            .on_input(Message::Search)
+            .line_height(LineHeight::Absolute(Pixels(35.0)))
+            .width(Length::Fill);
+
+        let search_row = widget::Row::new().push(search).width(Length::Fill);
+
         widget::Column::new()
-            //.push(search_row)
+            .push(search_row)
             .push(
                 widget::scrollable(
                     widget::Container::new(pokemon_grid).align_x(Horizontal::Center),
