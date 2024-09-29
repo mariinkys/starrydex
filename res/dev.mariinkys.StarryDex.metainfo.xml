@@ -31,6 +31,7 @@
 
     <provides>
         <id>dev.mariinkys.StarryDex.desktop</id>
+        <id>com.system76.CosmicApplication</id>
         <binary>starry-dex</binary>
     </provides>
 
@@ -54,7 +55,6 @@
         <category>Utility</category>
         <category>Game</category>
         <category>Education</category>
-        <category>COSMIC</category>
     </categories>
 
     <keywords>
