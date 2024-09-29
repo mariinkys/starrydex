@@ -1,26 +1,21 @@
-// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-License-Identifier: {{LICENSE}}
 
-use core::localization;
-
-use app::StarryDex;
-use i18n_embed::DesktopLanguageRequester;
-/// The `app` module is used by convention to indicate the main component of our application.
+mod api;
 mod app;
-mod core;
+mod config;
+mod i18n;
 mod utils;
 
 fn main() -> cosmic::iced::Result {
-    init_localizer();
+    // Get the system's preferred languages.
+    let requested_languages = i18n_embed::DesktopLanguageRequester::requested_languages();
 
-    let (settings, flags) = core::settings::init();
-    cosmic::app::run::<StarryDex>(settings, flags)
-}
+    // Enable localizations to be applied.
+    i18n::init(&requested_languages);
 
-fn init_localizer() {
-    let localizer = localization::localizer();
-    let requested_languages = DesktopLanguageRequester::requested_languages();
+    // Settings for configuring the application window and iced runtime.
+    let settings = cosmic::app::Settings::default();
 
-    if let Err(why) = localizer.select(&requested_languages) {
-        panic!("can't load localizations: {}", why);
-    }
+    // Starts the application's event loop with `()` as the application's flags.
+    cosmic::app::run::<app::StarryDex>(settings, ())
 }
