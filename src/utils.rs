@@ -1,6 +1,10 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 use std::fs;
 
-const APP_ID: &'static str = "dev.mariinkys.StarryDex";
+use crate::app::StarryPokemonStats;
+
+const APP_ID: &str = "dev.mariinkys.StarryDex";
 
 pub fn capitalize_string(input: &str) -> String {
     let words: Vec<&str> = input.split('-').collect();
@@ -22,6 +26,31 @@ pub fn capitalize_string(input: &str) -> String {
 
 pub fn scale_numbers(num: i64) -> f64 {
     (num as f64) / 10.0
+}
+
+pub fn parse_pokemon_stats(stats: &[rustemon::model::pokemon::PokemonStat]) -> StarryPokemonStats {
+    let mut starry_stats = StarryPokemonStats {
+        hp: 0,
+        attack: 0,
+        defense: 0,
+        sp_attack: 0,
+        sp_defense: 0,
+        speed: 0,
+    };
+
+    for stat in stats {
+        match stat.stat.name.as_str() {
+            "hp" => starry_stats.hp = stat.base_stat,
+            "attack" => starry_stats.attack = stat.base_stat,
+            "defense" => starry_stats.defense = stat.base_stat,
+            "special-attack" => starry_stats.sp_attack = stat.base_stat,
+            "special-defense" => starry_stats.sp_defense = stat.base_stat,
+            "speed" => starry_stats.speed = stat.base_stat,
+            _ => {} // Ignore any unknown stats
+        }
+    }
+
+    starry_stats
 }
 
 pub async fn download_image(
@@ -62,4 +91,18 @@ pub async fn download_image(
             format!("Failed to download image. Status: {}", response.status()),
         )))
     }
+}
+
+pub fn remove_dir_contents<P: AsRef<std::path::Path>>(path: P) -> std::io::Result<()> {
+    for entry in fs::read_dir(path)? {
+        let entry = entry?;
+        let path = entry.path();
+
+        if path.is_dir() {
+            fs::remove_dir_all(path)?;
+        } else {
+            fs::remove_file(path)?;
+        }
+    }
+    Ok(())
 }

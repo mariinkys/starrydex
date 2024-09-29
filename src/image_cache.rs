@@ -20,8 +20,7 @@ impl ImageCache {
 
         macro_rules! bundle {
             ($name:expr) => {
-                let data: &'static [u8] =
-                    include_bytes!(concat!("../../res/images/", $name, ".png"));
+                let data: &'static [u8] = include_bytes!(concat!("../res/images/", $name, ".png"));
                 cache.insert(
                     ImageCacheKey { name: $name },
                     image::Handle::from_memory(data.to_vec()),

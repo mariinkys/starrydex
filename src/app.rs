@@ -1,99 +1,118 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-use std::collections::HashMap;
-
-use crate::core::api::Api;
-use crate::core::config::{self, AppTheme, CONFIG_VERSION};
-use crate::core::icon_cache::IconCache;
-use crate::core::image_cache::ImageCache;
-use crate::core::key_bind::key_binds;
+use crate::api::Api;
+use crate::config::{AppTheme, Config, TypeFilteringMode};
 use crate::fl;
-use crate::utils::{capitalize_string, scale_numbers};
+use crate::image_cache::ImageCache;
+use crate::utils::{capitalize_string, remove_dir_contents, scale_numbers};
 use cosmic::app::{Command, Core};
+use cosmic::cosmic_config::{self, CosmicConfigEntry};
 use cosmic::iced::alignment::{Horizontal, Vertical};
-use cosmic::iced::{
-    event, keyboard::Event as KeyEvent, Alignment, Event, Length, Pixels, Subscription,
-};
-use cosmic::iced_core::keyboard::{Key, Modifiers};
+use cosmic::iced::{Alignment, Length, Pixels, Subscription};
 use cosmic::iced_core::text::LineHeight;
-use cosmic::iced_widget::Column;
-use cosmic::widget::menu::{action::MenuAction, key_bind::KeyBind};
-use cosmic::widget::{self, menu};
-use cosmic::{cosmic_config, cosmic_theme, theme, Application, ApplicationExt, Apply, Element};
-use rustemon::model::pokemon::{
-    LocationAreaEncounter, Pokemon, PokemonAbility, PokemonStat, PokemonType,
-};
+use cosmic::widget::{self, menu, Column};
+use cosmic::{cosmic_theme, theme, Application, ApplicationExt, Element};
+use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::fmt::Debug;
 
 const REPOSITORY: &str = "https://github.com/mariinkys/starrydex";
-const POKEMON_PER_ROW: usize = 3;
+const APP_ICON: &[u8] =
+    include_bytes!("../res/icons/hicolor/256x256/apps/dev.mariinkys.StarryDex.svg");
 
+/// The application model stores app-specific state used to describe its interface and
+/// drive its logic.
 pub struct StarryDex {
     /// Application state which is managed by the COSMIC runtime.
     core: Core,
     /// Display a context drawer with the designated page if defined.
     context_page: ContextPage,
     /// Key bindings for the application's menu bar.
-    key_binds: HashMap<KeyBind, Action>,
-    /// Modifiers
-    modifiers: Modifiers,
-    /// Application Themes
+    key_binds: HashMap<menu::KeyBind, MenuAction>,
+    // Configuration data that persists between application runs.
+    config: Config,
+    // Application Themes
     app_themes: Vec<String>,
-    /// Application Config Handler
-    config_handler: Option<cosmic_config::Config>,
-    /// Application Config
-    config: config::StarryDexConfig,
-    /// Api and Client
+    // API Client
     api: Api,
-    /// Currently selected Page
-    current_page: Page,
-    /// Page Status
-    page_status: PageStatus,
-    /// Settings Status
-    settings_status: SettingsStatus,
-    /// Contains the list of all Pokémon
-    pokemon_list: Vec<CustomPokemon>,
-    /// Contains the list of pokemon after searching
-    filtered_pokemon_list: Vec<CustomPokemon>,
-    /// Currently viewing Pokémon
-    selected_pokemon: Option<CustomPokemon>,
-    /// Holds the search input value
-    search: String,
-    /// Search widget Id
-    search_id: cosmic::widget::Id,
-    /// Wants the pokemon details in the pokémon page?
+    // Status of the main application page
+    current_page_status: PageStatus,
+    // Holds the list of Pokémon
+    pokemon_list: BTreeMap<i64, StarryPokemon>,
+    // Holds the shown list of Pokémon
+    filtered_pokemon_list: Vec<StarryPokemon>,
+    // Holds the data of the currently selected Pokémon to show it on the context page
+    selected_pokemon: Option<StarryPokemon>,
+    // Controls the Pokémon Details Toggle of the Pokémon Context Page
     wants_pokemon_details: bool,
+    // Holds the search input value
+    search: String,
+    // Holds the currently applied filters if there are any
+    filters: Filters,
+    // Type Filter Modes
+    type_filter_mode: Vec<String>,
 }
 
-#[allow(clippy::large_enum_variant)]
+/// Messages emitted by the application and its widgets.
 #[derive(Debug, Clone)]
 pub enum Message {
     LaunchUrl(String),
-    AppTheme(usize),
-    #[allow(dead_code)]
-    SystemThemeModeChange(cosmic_theme::ThemeMode),
-    Key(Modifiers, Key),
-    Modifiers(Modifiers),
     ToggleContextPage(ContextPage),
-    Search(String),
-    SearchClear,
+    UpdateConfig(Config),
+    UpdateTheme(usize),
+    UpdateTypeFilterMode(usize),
+
+    LoadPokemon(i64),
     TogglePokemonDetails(bool),
+    Search(String),
+    ApplyCurrentFilters,
+    ClearFilters,
+    DeleteCache,
 
-    LoadPokemon(String),
-    FixAllImages,
-    DownloadAllImages,
-    RenewCache,
-
-    FirstRunSetupCompleted,
-    LoadedPokemon(CustomPokemon),
-    LoadedPokemonList(Vec<CustomPokemon>),
-    DownloadedAllImages,
-    AllImagesFixed,
-    CacheRenewed,
+    CompletedFirstRun(Config, BTreeMap<i64, StarryPokemon>),
+    LoadedPokemonList(BTreeMap<i64, StarryPokemon>),
+    TypeFilterToggled(bool, String),
 }
 
-/// Identifies a page in the application.
-pub enum Page {
-    LandingPage,
+/// Represents a Pokémon in the application
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StarryPokemon {
+    pub pokemon: StarryPokemonData,
+    pub sprite_path: Option<String>,
+    pub encounter_info: Option<Vec<StarryPokemonEncounterInfo>>,
+}
+
+/// Data of a Pokémon
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StarryPokemonData {
+    pub id: i64,
+    pub name: String,
+    pub weight: i64,
+    pub height: i64,
+    pub types: Vec<String>,
+    pub abilities: Vec<String>,
+    pub stats: StarryPokemonStats,
+}
+
+/// Represents a Pokémon
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StarryPokemonStats {
+    pub hp: i64,
+    pub attack: i64,
+    pub defense: i64,
+    pub sp_attack: i64,
+    pub sp_defense: i64,
+    pub speed: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StarryPokemonEncounterInfo {
+    pub city: String,
+    pub games_method: Vec<String>,
+}
+
+pub struct Filters {
+    pub selected_types: HashSet<String>,
 }
 
 /// Identifies the status of a page in the application.
@@ -103,68 +122,18 @@ pub enum PageStatus {
     Loading,
 }
 
-/// Identifies the status the settings context page in the application.
-pub enum SettingsStatus {
-    NotDownloading,
-    Downloading,
-}
-
-/// Identifies a context page to display in the context drawer.
-#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
-pub enum ContextPage {
-    #[default]
-    About,
-    Settings,
-    PokemonPage,
-}
-
-impl ContextPage {
-    fn title(&self) -> String {
-        match self {
-            Self::About => fl!("about"),
-            Self::Settings => fl!("settings"),
-            Self::PokemonPage => fl!("pokemon-page"),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Action {
-    About,
-    Settings,
-}
-
-impl menu::action::MenuAction for Action {
-    type Message = Message;
-
-    fn message(&self) -> Self::Message {
-        match self {
-            Action::About => Message::ToggleContextPage(ContextPage::About),
-            Action::Settings => Message::ToggleContextPage(ContextPage::Settings),
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct Flags {
-    pub config_handler: Option<cosmic_config::Config>,
-    pub config: config::StarryDexConfig,
-}
-
-#[derive(Debug, Clone)]
-pub struct CustomPokemon {
-    pub pokemon: Pokemon,
-    pub sprite_path: Option<String>,
-    pub encounter_info: Option<Vec<LocationAreaEncounter>>,
-}
-
+/// Create a COSMIC application from the app model
 impl Application for StarryDex {
+    /// The async executor that will be used to run your application's commands.
     type Executor = cosmic::executor::Default;
 
-    type Flags = Flags;
+    /// Data that your application receives to its init method.
+    type Flags = ();
 
+    /// Messages which the application and its widgets will emit.
     type Message = Message;
 
+    /// Unique identifier in RDNN (reverse domain name notation) format.
     const APP_ID: &'static str = "dev.mariinkys.StarryDex";
 
     fn core(&self) -> &Core {
@@ -175,47 +144,78 @@ impl Application for StarryDex {
         &mut self.core
     }
 
-    fn init(core: Core, flags: Self::Flags) -> (Self, Command<Self::Message>) {
+    /// Initializes the application with any given flags and startup commands.
+    fn init(core: Core, _flags: Self::Flags) -> (Self, Command<Self::Message>) {
+        // Commands that will get executed on the application init
         let mut commands = vec![];
 
+        // Controls if it's the first time the application runs on a system
+        let mut first_run_completed = false;
+
+        // Construct the app model with the runtime's core.
         let mut app = StarryDex {
             core,
             context_page: ContextPage::default(),
-            key_binds: key_binds(),
-            modifiers: Modifiers::empty(),
+            key_binds: HashMap::new(),
+            // Optional configuration file for an application.
+            config: cosmic_config::Config::new(Self::APP_ID, Config::VERSION)
+                .map(|context| match Config::get_entry(&context) {
+                    Ok(config) => {
+                        first_run_completed = config.first_run_completed;
+                        config
+                    }
+                    Err((_errors, config)) => {
+                        // for why in errors {
+                        //     tracing::error!(%why, "error loading app config");
+                        // }
+
+                        config
+                    }
+                })
+                .unwrap_or_default(),
             app_themes: vec![fl!("match-desktop"), fl!("dark"), fl!("light")],
-            config_handler: flags.config_handler,
-            config: flags.config,
             api: Api::new(Self::APP_ID),
-            current_page: Page::LandingPage,
-            pokemon_list: Vec::<CustomPokemon>::new(),
-            filtered_pokemon_list: Vec::<CustomPokemon>::new(),
+            current_page_status: PageStatus::Loading,
+            pokemon_list: BTreeMap::new(),
+            filtered_pokemon_list: Vec::new(),
             selected_pokemon: None,
-            page_status: PageStatus::Loading,
-            search: String::new(),
-            settings_status: SettingsStatus::NotDownloading,
             wants_pokemon_details: false,
-            search_id: cosmic::widget::Id::unique(),
+            search: String::new(),
+            filters: Filters {
+                selected_types: HashSet::new(),
+            },
+            type_filter_mode: vec![fl!("exclusive"), fl!("inclusive")],
         };
-        commands.push(app.update_titles());
+        // Startup command that sets the window title.
+        commands.push(app.update_title());
 
-        let api_clone = app.api.clone();
-
+        // Create the directory where all of our application data will exist
         let app_data_dir = dirs::data_dir().unwrap().join(Self::APP_ID);
         std::fs::create_dir_all(&app_data_dir).expect("Failed to create the app data directory");
 
-        let first_run_file = app_data_dir.join("first_run.txt");
-        if !first_run_file.exists() {
-            let _file =
-                std::fs::File::create(&first_run_file).expect("Failed to create first_run.txt");
+        // Clone the app api in order to use it.
+        let api_clone = app.api.clone();
 
-            app.page_status = PageStatus::FirstRun;
-
+        if !first_run_completed {
+            // First application run, construct cache, download sprites and update the config
+            app.current_page_status = PageStatus::FirstRun;
             commands.push(cosmic::app::Command::perform(
-                async move { api_clone.clone().load_all_pokemon_data(true).await },
-                |_| cosmic::app::message::app(Message::FirstRunSetupCompleted),
+                async move { api_clone.load_all_pokemon().await },
+                |pokemon_list| {
+                    cosmic::app::message::app(Message::CompletedFirstRun(
+                        Config {
+                            app_theme: crate::config::AppTheme::System,
+                            first_run_completed: true,
+                            pokemon_per_row: 3,
+                            type_filtering_mode: crate::config::TypeFilteringMode::Exclusive,
+                        },
+                        pokemon_list,
+                    ))
+                },
             ));
         } else {
+            // Load  the Pokémon List
+            app.current_page_status = PageStatus::Loading;
             commands.push(cosmic::app::Command::perform(
                 async move { api_clone.load_all_pokemon().await },
                 |pokemon_list| cosmic::app::message::app(Message::LoadedPokemonList(pokemon_list)),
@@ -232,73 +232,52 @@ impl Application for StarryDex {
             menu::items(
                 &self.key_binds,
                 vec![
-                    menu::Item::Button(fl!("about"), Action::About),
-                    menu::Item::Button(fl!("settings"), Action::Settings),
+                    menu::Item::Button(fl!("about"), MenuAction::About),
+                    menu::Item::Button(String::from("Settings"), MenuAction::Settings),
                 ],
             ),
-        )])
-        .item_height(menu::ItemHeight::Dynamic(40))
-        .item_width(menu::ItemWidth::Uniform(270))
-        .spacing(4.0);
+        )]);
 
         vec![menu_bar.into()]
     }
 
-    fn subscription(&self) -> Subscription<Self::Message> {
-        struct ConfigSubscription;
-        struct ThemeSubscription;
+    /// Display a context drawer if the context page is requested.
+    fn context_drawer(&self) -> Option<Element<Self::Message>> {
+        if !self.core.window.show_context {
+            return None;
+        }
 
-        let subscriptions = vec![
-            cosmic::iced::event::listen_with(|event, status| match event {
-                Event::Keyboard(KeyEvent::KeyPressed { key, modifiers, .. }) => match status {
-                    event::Status::Ignored => Some(Message::Key(modifiers, key)),
-                    event::Status::Captured => None,
-                },
-                Event::Keyboard(KeyEvent::ModifiersChanged(modifiers)) => {
-                    Some(Message::Modifiers(modifiers))
-                }
-                _ => None,
-            }),
-            cosmic_config::config_subscription(
-                std::any::TypeId::of::<ConfigSubscription>(),
-                Self::APP_ID.into(),
-                CONFIG_VERSION,
-            )
-            .map(|update| {
-                if !update.errors.is_empty() {
-                    log::info!(
-                        "errors loading config {:?}: {:?}",
-                        update.keys,
-                        update.errors
-                    );
-                }
-                Message::SystemThemeModeChange(update.config)
-            }),
-            cosmic_config::config_subscription::<_, cosmic_theme::ThemeMode>(
-                std::any::TypeId::of::<ThemeSubscription>(),
-                cosmic_theme::THEME_MODE_ID.into(),
-                cosmic_theme::ThemeMode::version(),
-            )
-            .map(|update| {
-                if !update.errors.is_empty() {
-                    log::info!(
-                        "errors loading theme mode {:?}: {:?}",
-                        update.keys,
-                        update.errors
-                    );
-                }
-                Message::SystemThemeModeChange(update.config)
-            }),
-        ];
-
-        // subscriptions.push(self.content.subscription().map(Message::Content));
-
-        Subscription::batch(subscriptions)
+        Some(match self.context_page {
+            ContextPage::About => self.about(),
+            ContextPage::Settings => self.settings(),
+            ContextPage::PokemonPage => self.single_pokemon_page(),
+            ContextPage::FiltersPage => self.filters_page(),
+        })
     }
 
+    /// Describes the interface based on the current state of the application model.
+    ///
+    /// Application events will be processed through the view. Any messages emitted by
+    /// events received by widgets will be passed to the update method.
     fn view(&self) -> Element<Self::Message> {
-        let content = match self.current_page {
-            Page::LandingPage => self.landing(),
+        let space_s = theme::active().cosmic().spacing.space_s;
+
+        let content = match self.current_page_status {
+            PageStatus::FirstRun => Column::new()
+                .push(widget::text::text(fl!("downloading-sprites")))
+                .push(widget::text::text(fl!("estimate")))
+                .push(widget::text::text(fl!("once-message")))
+                .align_items(Alignment::Center)
+                .width(Length::Fill)
+                .spacing(space_s)
+                .into(),
+            PageStatus::Loaded => self.landing(),
+            PageStatus::Loading => Column::new()
+                .push(widget::text::text(fl!("loading")))
+                .align_items(Alignment::Center)
+                .width(Length::Fill)
+                .spacing(space_s)
+                .into(),
         };
 
         widget::container(content)
@@ -309,37 +288,34 @@ impl Application for StarryDex {
             .into()
     }
 
-    fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
-        // Helper for updating config values efficiently
-        macro_rules! config_set {
-            ($name: ident, $value: expr) => {
-                match &self.config_handler {
-                    Some(config_handler) => {
-                        match paste::paste! { self.config.[<set_ $name>](config_handler, $value) } {
-                            Ok(_) => {}
-                            Err(err) => {
-                                log::warn!(
-                                    "failed to save config {:?}: {}",
-                                    stringify!($name),
-                                    err
-                                );
-                            }
-                        }
-                    }
-                    None => {
-                        self.config.$name = $value;
-                        log::warn!(
-                            "failed to save config {:?}: no config handler",
-                            stringify!($name)
-                        );
-                    }
-                }
-            };
-        }
+    /// Register subscriptions for this application.
+    ///
+    /// Subscriptions are long-running async tasks running in the background which
+    /// emit messages to the application through a channel. They are started at the
+    /// beginning of the application, and persist through its lifetime.
+    fn subscription(&self) -> Subscription<Self::Message> {
+        Subscription::batch(vec![
+            // Watch for application configuration changes.
+            self.core()
+                .watch_config::<Config>(Self::APP_ID)
+                .map(|update| {
+                    // for why in update.errors {
+                    //     tracing::error!(?why, "app config error");
+                    // }
 
+                    Message::UpdateConfig(update.config)
+                }),
+        ])
+    }
+
+    /// Handles messages emitted by the application and its widgets.
+    ///
+    /// Commands may be returned for asynchronous execution of code in the background
+    /// on the application's async runtime.
+    fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
         match message {
             Message::LaunchUrl(url) => {
-                let _result = open::that_detached(url);
+                _ = open::that_detached(url);
             }
             Message::ToggleContextPage(context_page) => {
                 if self.context_page == context_page {
@@ -354,185 +330,190 @@ impl Application for StarryDex {
                 // Set the title of the context drawer.
                 self.set_context_title(context_page.title());
             }
-            Message::LoadedPokemonList(pokemons) => {
-                self.pokemon_list = pokemons.clone();
-                self.filtered_pokemon_list = pokemons;
-                self.page_status = PageStatus::Loaded;
-                self.settings_status = SettingsStatus::NotDownloading;
+            Message::UpdateConfig(config) => {
+                self.config = config;
+                return cosmic::app::command::set_theme(self.config.app_theme.theme());
             }
-            Message::LoadedPokemon(pokemon) => {
-                self.selected_pokemon = Some(pokemon);
+            Message::UpdateTheme(index) => {
+                let old_config = self.config.clone();
 
-                if self.context_page == ContextPage::PokemonPage {
-                    // Close the context drawer if the toggled context page is the same.
-                    self.core.window.show_context = !self.core.window.show_context;
-                } else {
-                    // Open the context drawer to display the requested context page.
-                    self.context_page = ContextPage::PokemonPage;
-                    self.core.window.show_context = true;
-                }
+                let app_theme = match index {
+                    1 => AppTheme::Dark,
+                    2 => AppTheme::Light,
+                    _ => AppTheme::System,
+                };
+                self.config = Config {
+                    first_run_completed: old_config.first_run_completed,
+                    pokemon_per_row: old_config.pokemon_per_row,
+                    type_filtering_mode: old_config.type_filtering_mode,
+                    app_theme,
+                };
+                return cosmic::app::command::set_theme(self.config.app_theme.theme());
+            }
+            Message::CompletedFirstRun(config, pokemon_list) => {
+                self.config = config;
+
+                //self.pokemon_list = pokemon_list; //TODO: This is to temporarly fix an error that makes a empty pokemon to appear on the first position of the btree
+                let mut pokemon_list = pokemon_list;
+                pokemon_list.pop_first();
+                self.pokemon_list = pokemon_list;
+
+                self.filtered_pokemon_list = self.pokemon_list.values().cloned().collect();
+                self.current_page_status = PageStatus::Loaded;
+
+                return cosmic::app::command::set_theme(self.config.app_theme.theme());
+            }
+            Message::LoadedPokemonList(pokemon_list) => {
+                //self.pokemon_list = pokemon_list; //TODO: This is to temporarly fix an error that makes a empty pokemon to appear on the first position of the btree
+                let mut pokemon_list = pokemon_list;
+                pokemon_list.pop_first();
+                self.pokemon_list = pokemon_list;
+
+                self.filtered_pokemon_list = self.pokemon_list.values().cloned().collect();
+                self.current_page_status = PageStatus::Loaded;
+            }
+            Message::LoadPokemon(pokemon_id) => {
+                self.selected_pokemon = self.pokemon_list.get(&pokemon_id).cloned();
+
+                // Open Context Page
+                self.context_page = ContextPage::PokemonPage;
+                self.core.window.show_context = true;
 
                 // Set the title of the context drawer.
                 self.set_context_title(ContextPage::PokemonPage.title());
             }
-            Message::LoadPokemon(pokemon_name) => {
-                let api_clone = self.api.clone();
-
-                return cosmic::app::Command::perform(
-                    async move { api_clone.load_pokemon(pokemon_name).await },
-                    |pokemon| cosmic::app::message::app(Message::LoadedPokemon(pokemon)),
-                );
-            }
-            Message::Search(new_value) => {
-                self.search = new_value;
+            Message::TogglePokemonDetails(value) => self.wants_pokemon_details = value,
+            Message::Search(value) => {
+                // TODO: Improve search speed? Search by id...Search shouldn't erase filters
+                self.search = value;
                 self.filtered_pokemon_list = self
                     .pokemon_list
-                    .clone()
-                    .into_iter()
-                    .filter(|pokemon| {
+                    .iter()
+                    .filter(|(&_id, pokemon)| {
                         pokemon
                             .pokemon
                             .name
                             .to_lowercase()
                             .contains(&self.search.to_lowercase())
                     })
+                    .map(|(_, pokemon)| pokemon.clone())
                     .collect();
             }
-            Message::DownloadAllImages => {
-                let api_clone = self.api.clone();
-
-                self.settings_status = SettingsStatus::Downloading;
-
-                return cosmic::app::Command::perform(
-                    async move { api_clone.download_all_pokemon_sprites().await },
-                    |_| cosmic::app::message::app(Message::DownloadedAllImages),
-                );
-            }
-            Message::FixAllImages => {
-                let api_clone = self.api.clone();
-
-                self.settings_status = SettingsStatus::Downloading;
-
-                return cosmic::app::Command::perform(
-                    async move { api_clone.fix_all_sprites().await },
-                    |_res| cosmic::app::message::app(Message::AllImagesFixed),
-                );
-            }
-            Message::DownloadedAllImages => {
-                let api_clone = self.api.clone();
-
-                self.settings_status = SettingsStatus::NotDownloading;
-                self.page_status = PageStatus::Loading;
-
-                return cosmic::app::Command::perform(
-                    async move { api_clone.load_all_pokemon().await },
-                    |pokemon_list| {
-                        cosmic::app::message::app(Message::LoadedPokemonList(pokemon_list))
-                    },
-                );
-            }
-            Message::AllImagesFixed => {
-                let api_clone = self.api.clone();
-
-                self.settings_status = SettingsStatus::NotDownloading;
-                self.page_status = PageStatus::Loading;
-
-                return cosmic::app::Command::perform(
-                    async move { api_clone.load_all_pokemon().await },
-                    |pokemon_list| {
-                        cosmic::app::message::app(Message::LoadedPokemonList(pokemon_list))
-                    },
-                );
-            }
-            Message::FirstRunSetupCompleted => {
-                let api_clone = self.api.clone();
-
-                self.page_status = PageStatus::Loading;
-
-                return cosmic::app::Command::perform(
-                    async move { api_clone.load_all_pokemon().await },
-                    |pokemon_list| {
-                        cosmic::app::message::app(Message::LoadedPokemonList(pokemon_list))
-                    },
-                );
-            }
-            Message::TogglePokemonDetails(value) => self.wants_pokemon_details = value,
-            Message::SearchClear => {
-                self.search.clear();
-                self.filtered_pokemon_list = self.pokemon_list.clone();
-            }
-            Message::AppTheme(index) => {
-                let app_theme = match index {
-                    1 => AppTheme::Dark,
-                    2 => AppTheme::Light,
-                    _ => AppTheme::System,
-                };
-                config_set!(app_theme, app_theme);
-                return self.update_config();
-            }
-            Message::SystemThemeModeChange(_) => {
-                return self.update_config();
-            }
-            Message::Key(modifiers, key) => {
-                for (key_bind, action) in self.key_binds.iter() {
-                    if key_bind.matches(modifiers, &key) {
-                        return self.update(action.message());
-                    }
+            Message::TypeFilterToggled(value, type_name) => {
+                if value {
+                    // Add the selected type to the filter
+                    self.filters.selected_types.insert(type_name);
+                } else {
+                    // Remove the deselected type from the filter
+                    self.filters.selected_types.remove(&type_name);
                 }
             }
-            Message::Modifiers(modifiers) => {
-                self.modifiers = modifiers;
-            }
-            Message::RenewCache => {
-                let api_clone = self.api.clone();
+            Message::ApplyCurrentFilters => {
+                //TODO: Revisit how to do this without this being necessary, search does not need to be lost?
+                self.search = String::new();
 
-                self.page_status = PageStatus::Loading;
-                self.settings_status = SettingsStatus::Downloading;
+                match self.config.type_filtering_mode {
+                    TypeFilteringMode::Inclusive => {
+                        // Ej: If fire and ice are selected it will show fire pokemons and ice pokemons
+                        let selected_types_lowercase: HashSet<String> = self
+                            .filters
+                            .selected_types
+                            .iter()
+                            .map(|t| t.to_lowercase())
+                            .collect();
 
-                return cosmic::app::Command::perform(
-                    async move { api_clone.delete_rustemon_cache().await },
-                    |_| cosmic::app::message::app(Message::CacheRenewed),
-                );
+                        self.filtered_pokemon_list = self
+                            .pokemon_list
+                            .values()
+                            .filter(|pokemon| {
+                                selected_types_lowercase.is_empty()
+                                    || pokemon.pokemon.types.iter().any(|t| {
+                                        selected_types_lowercase.contains(&t.to_lowercase())
+                                    })
+                            })
+                            .cloned()
+                            .collect();
+                    }
+                    TypeFilteringMode::Exclusive => {
+                        // Ej: If fire and ice are selected it will show pokemons that are both fire and ice types
+                        let selected_types_lowercase: HashSet<String> = self
+                            .filters
+                            .selected_types
+                            .iter()
+                            .map(|t| t.to_lowercase())
+                            .collect();
+
+                        self.filtered_pokemon_list = self
+                            .pokemon_list
+                            .values()
+                            .filter(|pokemon| {
+                                selected_types_lowercase.is_empty()
+                                    || selected_types_lowercase.iter().all(|selected_type| {
+                                        pokemon
+                                            .pokemon
+                                            .types
+                                            .iter()
+                                            .any(|t| t.to_lowercase() == *selected_type)
+                                    })
+                            })
+                            .cloned()
+                            .collect();
+                    }
+                }
+
+                self.core.window.show_context = false;
             }
-            Message::CacheRenewed => {
+            Message::ClearFilters => {
+                self.filtered_pokemon_list = self.pokemon_list.values().cloned().collect();
+                self.filters = Filters {
+                    selected_types: HashSet::new(),
+                };
+                self.current_page_status = PageStatus::Loaded;
+            }
+            Message::UpdateTypeFilterMode(index) => {
+                let old_config = self.config.clone();
+
+                let filter_mode = match index {
+                    1 => TypeFilteringMode::Inclusive,
+                    _ => TypeFilteringMode::Exclusive,
+                };
+                self.config = Config {
+                    first_run_completed: old_config.first_run_completed,
+                    pokemon_per_row: old_config.pokemon_per_row,
+                    type_filtering_mode: filter_mode,
+                    app_theme: old_config.app_theme,
+                };
+            }
+            Message::DeleteCache => {
+                self.current_page_status = PageStatus::FirstRun;
+                self.set_show_context(false);
+
+                let data_dir = dirs::data_dir().unwrap().join(Self::APP_ID);
+                if let Err(e) = remove_dir_contents(&data_dir) {
+                    eprintln!("Error deleting cache: {}", e);
+                }
+
+                // Reset the API
                 self.api = Api::new(Self::APP_ID);
                 let api_clone = self.api.clone();
-
                 return cosmic::app::Command::perform(
-                    async move { api_clone.load_all_pokemon_data(false).await },
-                    |_| cosmic::app::message::app(Message::FirstRunSetupCompleted),
+                    async move { api_clone.load_all_pokemon().await },
+                    |pokemon_list| {
+                        cosmic::app::message::app(Message::LoadedPokemonList(pokemon_list))
+                    },
                 );
             }
         }
         Command::none()
     }
-
-    /// Display a context drawer if the context page is requested.
-    fn context_drawer(&self) -> Option<Element<Self::Message>> {
-        if !self.core.window.show_context {
-            return None;
-        }
-
-        Some(match self.context_page {
-            ContextPage::About => self.about(),
-            ContextPage::Settings => self.settings(),
-            ContextPage::PokemonPage => self.pokemon_page(),
-        })
-    }
 }
 
 impl StarryDex {
-    fn update_config(&mut self) -> Command<Message> {
-        cosmic::app::command::set_theme(self.config.app_theme.theme())
-    }
-
-    /// The about page for this app.
+    /// The about context page for this app.
     pub fn about(&self) -> Element<Message> {
         let cosmic_theme::Spacing { space_xxs, .. } = theme::active().cosmic().spacing;
 
-        let icon = widget::svg(widget::svg::Handle::from_memory(
-            &include_bytes!("../res/icons/hicolor/128x128/apps/dev.mariinkys.StarryDex.svg")[..],
-        ));
+        let icon = widget::svg(widget::svg::Handle::from_memory(APP_ICON));
 
         let title = widget::text::title3(fl!("app-title"));
 
@@ -565,223 +546,161 @@ impl StarryDex {
             .into()
     }
 
+    /// The settings context page for this app.
     pub fn settings(&self) -> Element<Message> {
-        let spacing = theme::active().cosmic().spacing;
-
-        let download_row = widget::Row::new()
-            .push(
-                widget::column()
-                    .push(widget::text::text(fl!("download-all-title")))
-                    .push(widget::text::text(fl!("download-all-info")).size(10.0))
-                    .width(Length::Fill),
-            )
-            .push(match self.settings_status {
-                SettingsStatus::NotDownloading => widget::button::text(fl!("download-button-text"))
-                    .on_press(Message::DownloadAllImages)
-                    .style(theme::Button::Suggested)
-                    .width(Length::Shrink),
-                SettingsStatus::Downloading => widget::button::text(fl!("download-button-text"))
-                    .style(theme::Button::Suggested)
-                    .width(Length::Shrink),
-            })
-            .spacing(spacing.space_xxs)
-            .padding([0, 5, 0, 5]);
-
-        let fix_row = widget::Row::new()
-            .push(
-                widget::column()
-                    .push(widget::text::text(fl!("fix-all-title")))
-                    .push(widget::text::text(fl!("fix-all-info")).size(10.0))
-                    .width(Length::Fill),
-            )
-            .push(match self.settings_status {
-                SettingsStatus::NotDownloading => widget::button::text(fl!("fix-button-text"))
-                    .on_press(Message::FixAllImages)
-                    .style(theme::Button::Destructive)
-                    .width(Length::Shrink),
-                SettingsStatus::Downloading => widget::button::text(fl!("fix-button-text"))
-                    .style(theme::Button::Destructive)
-                    .width(Length::Shrink),
-            })
-            .spacing(spacing.space_xxs)
-            .padding([0, 5, 0, 5]);
-
-        let renew_cache_row = widget::Row::new()
-            .push(
-                widget::column()
-                    .push(widget::text::text(fl!("renew-cache-title")))
-                    .push(widget::text::text(fl!("renew-cache-info")).size(10.0))
-                    .width(Length::Fill),
-            )
-            .push(match self.settings_status {
-                SettingsStatus::NotDownloading => {
-                    widget::button::text(fl!("renew-cache-button-text"))
-                        .on_press(Message::RenewCache)
-                        .style(theme::Button::Destructive)
-                        .width(Length::Shrink)
-                }
-                SettingsStatus::Downloading => widget::button::text(fl!("renew-cache-button-text"))
-                    .style(theme::Button::Destructive)
-                    .width(Length::Shrink),
-            })
-            .spacing(spacing.space_xxs)
-            .padding([0, 5, 0, 5]);
-
         let app_theme_selected = match self.config.app_theme {
             AppTheme::Dark => 1,
             AppTheme::Light => 2,
             AppTheme::System => 0,
         };
 
-        match self.settings_status {
-            SettingsStatus::NotDownloading => widget::settings::view_column(vec![
-                widget::settings::section()
-                    .title(fl!("settings"))
-                    .add(download_row)
-                    .add(fix_row)
-                    .add(renew_cache_row)
-                    .into(),
-                widget::settings::section()
-                    .title(fl!("appearance"))
-                    .add(
-                        widget::settings::item::builder(fl!("theme")).control(widget::dropdown(
-                            &self.app_themes,
-                            Some(app_theme_selected),
-                            Message::AppTheme,
-                        )),
-                    )
-                    .into(),
-            ])
-            .into(),
-            SettingsStatus::Downloading => widget::settings::view_column(vec![
-                widget::settings::section()
-                    .title(fl!("settings"))
-                    .add(download_row)
-                    .add(fix_row)
-                    .add(renew_cache_row)
-                    .add(
-                        widget::row()
-                            .push(
-                                widget::text(fl!("downloading-text"))
-                                    .width(Length::Fill)
-                                    .horizontal_alignment(Horizontal::Center),
-                            )
-                            .align_items(Alignment::Center)
-                            .width(Length::Fill),
-                    )
-                    .into(),
-                widget::settings::section()
-                    .title(fl!("appearance"))
-                    .add(
-                        widget::settings::item::builder(fl!("theme")).control(widget::dropdown(
-                            &self.app_themes,
-                            Some(app_theme_selected),
-                            Message::AppTheme,
-                        )),
-                    )
-                    .into(),
-            ])
-            .into(),
-        }
+        let type_filter_mode_selected = match self.config.type_filtering_mode {
+            TypeFilteringMode::Inclusive => 1,
+            TypeFilteringMode::Exclusive => 0,
+        };
+
+        let current_value = self.config.pokemon_per_row as u16;
+        let old_config = self.config.clone();
+
+        widget::settings::view_column(vec![
+            widget::settings::section()
+                .title(fl!("appearance"))
+                .add(
+                    widget::settings::item::builder(fl!("theme")).control(widget::dropdown(
+                        &self.app_themes,
+                        Some(app_theme_selected),
+                        Message::UpdateTheme,
+                    )),
+                )
+                .add(
+                    widget::settings::item::builder(fl!("pokemon-per-row"))
+                        .description(format!("{}", current_value))
+                        .control(
+                            widget::slider(1..=10, current_value, move |new_value| {
+                                Message::UpdateConfig(Config {
+                                    app_theme: old_config.app_theme,
+                                    first_run_completed: old_config.first_run_completed,
+                                    pokemon_per_row: new_value as usize,
+                                    type_filtering_mode: old_config.type_filtering_mode,
+                                })
+                            })
+                            .step(1u16),
+                        ),
+                )
+                .into(),
+            widget::settings::section()
+                .title(fl!("other"))
+                .add(
+                    widget::settings::item::builder(fl!("type-filter-mode")).control(
+                        widget::dropdown(
+                            &self.type_filter_mode,
+                            Some(type_filter_mode_selected),
+                            Message::UpdateTypeFilterMode,
+                        ),
+                    ),
+                )
+                .add(
+                    widget::settings::item::builder(fl!("renew-cache")).control(
+                        widget::button::destructive(fl!("renew-cache-button"))
+                            .on_press(Message::DeleteCache),
+                    ),
+                )
+                .into(),
+        ])
+        .into()
     }
 
+    /// The main page for this app.
     pub fn landing(&self) -> Element<Message> {
-        let space_s = theme::active().cosmic().spacing.space_s;
         let spacing = theme::active().cosmic().spacing;
+        let mut pokemon_grid = widget::Grid::new().width(Length::Fill);
 
-        match self.page_status {
-            PageStatus::Loaded => {
-                let mut pokemon_grid = widget::Grid::new().width(Length::Fill);
+        for (index, pokemon) in self.filtered_pokemon_list.iter().enumerate() {
+            let pokemon_image = if let Some(path) = &pokemon.sprite_path {
+                widget::Image::new(path)
+                    .content_fit(cosmic::iced::ContentFit::None)
+                    .width(Length::Fixed(100.0))
+                    .height(Length::Fixed(100.0))
+            } else {
+                widget::Image::new(ImageCache::get("fallback"))
+                    .content_fit(cosmic::iced::ContentFit::None)
+                    .width(Length::Fixed(100.0))
+                    .height(Length::Fixed(100.0))
+            };
 
-                for (index, pokemon) in self.filtered_pokemon_list.iter().enumerate() {
-                    let pokemon_image = if let Some(path) = &pokemon.sprite_path {
-                        widget::Image::new(path)
-                            .content_fit(cosmic::iced::ContentFit::None)
-                            .width(Length::Fixed(100.0))
-                            .height(Length::Fixed(100.0))
-                    } else {
-                        widget::Image::new(ImageCache::get("fallback"))
-                            .content_fit(cosmic::iced::ContentFit::None)
-                            .width(Length::Fixed(100.0))
-                            .height(Length::Fixed(100.0))
-                    };
-
-                    let pokemon_container = widget::button::custom(
-                        widget::Column::new()
-                            .push(pokemon_image.width(Length::Shrink))
-                            .push(
-                                widget::text::text(capitalize_string(&pokemon.pokemon.name))
-                                    .width(Length::Shrink)
-                                    .line_height(LineHeight::Absolute(Pixels::from(15.0))),
-                            )
-                            .width(Length::Fill)
-                            .align_items(Alignment::Center),
-                    )
-                    .width(Length::Fixed(200.0))
-                    .height(Length::Fixed(135.0))
-                    .on_press_down(Message::LoadPokemon(pokemon.pokemon.name.to_string()))
-                    .style(theme::Button::Image)
-                    .padding([spacing.space_none, spacing.space_s]);
-
-                    if index % POKEMON_PER_ROW == 0 {
-                        pokemon_grid = pokemon_grid.insert_row();
-                    }
-
-                    pokemon_grid = pokemon_grid.push(pokemon_container);
-                }
-
-                let search = widget::search_input(fl!("search"), &self.search)
-                    .id(self.search_id.clone())
-                    .leading_icon(IconCache::get("system-search-symbolic", 18).into())
-                    .on_clear(Message::SearchClear)
-                    .trailing_icon(IconCache::get("edit-clear-symbolic", 18).into())
-                    //.on_submit(Message::SearchSubmit)
-                    .style(theme::TextInput::Search)
-                    .on_input(Message::Search)
-                    .line_height(LineHeight::Absolute(Pixels(35.0)))
-                    .width(Length::Fill);
-
-                let search_row = widget::Row::new().push(search).width(Length::Fill);
-
+            let pokemon_container = widget::button::custom(
                 widget::Column::new()
-                    .push(search_row)
+                    .push(pokemon_image.width(Length::Shrink))
                     .push(
-                        widget::scrollable(
-                            widget::Container::new(pokemon_grid).align_x(Horizontal::Center),
-                        )
-                        .width(Length::Fill),
+                        widget::text::text(capitalize_string(&pokemon.pokemon.name))
+                            .width(Length::Shrink)
+                            .line_height(LineHeight::Absolute(Pixels::from(15.0))),
                     )
                     .width(Length::Fill)
-                    .spacing(5.0)
-                    .into()
+                    .align_items(Alignment::Center),
+            )
+            .width(Length::Fixed(200.0))
+            .height(Length::Fixed(135.0))
+            .on_press_down(Message::LoadPokemon(pokemon.pokemon.id))
+            .style(theme::Button::Image)
+            .padding([spacing.space_none, spacing.space_s]);
+
+            // Insert a new row before adding the first Pokémon of each row
+            if index % self.config.pokemon_per_row == 0 {
+                pokemon_grid = pokemon_grid.insert_row();
             }
-            PageStatus::Loading => Column::new()
-                .push(widget::text::text(fl!("loading")))
-                .align_items(Alignment::Center)
-                .width(Length::Fill)
-                .spacing(space_s)
-                .into(),
-            PageStatus::FirstRun => Column::new()
-                .push(widget::text::text(fl!("downloading-sprites")))
-                .push(widget::text::text(fl!("estimate")))
-                .push(widget::text::text(fl!("once-message")))
-                .align_items(Alignment::Center)
-                .width(Length::Fill)
-                .into(),
+
+            pokemon_grid = pokemon_grid.push(pokemon_container);
         }
+
+        let search = widget::search_input(fl!("search"), &self.search)
+            .style(theme::TextInput::Search)
+            .on_input(Message::Search)
+            .line_height(LineHeight::Absolute(Pixels(30.0)))
+            .width(Length::Fill);
+
+        let filters = widget::button::standard(fl!("filter"))
+            .style(theme::Button::Suggested)
+            .on_press(Message::ToggleContextPage(ContextPage::FiltersPage))
+            .width(Length::Shrink);
+
+        let clear_filters = widget::button::standard(fl!("clear-filters"))
+            .style(theme::Button::Destructive)
+            .on_press(Message::ClearFilters)
+            .width(Length::Shrink);
+
+        let search_row = widget::Row::new()
+            .push(search)
+            .push(filters)
+            .push(clear_filters)
+            .spacing(Pixels::from(spacing.space_xxxs))
+            .width(Length::Fill);
+
+        widget::Column::new()
+            .push(search_row)
+            .push(
+                widget::scrollable(
+                    widget::Container::new(pokemon_grid).align_x(Horizontal::Center),
+                )
+                .width(Length::Fill),
+            )
+            .width(Length::Fill)
+            .spacing(spacing.space_s)
+            .into()
     }
 
-    pub fn pokemon_page(&self) -> Element<Message> {
+    /// The pokemon details context page for this app.
+    pub fn single_pokemon_page(&self) -> Element<Message> {
         let spacing = theme::active().cosmic().spacing;
 
         let content: widget::Column<_> = match &self.selected_pokemon {
-            Some(custom_pokemon) => {
+            Some(starry_pokemon) => {
                 let page_title =
-                    widget::text::title1(capitalize_string(custom_pokemon.pokemon.name.as_str()))
+                    widget::text::title1(capitalize_string(starry_pokemon.pokemon.name.as_str()))
                         .width(Length::Fill)
                         .horizontal_alignment(Horizontal::Center);
 
-                let pokemon_image = if let Some(path) = &custom_pokemon.sprite_path {
+                let pokemon_image = if let Some(path) = &starry_pokemon.sprite_path {
                     widget::Image::new(path).content_fit(cosmic::iced::ContentFit::Fill)
                 } else {
                     widget::Image::new(ImageCache::get("fallback"))
@@ -794,7 +713,7 @@ impl StarryDex {
                         .push(
                             widget::text::text(format!(
                                 "{} Kg",
-                                scale_numbers(custom_pokemon.pokemon.weight)
+                                scale_numbers(starry_pokemon.pokemon.weight)
                             ))
                             .size(15.0),
                         )
@@ -810,7 +729,7 @@ impl StarryDex {
                         .push(
                             widget::text::text(format!(
                                 "{} m",
-                                scale_numbers(custom_pokemon.pokemon.height)
+                                scale_numbers(starry_pokemon.pokemon.height)
                             ))
                             .size(15.0),
                         )
@@ -820,21 +739,109 @@ impl StarryDex {
                 .style(theme::Container::ContextDrawer)
                 .padding([spacing.space_none, spacing.space_xxs]);
 
-                let parsed_pokemon_types =
-                    self.parse_pokemon_types(&custom_pokemon.pokemon.types, &spacing);
+                let pokemon_types = widget::container::Container::new(Column::with_children(
+                    starry_pokemon.pokemon.types.iter().map(|poke_type| {
+                        widget::Row::new()
+                            .push(
+                                widget::text(poke_type.to_uppercase())
+                                    .width(Length::Fill)
+                                    .horizontal_alignment(Horizontal::Center),
+                            )
+                            .width(Length::Fill)
+                            .into()
+                    }),
+                ))
+                .style(theme::Container::ContextDrawer)
+                .padding([spacing.space_none, spacing.space_xxs]);
+
+                let pokemon_abilities = widget::container::Container::new(Column::with_children(
+                    starry_pokemon.pokemon.abilities.iter().map(|poke_ability| {
+                        widget::Row::new()
+                            .push(
+                                widget::text(poke_ability.to_uppercase())
+                                    .width(Length::Fill)
+                                    .horizontal_alignment(Horizontal::Center),
+                            )
+                            .width(Length::Fill)
+                            .into()
+                    }),
+                ))
+                .style(theme::Container::ContextDrawer)
+                .padding([spacing.space_none, spacing.space_xxs]);
+
+                let pokemon_stats = widget::container::Container::new(
+                    Column::new()
+                        .push(
+                            widget::Row::new()
+                                .push(widget::text(fl!("hp")).width(Length::Fill))
+                                .push(
+                                    widget::text(starry_pokemon.pokemon.stats.hp.to_string())
+                                        .horizontal_alignment(Horizontal::Left),
+                                ),
+                        )
+                        .push(
+                            widget::Row::new()
+                                .push(widget::text(fl!("attack")).width(Length::Fill))
+                                .push(
+                                    widget::text(starry_pokemon.pokemon.stats.attack.to_string())
+                                        .horizontal_alignment(Horizontal::Left),
+                                ),
+                        )
+                        .push(
+                            widget::Row::new()
+                                .push(widget::text(fl!("defense")).width(Length::Fill))
+                                .push(
+                                    widget::text(starry_pokemon.pokemon.stats.defense.to_string())
+                                        .horizontal_alignment(Horizontal::Left),
+                                ),
+                        )
+                        .push(
+                            widget::Row::new()
+                                .push(widget::text(fl!("sp-a")).width(Length::Fill))
+                                .push(
+                                    widget::text(
+                                        starry_pokemon.pokemon.stats.sp_attack.to_string(),
+                                    )
+                                    .horizontal_alignment(Horizontal::Left),
+                                ),
+                        )
+                        .push(
+                            widget::Row::new()
+                                .push(widget::text(fl!("sp-d")).width(Length::Fill))
+                                .push(
+                                    widget::text(
+                                        starry_pokemon.pokemon.stats.sp_defense.to_string(),
+                                    )
+                                    .horizontal_alignment(Horizontal::Left),
+                                ),
+                        )
+                        .push(
+                            widget::Row::new()
+                                .push(widget::text(fl!("spd")).width(Length::Fill))
+                                .push(
+                                    widget::text(starry_pokemon.pokemon.stats.speed.to_string())
+                                        .horizontal_alignment(Horizontal::Left),
+                                ),
+                        ),
+                )
+                .style(theme::Container::ContextDrawer)
+                .padding([spacing.space_none, spacing.space_xxs]);
 
                 let pokemon_first_row = widget::Row::new()
                     .push(pokemon_weight)
                     .push(pokemon_height)
-                    .push(parsed_pokemon_types)
+                    .push(pokemon_types)
                     .spacing(8.0)
                     .align_items(Alignment::Center);
 
-                let pokemon_abilities =
-                    self.parse_pokemon_abilities(&custom_pokemon.pokemon.abilities, &spacing);
-
-                let parsed_pokemon_stats =
-                    self.parse_pokemon_stats(&custom_pokemon.pokemon.stats, &spacing);
+                let mut result_col = widget::Column::new()
+                    .push(page_title)
+                    .push(pokemon_image)
+                    .push(pokemon_first_row)
+                    .push(pokemon_abilities)
+                    .push(pokemon_stats)
+                    .align_items(Alignment::Center)
+                    .spacing(10.0);
 
                 let show_details = widget::Checkbox::new(
                     fl!("show-encounter-details"),
@@ -842,31 +849,40 @@ impl StarryDex {
                     Message::TogglePokemonDetails,
                 );
 
-                let encounter_info = match &custom_pokemon.encounter_info {
-                    Some(info) => self.parse_encounter_info(info, &spacing),
+                let encounter_info = match &starry_pokemon.encounter_info {
+                    Some(info) => {
+                        let children = info.iter().map(|ef| {
+                            let mut version_column = widget::Column::new().width(Length::Fill);
+                            version_column = version_column.push(
+                                widget::text(capitalize_string(&ef.city))
+                                    .style(theme::Text::Accent)
+                                    .size(Pixels::from(15)),
+                            );
+
+                            for method in &ef.games_method {
+                                version_column = version_column.push(widget::text(method));
+                            }
+
+                            version_column.into()
+                        });
+
+                        widget::container::Container::new(Column::with_children(children))
+                            .style(theme::Container::ContextDrawer)
+                            .padding([spacing.space_none, spacing.space_xxs])
+                    }
                     None => widget::Container::new(widget::Text::new(fl!("no-encounter-info")))
-                        .style(theme::Container::ContextDrawer)
-                        .into(),
+                        .style(theme::Container::ContextDrawer),
                 };
 
                 let link = widget::button::link(fl!("link-more-info"))
                     .on_press(Message::LaunchUrl(format!(
                         "https://bulbapedia.bulbagarden.net/w/index.php?search={}",
-                        &custom_pokemon.pokemon.name
+                        &starry_pokemon.pokemon.name
                     )))
                     .padding(0);
 
-                let mut result_col = widget::Column::new()
-                    .push(page_title)
-                    .push(pokemon_image)
-                    .push(pokemon_first_row)
-                    .push(pokemon_abilities)
-                    .push(parsed_pokemon_stats)
-                    .align_items(Alignment::Center)
-                    .spacing(10.0);
-
-                if custom_pokemon.encounter_info.is_some()
-                    && !custom_pokemon.encounter_info.clone().unwrap().is_empty()
+                if starry_pokemon.encounter_info.is_some()
+                    && !starry_pokemon.encounter_info.clone().unwrap().is_empty()
                 {
                     result_col = result_col.push(show_details);
                     if self.wants_pokemon_details {
@@ -878,12 +894,14 @@ impl StarryDex {
                 return result_col.into();
             }
             None => {
-                let error = widget::text::title1(fl!("generic-error"))
-                    .apply(widget::container)
-                    .width(Length::Fill)
-                    .height(Length::Fill)
-                    .align_x(Horizontal::Center)
-                    .align_y(Vertical::Center);
+                let error = cosmic::Apply::apply(
+                    widget::text::title1(fl!("generic-error")),
+                    widget::container,
+                )
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .align_x(Horizontal::Center)
+                .align_y(Vertical::Center);
 
                 widget::Column::new().push(error)
             }
@@ -892,134 +910,134 @@ impl StarryDex {
         widget::container(content).into()
     }
 
-    /// Updates the header and window titles.
-    pub fn update_titles(&mut self) -> Command<Message> {
-        let mut window_title = fl!("app-title");
-        let mut header_title = String::new();
+    /// The filters context page for this app.
+    pub fn filters_page(&self) -> Element<Message> {
+        // TODO: Pokémon Types can't be transated because they need to match so the filtering works.
+        //let all_pokemon_types = vec![
+        //    fl!("normal"),
+        //    fl!("fire"),
+        //    fl!("water"),
+        //    fl!("electric"),
+        //    fl!("grass"),
+        //    fl!("ice"),
+        //    fl!("fighting"),
+        //    fl!("poison"),
+        //    fl!("ground"),
+        //    fl!("flying"),
+        //    fl!("psychic"),
+        //    fl!("bug"),
+        //    fl!("rock"),
+        //    fl!("ghost"),
+        //    fl!("dragon"),
+        //    fl!("dark"),
+        //    fl!("steel"),
+        //    fl!("fairy"),
+        //];
+        let all_pokemon_types = vec![
+            "Normal", "Fire", "Water", "Electric", "Grass", "Ice", "Fighting", "Poison", "Ground",
+            "Flying", "Psychic", "Bug", "Rock", "Ghost", "Dragon", "Dark", "Steel", "Fairy",
+        ];
 
-        match self.current_page {
-            Page::LandingPage => {
-                window_title.push_str(" — ");
-                window_title.push_str(fl!("landing-page-title").as_str());
-                header_title.push_str(fl!("landing-page-title").as_str());
+        let type_checkboxes: Vec<Element<Message>> = all_pokemon_types
+            .into_iter()
+            .map(|pokemon_type| {
+                let is_checked = self.filters.selected_types.contains(pokemon_type);
+                let checkbox: Element<Message> =
+                    widget::checkbox::Checkbox::new(pokemon_type, is_checked, move |value| {
+                        Message::TypeFilterToggled(value, pokemon_type.to_string())
+                    })
+                    .into();
+
+                widget::Container::new(checkbox).width(Length::Fill).into()
+            })
+            .collect();
+
+        let mut types_column = widget::Column::new()
+            .push(widget::text::title3(fl!("type-filters")))
+            .spacing(5)
+            .width(Length::Fill);
+        let mut current_row = widget::Row::new();
+        let mut count = 0;
+
+        for t_checkbox in type_checkboxes {
+            current_row = current_row.push(t_checkbox);
+            count += 1;
+
+            if count % 2 == 0 {
+                types_column = types_column.push(current_row);
+                current_row = widget::Row::new();
             }
         }
 
-        self.set_header_title(header_title);
+        // If there's an odd number of checkboxes, add the last row
+        if count % 2 != 0 {
+            types_column = types_column.push(current_row);
+        }
+
+        let result_column = widget::Column::new()
+            .width(Length::Fill)
+            .push(types_column)
+            .push(
+                widget::Container::new(
+                    widget::button::suggested(fl!("apply-filters"))
+                        .on_press(Message::ApplyCurrentFilters)
+                        .width(Length::Shrink),
+                )
+                .width(Length::Fill)
+                .align_x(Horizontal::Center),
+            )
+            .spacing(Pixels::from(30.0));
+
+        widget::Container::new(result_column).into()
+    }
+
+    /// Updates the header and window titles.
+    pub fn update_title(&mut self) -> Command<Message> {
+        let window_title = fl!("app-title");
+
+        // if let Some(page) = self.nav.text(self.nav.active()) {
+        //     window_title.push_str(" — ");
+        //     window_title.push_str(page);
+        // }
+
         self.set_window_title(window_title)
     }
+}
 
-    #[allow(clippy::ptr_arg)]
-    pub fn parse_pokemon_stats(
-        &self,
-        stats: &Vec<PokemonStat>,
-        spacing: &cosmic_theme::Spacing,
-    ) -> Element<Message> {
-        let children = stats.iter().map(|pokemon_stats| {
-            widget::Row::new()
-                .push(widget::text(capitalize_string(&pokemon_stats.stat.name)).width(Length::Fill))
-                .push(
-                    widget::text(pokemon_stats.base_stat.to_string())
-                        .horizontal_alignment(Horizontal::Left),
-                )
-                .into()
-        });
+/// The context page to display in the context drawer.
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
+pub enum ContextPage {
+    #[default]
+    About,
+    Settings,
+    PokemonPage,
+    FiltersPage,
+}
 
-        widget::container::Container::new(Column::with_children(children))
-            .style(theme::Container::ContextDrawer)
-            .padding([spacing.space_none, spacing.space_xxs])
-            .into()
+impl ContextPage {
+    fn title(&self) -> String {
+        match self {
+            Self::About => fl!("about"),
+            Self::Settings => fl!("settings"),
+            Self::PokemonPage => fl!("pokemon-page"),
+            Self::FiltersPage => fl!("filters-page"),
+        }
     }
+}
 
-    #[allow(clippy::ptr_arg)]
-    pub fn parse_pokemon_types(
-        &self,
-        types: &Vec<PokemonType>,
-        spacing: &cosmic_theme::Spacing,
-    ) -> Element<Message> {
-        let children = types.iter().map(|pokemon_types| {
-            widget::Row::new()
-                .push(
-                    widget::text(pokemon_types.type_.name.to_uppercase())
-                        .width(Length::Fill)
-                        .horizontal_alignment(Horizontal::Center),
-                )
-                .width(Length::Fill)
-                .into()
-        });
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MenuAction {
+    About,
+    Settings,
+}
 
-        widget::container::Container::new(Column::with_children(children))
-            .style(theme::Container::ContextDrawer)
-            .padding([spacing.space_none, spacing.space_xxs])
-            .into()
-    }
+impl menu::action::MenuAction for MenuAction {
+    type Message = Message;
 
-    #[allow(clippy::ptr_arg)]
-    pub fn parse_pokemon_abilities(
-        &self,
-        abilities: &Vec<PokemonAbility>,
-        spacing: &cosmic_theme::Spacing,
-    ) -> Element<Message> {
-        let children = abilities.iter().map(|pokemon_abilities| {
-            widget::Row::new()
-                .push(match pokemon_abilities.is_hidden {
-                    true => widget::text(format!(
-                        "{} (HIDDEN)",
-                        capitalize_string(&pokemon_abilities.ability.name)
-                    ))
-                    .width(Length::Fill)
-                    .horizontal_alignment(Horizontal::Center),
-                    false => widget::text(capitalize_string(&pokemon_abilities.ability.name))
-                        .width(Length::Fill)
-                        .horizontal_alignment(Horizontal::Center),
-                })
-                .width(Length::Fill)
-                .into()
-        });
-
-        widget::container::Container::new(Column::with_children(children))
-            .style(theme::Container::ContextDrawer)
-            .padding([spacing.space_none, spacing.space_xxs])
-            .into()
-    }
-
-    #[allow(clippy::ptr_arg)]
-    pub fn parse_encounter_info(
-        &self,
-        encounter_info: &Vec<LocationAreaEncounter>,
-        spacing: &cosmic_theme::Spacing,
-    ) -> Element<Message> {
-        let children = encounter_info.iter().map(|encounter_info| {
-            let mut version_column = widget::Column::new().width(Length::Fill);
-            version_column = version_column.push(
-                widget::text(capitalize_string(&encounter_info.location_area.name))
-                    .style(theme::Text::Accent)
-                    .size(Pixels::from(15)),
-            );
-
-            for games_info in &encounter_info.version_details {
-                let game_name = capitalize_string(&games_info.version.name);
-                let mut method_name = String::new();
-                // let mut conditions = String::new();
-
-                for enc_details in &games_info.encounter_details {
-                    method_name = capitalize_string(&enc_details.method.name);
-
-                    // for condition in &enc_details.condition_values {
-                    //     conditions = conditions + &capitalize_string(&condition.name);
-                    // }
-                }
-
-                version_column =
-                    version_column.push(widget::text(format!("{}: {}", game_name, method_name)))
-            }
-
-            version_column.into()
-        });
-
-        widget::container::Container::new(Column::with_children(children))
-            .style(theme::Container::ContextDrawer)
-            .padding([spacing.space_none, spacing.space_xxs])
-            .into()
+    fn message(&self) -> Self::Message {
+        match self {
+            MenuAction::About => Message::ToggleContextPage(ContextPage::About),
+            MenuAction::Settings => Message::ToggleContextPage(ContextPage::Settings),
+        }
     }
 }
