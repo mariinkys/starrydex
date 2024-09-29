@@ -30,7 +30,6 @@
     <content_rating type="oars-1.1"/>
 
     <provides>
-        <id>dev.mariinkys.StarryDex.desktop</id>
         <id>com.system76.CosmicApplication</id>
         <binary>starry-dex</binary>
     </provides>
