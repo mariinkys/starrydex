@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 use crate::api::Api;
-use crate::config::{AppTheme, Config};
+use crate::config::{AppTheme, Config, TypeFilteringMode};
 use crate::fl;
 use crate::image_cache::ImageCache;
 use crate::utils::{capitalize_string, scale_numbers};
@@ -49,6 +49,8 @@ pub struct StarryDex {
     search: String,
     // Holds the currently applied filters if there are any
     filters: Filters,
+    // Type Filter Modes
+    type_filter_mode: Vec<String>,
 }
 
 /// Messages emitted by the application and its widgets.
@@ -58,7 +60,7 @@ pub enum Message {
     ToggleContextPage(ContextPage),
     UpdateConfig(Config),
     UpdateTheme(usize),
-    UpdatePokePerRow(usize),
+    UpdateTypeFilterMode(usize),
 
     LoadPokemon(i64),
     TogglePokemonDetails(bool),
@@ -181,6 +183,7 @@ impl Application for StarryDex {
             filters: Filters {
                 selected_types: HashSet::new(),
             },
+            type_filter_mode: vec![fl!("exclusive"), fl!("inclusive")],
         };
         // Startup command that sets the window title.
         commands.push(app.update_title());
@@ -203,6 +206,7 @@ impl Application for StarryDex {
                             app_theme: crate::config::AppTheme::System,
                             first_run_completed: true,
                             pokemon_per_row: 3,
+                            type_filtering_mode: crate::config::TypeFilteringMode::Exclusive,
                         },
                         pokemon_list,
                     ))
@@ -340,6 +344,7 @@ impl Application for StarryDex {
                 self.config = Config {
                     first_run_completed: old_config.first_run_completed,
                     pokemon_per_row: old_config.pokemon_per_row,
+                    type_filtering_mode: old_config.type_filtering_mode,
                     app_theme,
                 };
                 return cosmic::app::command::set_theme(self.config.app_theme.theme());
@@ -406,26 +411,54 @@ impl Application for StarryDex {
                 //TODO: Revisit how to do this without this being necessary, search does not need to be lost?
                 self.search = String::new();
 
-                let selected_types_lowercase: HashSet<String> = self
-                    .filters
-                    .selected_types
-                    .iter()
-                    .map(|t| t.to_lowercase())
-                    .collect();
+                match self.config.type_filtering_mode {
+                    TypeFilteringMode::Inclusive => {
+                        // Ej: If fire and ice are selected it will show fire pokemons and ice pokemons
+                        let selected_types_lowercase: HashSet<String> = self
+                            .filters
+                            .selected_types
+                            .iter()
+                            .map(|t| t.to_lowercase())
+                            .collect();
 
-                self.filtered_pokemon_list = self
-                    .pokemon_list
-                    .values()
-                    .filter(|pokemon| {
-                        selected_types_lowercase.is_empty()
-                            || pokemon
-                                .pokemon
-                                .types
-                                .iter()
-                                .any(|t| selected_types_lowercase.contains(&t.to_lowercase()))
-                    })
-                    .cloned()
-                    .collect();
+                        self.filtered_pokemon_list = self
+                            .pokemon_list
+                            .values()
+                            .filter(|pokemon| {
+                                selected_types_lowercase.is_empty()
+                                    || pokemon.pokemon.types.iter().any(|t| {
+                                        selected_types_lowercase.contains(&t.to_lowercase())
+                                    })
+                            })
+                            .cloned()
+                            .collect();
+                    }
+                    TypeFilteringMode::Exclusive => {
+                        // Ej: If fire and ice are selected it will show pokemons that are both fire and ice types
+                        let selected_types_lowercase: HashSet<String> = self
+                            .filters
+                            .selected_types
+                            .iter()
+                            .map(|t| t.to_lowercase())
+                            .collect();
+
+                        self.filtered_pokemon_list = self
+                            .pokemon_list
+                            .values()
+                            .filter(|pokemon| {
+                                selected_types_lowercase.is_empty()
+                                    || selected_types_lowercase.iter().all(|selected_type| {
+                                        pokemon
+                                            .pokemon
+                                            .types
+                                            .iter()
+                                            .any(|t| t.to_lowercase() == *selected_type)
+                                    })
+                            })
+                            .cloned()
+                            .collect();
+                    }
+                }
 
                 self.core.window.show_context = false;
             }
@@ -436,15 +469,19 @@ impl Application for StarryDex {
                 };
                 self.current_page_status = PageStatus::Loaded;
             }
-            Message::UpdatePokePerRow(new_value) => {
+            Message::UpdateTypeFilterMode(index) => {
                 let old_config = self.config.clone();
 
+                let filter_mode = match index {
+                    1 => TypeFilteringMode::Inclusive,
+                    _ => TypeFilteringMode::Exclusive,
+                };
                 self.config = Config {
                     first_run_completed: old_config.first_run_completed,
-                    pokemon_per_row: new_value,
+                    pokemon_per_row: old_config.pokemon_per_row,
+                    type_filtering_mode: filter_mode,
                     app_theme: old_config.app_theme,
                 };
-                return cosmic::app::command::set_theme(self.config.app_theme.theme());
             }
         }
         Command::none()
@@ -497,28 +534,53 @@ impl StarryDex {
             AppTheme::System => 0,
         };
 
-        let current_value = self.config.pokemon_per_row as u16;
+        let type_filter_mode_selected = match self.config.type_filtering_mode {
+            TypeFilteringMode::Inclusive => 1,
+            TypeFilteringMode::Exclusive => 0,
+        };
 
-        widget::settings::view_column(vec![widget::settings::section()
-            .title(fl!("appearance"))
-            .add(
-                widget::settings::item::builder(fl!("theme")).control(widget::dropdown(
-                    &self.app_themes,
-                    Some(app_theme_selected),
-                    Message::UpdateTheme,
-                )),
-            )
-            .add(
-                widget::settings::item::builder(fl!("pokemon-per-row"))
-                    .description(format!("{}", current_value))
-                    .control(
-                        widget::slider(1..=10, current_value, move |new_value| {
-                            Message::UpdatePokePerRow(new_value as usize)
-                        })
-                        .step(1u16),
+        let current_value = self.config.pokemon_per_row as u16;
+        let old_config = self.config.clone();
+
+        widget::settings::view_column(vec![
+            widget::settings::section()
+                .title(fl!("appearance"))
+                .add(
+                    widget::settings::item::builder(fl!("theme")).control(widget::dropdown(
+                        &self.app_themes,
+                        Some(app_theme_selected),
+                        Message::UpdateTheme,
+                    )),
+                )
+                .add(
+                    widget::settings::item::builder(fl!("pokemon-per-row"))
+                        .description(format!("{}", current_value))
+                        .control(
+                            widget::slider(1..=10, current_value, move |new_value| {
+                                Message::UpdateConfig(Config {
+                                    app_theme: old_config.app_theme,
+                                    first_run_completed: old_config.first_run_completed,
+                                    pokemon_per_row: new_value as usize,
+                                    type_filtering_mode: old_config.type_filtering_mode,
+                                })
+                            })
+                            .step(1u16),
+                        ),
+                )
+                .into(),
+            widget::settings::section()
+                .title(fl!("other"))
+                .add(
+                    widget::settings::item::builder(fl!("type-filter-mode")).control(
+                        widget::dropdown(
+                            &self.type_filter_mode,
+                            Some(type_filter_mode_selected),
+                            Message::UpdateTypeFilterMode,
+                        ),
                     ),
-            )
-            .into()])
+                )
+                .into(),
+        ])
         .into()
     }
 

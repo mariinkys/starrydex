@@ -25,6 +25,12 @@ pokeapi-text = This application uses PokéApi and it's resources.
 nintendo-text = Pokémon and Pokémon character names are trademarks of Nintendo.
 
 <#-- Settings Page -->
+other = Other
+type-filter-mode = Type filtering mode
+inclusive = Inclusive
+exclusive = Exclusive
+renew-cache = Renew Cache
+renew-cache-button = Renew
 
 <#-- Landing (Main) Page -->
 landing-page-title = All Pokémon

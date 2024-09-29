@@ -12,6 +12,7 @@ pub struct Config {
     pub app_theme: AppTheme,
     pub first_run_completed: bool,
     pub pokemon_per_row: usize,
+    pub type_filtering_mode: TypeFilteringMode,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -30,4 +31,11 @@ impl AppTheme {
             Self::System => theme::system_preference(),
         }
     }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub enum TypeFilteringMode {
+    Inclusive,
+    #[default]
+    Exclusive,
 }
