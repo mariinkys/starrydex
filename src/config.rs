@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 pub struct Config {
     pub app_theme: AppTheme,
     pub first_run_completed: bool,
+    pub pokemon_per_row: usize,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]

@@ -14,6 +14,7 @@ use cosmic::widget::{self, menu, Column};
 use cosmic::{cosmic_theme, theme, Application, ApplicationExt, Element};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
+use std::fmt::Debug;
 
 const REPOSITORY: &str = "https://github.com/mariinkys/starrydex";
 const APP_ICON: &[u8] =
@@ -57,6 +58,7 @@ pub enum Message {
     ToggleContextPage(ContextPage),
     UpdateConfig(Config),
     UpdateTheme(usize),
+    UpdatePokePerRow(usize),
 
     LoadPokemon(i64),
     TogglePokemonDetails(bool),
@@ -200,6 +202,7 @@ impl Application for StarryDex {
                         Config {
                             app_theme: crate::config::AppTheme::System,
                             first_run_completed: true,
+                            pokemon_per_row: 3,
                         },
                         pokemon_list,
                     ))
@@ -327,13 +330,16 @@ impl Application for StarryDex {
                 return cosmic::app::command::set_theme(self.config.app_theme.theme());
             }
             Message::UpdateTheme(index) => {
+                let old_config = self.config.clone();
+
                 let app_theme = match index {
                     1 => AppTheme::Dark,
                     2 => AppTheme::Light,
                     _ => AppTheme::System,
                 };
                 self.config = Config {
-                    first_run_completed: true,
+                    first_run_completed: old_config.first_run_completed,
+                    pokemon_per_row: old_config.pokemon_per_row,
                     app_theme,
                 };
                 return cosmic::app::command::set_theme(self.config.app_theme.theme());
@@ -395,7 +401,6 @@ impl Application for StarryDex {
                     // Remove the deselected type from the filter
                     self.filters.selected_types.remove(&type_name);
                 }
-                //self.apply_filters();
             }
             Message::ApplyCurrentFilters => {
                 //TODO: Revisit how to do this without this being necessary, search does not need to be lost?
@@ -430,6 +435,16 @@ impl Application for StarryDex {
                     selected_types: HashSet::new(),
                 };
                 self.current_page_status = PageStatus::Loaded;
+            }
+            Message::UpdatePokePerRow(new_value) => {
+                let old_config = self.config.clone();
+
+                self.config = Config {
+                    first_run_completed: old_config.first_run_completed,
+                    pokemon_per_row: new_value,
+                    app_theme: old_config.app_theme,
+                };
+                return cosmic::app::command::set_theme(self.config.app_theme.theme());
             }
         }
         Command::none()
@@ -476,13 +491,13 @@ impl StarryDex {
 
     /// The settings context page for this app.
     pub fn settings(&self) -> Element<Message> {
-        //let cosmic_theme::Spacing { space_xxs, .. } = theme::active().cosmic().spacing;
-
         let app_theme_selected = match self.config.app_theme {
             AppTheme::Dark => 1,
             AppTheme::Light => 2,
             AppTheme::System => 0,
         };
+
+        let current_value = self.config.pokemon_per_row as u16;
 
         widget::settings::view_column(vec![widget::settings::section()
             .title(fl!("appearance"))
@@ -492,6 +507,16 @@ impl StarryDex {
                     Some(app_theme_selected),
                     Message::UpdateTheme,
                 )),
+            )
+            .add(
+                widget::settings::item::builder(fl!("pokemon-per-row"))
+                    .description(format!("{}", current_value))
+                    .control(
+                        widget::slider(1..=10, current_value, move |new_value| {
+                            Message::UpdatePokePerRow(new_value as usize)
+                        })
+                        .step(1u16),
+                    ),
             )
             .into()])
         .into()
@@ -533,7 +558,7 @@ impl StarryDex {
             .padding([spacing.space_none, spacing.space_s]);
 
             // Insert a new row before adding the first Pokémon of each row
-            if index % 3 == 0 {
+            if index % self.config.pokemon_per_row == 0 {
                 pokemon_grid = pokemon_grid.insert_row();
             }
 
