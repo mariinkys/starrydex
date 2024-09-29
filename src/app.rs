@@ -3,6 +3,7 @@
 use crate::api::Api;
 use crate::config::{AppTheme, Config};
 use crate::fl;
+use crate::image_cache::ImageCache;
 use crate::utils::{capitalize_string, scale_numbers};
 use cosmic::app::{Command, Core};
 use cosmic::cosmic_config::{self, CosmicConfigEntry};
@@ -431,12 +432,7 @@ impl StarryDex {
                     .width(Length::Fixed(100.0))
                     .height(Length::Fixed(100.0))
             } else {
-                //TODO
-                //widget::Image::new(ImageCache::get("fallback"))
-                //    .content_fit(cosmic::iced::ContentFit::None)
-                //    .width(Length::Fixed(100.0))
-                //    .height(Length::Fixed(100.0))
-                widget::Image::new("")
+                widget::Image::new(ImageCache::get("fallback"))
                     .content_fit(cosmic::iced::ContentFit::None)
                     .width(Length::Fixed(100.0))
                     .height(Length::Fixed(100.0))
@@ -494,15 +490,13 @@ impl StarryDex {
                 let pokemon_image = if let Some(path) = &starry_pokemon.sprite_path {
                     widget::Image::new(path).content_fit(cosmic::iced::ContentFit::Fill)
                 } else {
-                    // TODO
-                    //widget::Image::new(ImageCache::get("fallback"))
-                    //    .content_fit(cosmic::iced::ContentFit::Fill)
-                    widget::Image::new("").content_fit(cosmic::iced::ContentFit::Fill)
+                    widget::Image::new(ImageCache::get("fallback"))
+                        .content_fit(cosmic::iced::ContentFit::Fill)
                 };
 
                 let pokemon_weight = widget::container::Container::new(
                     widget::Column::new()
-                        .push(widget::text::title3(fl!("weight"))) //TODO
+                        .push(widget::text::title3(fl!("weight")))
                         .push(
                             widget::text::text(format!(
                                 "{} Kg",
@@ -518,7 +512,7 @@ impl StarryDex {
 
                 let pokemon_height = widget::container::Container::new(
                     widget::Column::new()
-                        .push(widget::text::title3(fl!("height"))) // TODO
+                        .push(widget::text::title3(fl!("height")))
                         .push(
                             widget::text::text(format!(
                                 "{} m",
@@ -663,13 +657,11 @@ impl StarryDex {
                             .style(theme::Container::ContextDrawer)
                             .padding([spacing.space_none, spacing.space_xxs])
                     }
-                    None => {
-                        widget::Container::new(widget::Text::new(fl!("no-encounter-info"))) //TODO
-                            .style(theme::Container::ContextDrawer)
-                    }
+                    None => widget::Container::new(widget::Text::new(fl!("no-encounter-info")))
+                        .style(theme::Container::ContextDrawer),
                 };
 
-                let link = widget::button::link(fl!("link-more-info")) //TODO
+                let link = widget::button::link(fl!("link-more-info"))
                     .on_press(Message::LaunchUrl(format!(
                         "https://bulbapedia.bulbagarden.net/w/index.php?search={}",
                         &starry_pokemon.pokemon.name

@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
+use image_cache::{ImageCache, IMAGE_CACHE};
+
 mod api;
 mod app;
 mod config;
 mod i18n;
+mod image_cache;
 mod utils;
 
 fn main() -> cosmic::iced::Result {
@@ -12,6 +15,9 @@ fn main() -> cosmic::iced::Result {
 
     // Enable localizations to be applied.
     i18n::init(&requested_languages);
+
+    // Init the image cache
+    IMAGE_CACHE.get_or_init(|| std::sync::Mutex::new(ImageCache::new()));
 
     // Settings for configuring the application window and iced runtime.
     let settings = cosmic::app::Settings::default();
