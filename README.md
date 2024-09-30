@@ -41,8 +41,6 @@ Created by [mariinkys](https://github.com/mariinkys). Pokémon and Pokémon char
 
 This application uses [PokeApi](https://github.com/PokeAPI/) and it's resources.
 
-Bundled Icons:  "[Cosmic Icons](http://github.com/pop-os/cosmic-icons)" by [System76](http://system76.com/) is licensed under [CC-SA-4.0](http://creativecommons.org/licenses/by-sa/4.0/)
-
 ## Install
 
 To install your COSMIC application, you will need [just](https://github.com/casey/just), if you're on Pop!\_OS, you can install it with the following command:
