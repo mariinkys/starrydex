@@ -4984,6 +4984,7 @@ dependencies = [
  "libcosmic",
  "once_cell",
  "open",
+ "paste",
  "reqwest",
  "rust-embed",
  "rustemon",

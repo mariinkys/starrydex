@@ -1,15 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 use crate::api::Api;
-use crate::config::{AppTheme, Config, TypeFilteringMode};
+use crate::config::{self, AppTheme, StarryConfig, TypeFilteringMode, CONFIG_VERSION};
 use crate::fl;
 use crate::image_cache::ImageCache;
 use crate::utils::{capitalize_string, remove_dir_contents, scale_numbers};
 use cosmic::app::{Command, Core};
-use cosmic::cosmic_config::{self, CosmicConfigEntry};
+use cosmic::cosmic_config::{self};
 use cosmic::iced::alignment::{Horizontal, Vertical};
-use cosmic::iced::{Alignment, Length, Pixels, Subscription};
+use cosmic::iced::{event, keyboard::Event as KeyEvent, Event, Subscription};
+use cosmic::iced::{Alignment, Length, Pixels};
+use cosmic::iced_core::keyboard::{Key, Modifiers};
 use cosmic::iced_core::text::LineHeight;
+use cosmic::widget::menu::key_bind::KeyBind;
 use cosmic::widget::{self, menu, Column};
 use cosmic::{cosmic_theme, theme, Application, ApplicationExt, Element};
 use serde::{Deserialize, Serialize};
@@ -28,9 +31,13 @@ pub struct StarryDex {
     /// Display a context drawer with the designated page if defined.
     context_page: ContextPage,
     /// Key bindings for the application's menu bar.
-    key_binds: HashMap<menu::KeyBind, MenuAction>,
+    key_binds: HashMap<KeyBind, MenuAction>,
+    /// Application Modifiers
+    modifiers: Modifiers,
     // Configuration data that persists between application runs.
-    config: Config,
+    config: StarryConfig,
+    /// Config Handler
+    config_handler: Option<cosmic_config::Config>,
     // Application Themes
     app_themes: Vec<String>,
     // API Client
@@ -58,9 +65,14 @@ pub struct StarryDex {
 pub enum Message {
     LaunchUrl(String),
     ToggleContextPage(ContextPage),
-    UpdateConfig(Config),
+    UpdateConfig(StarryConfig),
     UpdateTheme(usize),
     UpdateTypeFilterMode(usize),
+
+    #[allow(dead_code)]
+    SystemThemeModeChange(cosmic_theme::ThemeMode),
+    Key(Modifiers, Key),
+    Modifiers(Modifiers),
 
     LoadPokemon(i64),
     TogglePokemonDetails(bool),
@@ -69,7 +81,7 @@ pub enum Message {
     ClearFilters,
     DeleteCache,
 
-    CompletedFirstRun(Config, BTreeMap<i64, StarryPokemon>),
+    CompletedFirstRun(StarryConfig, BTreeMap<i64, StarryPokemon>),
     LoadedPokemonList(BTreeMap<i64, StarryPokemon>),
     TypeFilterToggled(bool, String),
 }
@@ -122,13 +134,20 @@ pub enum PageStatus {
     Loading,
 }
 
+/// Application Flags
+#[derive(Clone, Debug)]
+pub struct Flags {
+    pub config_handler: Option<cosmic_config::Config>,
+    pub config: config::StarryConfig,
+}
+
 /// Create a COSMIC application from the app model
 impl Application for StarryDex {
     /// The async executor that will be used to run your application's commands.
     type Executor = cosmic::executor::Default;
 
     /// Data that your application receives to its init method.
-    type Flags = ();
+    type Flags = Flags;
 
     /// Messages which the application and its widgets will emit.
     type Message = Message;
@@ -145,34 +164,22 @@ impl Application for StarryDex {
     }
 
     /// Initializes the application with any given flags and startup commands.
-    fn init(core: Core, _flags: Self::Flags) -> (Self, Command<Self::Message>) {
+    fn init(core: Core, flags: Self::Flags) -> (Self, Command<Self::Message>) {
         // Commands that will get executed on the application init
         let mut commands = vec![];
 
         // Controls if it's the first time the application runs on a system
-        let mut first_run_completed = false;
+        //let mut first_run_completed = false;
 
         // Construct the app model with the runtime's core.
         let mut app = StarryDex {
             core,
             context_page: ContextPage::default(),
             key_binds: HashMap::new(),
+            modifiers: Modifiers::empty(),
             // Optional configuration file for an application.
-            config: cosmic_config::Config::new(Self::APP_ID, Config::VERSION)
-                .map(|context| match Config::get_entry(&context) {
-                    Ok(config) => {
-                        first_run_completed = config.first_run_completed;
-                        config
-                    }
-                    Err((_errors, config)) => {
-                        // for why in errors {
-                        //     tracing::error!(%why, "error loading app config");
-                        // }
-
-                        config
-                    }
-                })
-                .unwrap_or_default(),
+            config: flags.config,
+            config_handler: flags.config_handler,
             app_themes: vec![fl!("match-desktop"), fl!("dark"), fl!("light")],
             api: Api::new(Self::APP_ID),
             current_page_status: PageStatus::Loading,
@@ -196,14 +203,14 @@ impl Application for StarryDex {
         // Clone the app api in order to use it.
         let api_clone = app.api.clone();
 
-        if !first_run_completed {
+        if !app.config.first_run_completed {
             // First application run, construct cache, download sprites and update the config
             app.current_page_status = PageStatus::FirstRun;
             commands.push(cosmic::app::Command::perform(
                 async move { api_clone.load_all_pokemon().await },
                 |pokemon_list| {
                     cosmic::app::message::app(Message::CompletedFirstRun(
-                        Config {
+                        StarryConfig {
                             app_theme: crate::config::AppTheme::System,
                             first_run_completed: true,
                             pokemon_per_row: 3,
@@ -294,18 +301,53 @@ impl Application for StarryDex {
     /// emit messages to the application through a channel. They are started at the
     /// beginning of the application, and persist through its lifetime.
     fn subscription(&self) -> Subscription<Self::Message> {
-        Subscription::batch(vec![
-            // Watch for application configuration changes.
-            self.core()
-                .watch_config::<Config>(Self::APP_ID)
-                .map(|update| {
-                    // for why in update.errors {
-                    //     tracing::error!(?why, "app config error");
-                    // }
+        struct ConfigSubscription;
+        struct ThemeSubscription;
 
-                    Message::UpdateConfig(update.config)
-                }),
-        ])
+        let subscriptions = vec![
+            event::listen_with(|event, status| match event {
+                Event::Keyboard(KeyEvent::KeyPressed { key, modifiers, .. }) => match status {
+                    event::Status::Ignored => Some(Message::Key(modifiers, key)),
+                    event::Status::Captured => None,
+                },
+                Event::Keyboard(KeyEvent::ModifiersChanged(modifiers)) => {
+                    Some(Message::Modifiers(modifiers))
+                }
+                _ => None,
+            }),
+            cosmic_config::config_subscription(
+                std::any::TypeId::of::<ConfigSubscription>(),
+                Self::APP_ID.into(),
+                CONFIG_VERSION,
+            )
+            .map(|update| {
+                if !update.errors.is_empty() {
+                    println!(
+                        "errors loading config {:?}: {:?}",
+                        update.keys, update.errors
+                    );
+                }
+                Message::SystemThemeModeChange(update.config)
+            }),
+            cosmic_config::config_subscription::<_, cosmic_theme::ThemeMode>(
+                std::any::TypeId::of::<ThemeSubscription>(),
+                cosmic_theme::THEME_MODE_ID.into(),
+                cosmic_theme::ThemeMode::version(),
+            )
+            .map(|update| {
+                if !update.errors.is_empty() {
+                    println!(
+                        "errors loading theme mode {:?}: {:?}",
+                        update.keys, update.errors
+                    );
+                }
+                Message::SystemThemeModeChange(update.config)
+            }),
+        ];
+
+        // subscriptions.push(self.content.subscription().map(Message::Content));
+
+        Subscription::batch(subscriptions)
     }
 
     /// Handles messages emitted by the application and its widgets.
@@ -313,6 +355,29 @@ impl Application for StarryDex {
     /// Commands may be returned for asynchronous execution of code in the background
     /// on the application's async runtime.
     fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
+        // Helper for updating config values efficiently
+        macro_rules! config_set {
+            ($name: ident, $value: expr) => {
+                match &self.config_handler {
+                    Some(config_handler) => {
+                        match paste::paste! { self.config.[<set_ $name>](config_handler, $value) } {
+                            Ok(_) => {}
+                            Err(err) => {
+                                println!("failed to save config {:?}: {}", stringify!($name), err);
+                            }
+                        }
+                    }
+                    None => {
+                        self.config.$name = $value;
+                        println!(
+                            "failed to save config {:?}: no config handler",
+                            stringify!($name)
+                        );
+                    }
+                }
+            };
+        }
+
         match message {
             Message::LaunchUrl(url) => {
                 _ = open::that_detached(url);
@@ -332,22 +397,14 @@ impl Application for StarryDex {
             }
             Message::UpdateConfig(config) => {
                 self.config = config;
-                return cosmic::app::command::set_theme(self.config.app_theme.theme());
             }
             Message::UpdateTheme(index) => {
-                let old_config = self.config.clone();
-
                 let app_theme = match index {
                     1 => AppTheme::Dark,
                     2 => AppTheme::Light,
                     _ => AppTheme::System,
                 };
-                self.config = Config {
-                    first_run_completed: old_config.first_run_completed,
-                    pokemon_per_row: old_config.pokemon_per_row,
-                    type_filtering_mode: old_config.type_filtering_mode,
-                    app_theme,
-                };
+                config_set!(app_theme, app_theme);
                 return cosmic::app::command::set_theme(self.config.app_theme.theme());
             }
             Message::CompletedFirstRun(config, pokemon_list) => {
@@ -477,7 +534,7 @@ impl Application for StarryDex {
                     1 => TypeFilteringMode::Inclusive,
                     _ => TypeFilteringMode::Exclusive,
                 };
-                self.config = Config {
+                self.config = StarryConfig {
                     first_run_completed: old_config.first_run_completed,
                     pokemon_per_row: old_config.pokemon_per_row,
                     type_filtering_mode: filter_mode,
@@ -502,6 +559,20 @@ impl Application for StarryDex {
                         cosmic::app::message::app(Message::LoadedPokemonList(pokemon_list))
                     },
                 );
+            }
+            Message::SystemThemeModeChange(_) => {
+                return cosmic::app::command::set_theme(self.config.app_theme.theme());
+            }
+            Message::Key(modifiers, key) => {
+                for (key_bind, _action) in self.key_binds.iter() {
+                    if key_bind.matches(modifiers, &key) {
+                        //TOOD
+                        // return self.update(action.message());
+                    }
+                }
+            }
+            Message::Modifiers(modifiers) => {
+                self.modifiers = modifiers;
             }
         }
         Command::none()
@@ -577,7 +648,7 @@ impl StarryDex {
                         .description(format!("{}", current_value))
                         .control(
                             widget::slider(1..=10, current_value, move |new_value| {
-                                Message::UpdateConfig(Config {
+                                Message::UpdateConfig(StarryConfig {
                                     app_theme: old_config.app_theme,
                                     first_run_completed: old_config.first_run_completed,
                                     pokemon_per_row: new_value as usize,

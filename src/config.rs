@@ -1,18 +1,36 @@
-// SPDX-License-Identifier: GPL-3.0-only
-
+use crate::app::StarryDex;
 use cosmic::{
-    cosmic_config::{self, cosmic_config_derive::CosmicConfigEntry, CosmicConfigEntry},
-    theme,
+    cosmic_config::{self, cosmic_config_derive::CosmicConfigEntry, Config, CosmicConfigEntry},
+    theme, Application,
 };
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Default, Clone, CosmicConfigEntry, Eq, PartialEq)]
-#[version = 1]
-pub struct Config {
+pub const CONFIG_VERSION: u64 = 1;
+
+#[derive(Clone, Default, Debug, Eq, PartialEq, Deserialize, Serialize, CosmicConfigEntry)]
+pub struct StarryConfig {
     pub app_theme: AppTheme,
     pub first_run_completed: bool,
     pub pokemon_per_row: usize,
     pub type_filtering_mode: TypeFilteringMode,
+}
+
+impl StarryConfig {
+    pub fn config_handler() -> Option<Config> {
+        Config::new(StarryDex::APP_ID, CONFIG_VERSION).ok()
+    }
+
+    pub fn config() -> StarryConfig {
+        match Self::config_handler() {
+            Some(config_handler) => {
+                StarryConfig::get_entry(&config_handler).unwrap_or_else(|(_errs, config)| {
+                    //log::info!("errors loading config: {:?}", errs);
+                    config
+                })
+            }
+            None => StarryConfig::default(),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
