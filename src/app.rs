@@ -264,9 +264,13 @@ impl Application for StarryDex {
 
         let content = match self.current_page_status {
             PageStatus::FirstRun => Column::new()
-                .push(widget::text::text(fl!("downloading-sprites")))
-                .push(widget::text::text(fl!("estimate")))
-                .push(widget::text::text(fl!("once-message")))
+                //.push(widget::text::text(fl!("downloading-sprites")))
+                //.push(widget::text::text(fl!("estimate")))
+                //.push(widget::text::text(fl!("once-message")))
+                // TODO: This is temporal because settings do not get saved and are lost upon app restart.
+                .push(widget::text::text("Loading..."))
+                .push(widget::text::text("First load may take a minute"))
+                .push(widget::text::text("It will go faster after the first load"))
                 .align_items(Alignment::Center)
                 .width(Length::Fill)
                 .spacing(space_s)
