@@ -31,7 +31,7 @@
 
 > [!CAUTION]
 > Right now the application configuration does not get saved and it's lost upon application restart.
-> The application can't follow the system theme when installed as a Flatpak,
+> The application can't follow the system theme when installed as a Flatpak.
 
 > [!WARNING]
 > Beware there are some visual bugs when COSMIC is not installed on the system.
