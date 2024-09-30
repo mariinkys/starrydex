@@ -1,6 +1,6 @@
 [package]
 name = "starry-dex"
-version = "0.1.3"
+version = "0.2.0"
 authors = ["mariinkys (kysdev.owjga@aleeas.com)"]
 edition = "2021"
 description = "A Pokédex application for the COSMIC™ desktop written in Rust"
