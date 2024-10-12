@@ -357,10 +357,11 @@ impl Application for StarryDex {
             Message::CompletedFirstRun(config, pokemon_list) => {
                 self.config = config;
 
-                //self.pokemon_list = pokemon_list; //TODO: This is to temporarly fix an error that makes a empty pokemon to appear on the first position of the btree
-                let mut pokemon_list = pokemon_list;
-                pokemon_list.pop_first();
-                self.pokemon_list = pokemon_list;
+                self.pokemon_list = pokemon_list; 
+                //TODO: Remove this. This is to temporarly fixed an error that makes a empty pokemon to appear on the first position of the btree
+                //let mut pokemon_list = pokemon_list;
+                //pokemon_list.pop_first();
+                //self.pokemon_list = pokemon_list;
 
                 self.filtered_pokemon_list = self.pokemon_list.values().cloned().collect();
                 self.current_page_status = PageStatus::Loaded;
