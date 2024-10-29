@@ -233,7 +233,7 @@ impl Application for StarryDex {
                 &self.key_binds,
                 vec![
                     menu::Item::Button(fl!("about"), MenuAction::About),
-                    menu::Item::Button(String::from("Settings"), MenuAction::Settings),
+                    menu::Item::Button(fl!("settings"), MenuAction::Settings),
                 ],
             ),
         )]);
@@ -357,7 +357,7 @@ impl Application for StarryDex {
             Message::CompletedFirstRun(config, pokemon_list) => {
                 self.config = config;
 
-                self.pokemon_list = pokemon_list; 
+                self.pokemon_list = pokemon_list;
                 //TODO: Remove this. This is to temporarly fixed an error that makes a empty pokemon to appear on the first position of the btree
                 //let mut pokemon_list = pokemon_list;
                 //pokemon_list.pop_first();
