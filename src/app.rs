@@ -5,7 +5,7 @@ use crate::config::{AppTheme, Config, TypeFilteringMode};
 use crate::fl;
 use crate::image_cache::ImageCache;
 use crate::utils::{capitalize_string, remove_dir_contents, scale_numbers};
-use cosmic::app::{Command, Core};
+use cosmic::app::{Core, Task};
 use cosmic::cosmic_config::{self, CosmicConfigEntry};
 use cosmic::iced::alignment::{Horizontal, Vertical};
 use cosmic::iced::{Alignment, Length, Pixels, Subscription};
@@ -124,7 +124,7 @@ pub enum PageStatus {
 
 /// Create a COSMIC application from the app model
 impl Application for StarryDex {
-    /// The async executor that will be used to run your application's commands.
+    /// The async executor that will be used to run your application's tasks.
     type Executor = cosmic::executor::Default;
 
     /// Data that your application receives to its init method.
@@ -144,10 +144,10 @@ impl Application for StarryDex {
         &mut self.core
     }
 
-    /// Initializes the application with any given flags and startup commands.
-    fn init(core: Core, _flags: Self::Flags) -> (Self, Command<Self::Message>) {
-        // Commands that will get executed on the application init
-        let mut commands = vec![];
+    /// Initializes the application with any given flags and startup tasks.
+    fn init(core: Core, _flags: Self::Flags) -> (Self, Task<Self::Message>) {
+        // Tasks that will get executed on the application init
+        let mut tasks = vec![];
 
         // Controls if it's the first time the application runs on a system
         let mut first_run_completed = false;
@@ -186,8 +186,8 @@ impl Application for StarryDex {
             },
             type_filter_mode: vec![fl!("exclusive"), fl!("inclusive")],
         };
-        // Startup command that sets the window title.
-        commands.push(app.update_title());
+        // Startup task that sets the window title.
+        tasks.push(app.update_title());
 
         // Create the directory where all of our application data will exist
         let app_data_dir = dirs::data_dir().unwrap().join(Self::APP_ID);
@@ -199,7 +199,7 @@ impl Application for StarryDex {
         if !first_run_completed {
             // First application run, construct cache, download sprites and update the config
             app.current_page_status = PageStatus::FirstRun;
-            commands.push(cosmic::app::Command::perform(
+            tasks.push(cosmic::app::Task::perform(
                 async move { api_clone.load_all_pokemon().await },
                 |pokemon_list| {
                     cosmic::app::message::app(Message::CompletedFirstRun(
@@ -216,13 +216,13 @@ impl Application for StarryDex {
         } else {
             // Load  the Pokémon List
             app.current_page_status = PageStatus::Loading;
-            commands.push(cosmic::app::Command::perform(
+            tasks.push(cosmic::app::Task::perform(
                 async move { api_clone.load_all_pokemon().await },
                 |pokemon_list| cosmic::app::message::app(Message::LoadedPokemonList(pokemon_list)),
             ));
         }
 
-        (app, Command::batch(commands))
+        (app, Task::batch(tasks))
     }
 
     /// Elements to pack at the start of the header bar.
@@ -271,14 +271,14 @@ impl Application for StarryDex {
                 .push(widget::text::text("Loading..."))
                 .push(widget::text::text("First load may take a minute"))
                 .push(widget::text::text("It will go faster after the first load"))
-                .align_items(Alignment::Center)
+                .align_x(Alignment::Center)
                 .width(Length::Fill)
                 .spacing(space_s)
                 .into(),
             PageStatus::Loaded => self.landing(),
             PageStatus::Loading => Column::new()
                 .push(widget::text::text(fl!("loading")))
-                .align_items(Alignment::Center)
+                .align_x(Alignment::Center)
                 .width(Length::Fill)
                 .spacing(space_s)
                 .into(),
@@ -314,9 +314,9 @@ impl Application for StarryDex {
 
     /// Handles messages emitted by the application and its widgets.
     ///
-    /// Commands may be returned for asynchronous execution of code in the background
+    /// Tasks may be returned for asynchronous execution of code in the background
     /// on the application's async runtime.
-    fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
+    fn update(&mut self, message: Self::Message) -> Task<Self::Message> {
         match message {
             Message::LaunchUrl(url) => {
                 _ = open::that_detached(url);
@@ -501,7 +501,7 @@ impl Application for StarryDex {
                 // Reset the API
                 self.api = Api::new(Self::APP_ID);
                 let api_clone = self.api.clone();
-                return cosmic::app::Command::perform(
+                return cosmic::app::Task::perform(
                     async move { api_clone.load_all_pokemon().await },
                     |pokemon_list| {
                         cosmic::app::message::app(Message::LoadedPokemonList(pokemon_list))
@@ -509,7 +509,7 @@ impl Application for StarryDex {
                 );
             }
         }
-        Command::none()
+        Task::none()
     }
 }
 
@@ -546,7 +546,7 @@ impl StarryDex {
             .push(pokeapi_text)
             .push(nintendo_text)
             .push(version_link)
-            .align_items(Alignment::Center)
+            .align_x(Alignment::Center)
             .spacing(space_xxs)
             .into()
     }
@@ -642,12 +642,12 @@ impl StarryDex {
                             .line_height(LineHeight::Absolute(Pixels::from(15.0))),
                     )
                     .width(Length::Fill)
-                    .align_items(Alignment::Center),
+                    .align_x(Alignment::Center),
             )
             .width(Length::Fixed(200.0))
             .height(Length::Fixed(135.0))
             .on_press_down(Message::LoadPokemon(pokemon.pokemon.id))
-            .style(theme::Button::Image)
+            .class(theme::Button::Image)
             .padding([spacing.space_none, spacing.space_s]);
 
             // Insert a new row before adding the first Pokémon of each row
@@ -665,12 +665,12 @@ impl StarryDex {
             .width(Length::Fill);
 
         let filters = widget::button::standard(fl!("filter"))
-            .style(theme::Button::Suggested)
+            .class(theme::Button::Suggested)
             .on_press(Message::ToggleContextPage(ContextPage::FiltersPage))
             .width(Length::Shrink);
 
         let clear_filters = widget::button::standard(fl!("clear-filters"))
-            .style(theme::Button::Destructive)
+            .class(theme::Button::Destructive)
             .on_press(Message::ClearFilters)
             .width(Length::Shrink);
 
@@ -703,7 +703,7 @@ impl StarryDex {
                 let page_title =
                     widget::text::title1(capitalize_string(starry_pokemon.pokemon.name.as_str()))
                         .width(Length::Fill)
-                        .horizontal_alignment(Horizontal::Center);
+                        .align_x(Horizontal::Center);
 
                 let pokemon_image = if let Some(path) = &starry_pokemon.sprite_path {
                     widget::Image::new(path).content_fit(cosmic::iced::ContentFit::Fill)
@@ -722,10 +722,10 @@ impl StarryDex {
                             ))
                             .size(15.0),
                         )
-                        .align_items(Alignment::Center)
+                        .align_x(Alignment::Center)
                         .width(Length::Fill),
                 )
-                .style(theme::Container::ContextDrawer)
+                .class(theme::Container::ContextDrawer)
                 .padding([spacing.space_none, spacing.space_xxs]);
 
                 let pokemon_height = widget::container::Container::new(
@@ -738,10 +738,10 @@ impl StarryDex {
                             ))
                             .size(15.0),
                         )
-                        .align_items(Alignment::Center)
+                        .align_x(Alignment::Center)
                         .width(Length::Fill),
                 )
-                .style(theme::Container::ContextDrawer)
+                .class(theme::Container::ContextDrawer)
                 .padding([spacing.space_none, spacing.space_xxs]);
 
                 let pokemon_types = widget::container::Container::new(Column::with_children(
@@ -750,13 +750,13 @@ impl StarryDex {
                             .push(
                                 widget::text(poke_type.to_uppercase())
                                     .width(Length::Fill)
-                                    .horizontal_alignment(Horizontal::Center),
+                                    .align_x(Horizontal::Center),
                             )
                             .width(Length::Fill)
                             .into()
                     }),
                 ))
-                .style(theme::Container::ContextDrawer)
+                .class(theme::Container::ContextDrawer)
                 .padding([spacing.space_none, spacing.space_xxs]);
 
                 let pokemon_abilities = widget::container::Container::new(Column::with_children(
@@ -765,13 +765,13 @@ impl StarryDex {
                             .push(
                                 widget::text(poke_ability.to_uppercase())
                                     .width(Length::Fill)
-                                    .horizontal_alignment(Horizontal::Center),
+                                    .align_x(Horizontal::Center),
                             )
                             .width(Length::Fill)
                             .into()
                     }),
                 ))
-                .style(theme::Container::ContextDrawer)
+                .class(theme::Container::ContextDrawer)
                 .padding([spacing.space_none, spacing.space_xxs]);
 
                 let pokemon_stats = widget::container::Container::new(
@@ -781,7 +781,7 @@ impl StarryDex {
                                 .push(widget::text(fl!("hp")).width(Length::Fill))
                                 .push(
                                     widget::text(starry_pokemon.pokemon.stats.hp.to_string())
-                                        .horizontal_alignment(Horizontal::Left),
+                                        .align_x(Horizontal::Left),
                                 ),
                         )
                         .push(
@@ -789,7 +789,7 @@ impl StarryDex {
                                 .push(widget::text(fl!("attack")).width(Length::Fill))
                                 .push(
                                     widget::text(starry_pokemon.pokemon.stats.attack.to_string())
-                                        .horizontal_alignment(Horizontal::Left),
+                                        .align_x(Horizontal::Left),
                                 ),
                         )
                         .push(
@@ -797,7 +797,7 @@ impl StarryDex {
                                 .push(widget::text(fl!("defense")).width(Length::Fill))
                                 .push(
                                     widget::text(starry_pokemon.pokemon.stats.defense.to_string())
-                                        .horizontal_alignment(Horizontal::Left),
+                                        .align_x(Horizontal::Left),
                                 ),
                         )
                         .push(
@@ -807,7 +807,7 @@ impl StarryDex {
                                     widget::text(
                                         starry_pokemon.pokemon.stats.sp_attack.to_string(),
                                     )
-                                    .horizontal_alignment(Horizontal::Left),
+                                    .align_x(Horizontal::Left),
                                 ),
                         )
                         .push(
@@ -817,7 +817,7 @@ impl StarryDex {
                                     widget::text(
                                         starry_pokemon.pokemon.stats.sp_defense.to_string(),
                                     )
-                                    .horizontal_alignment(Horizontal::Left),
+                                    .align_x(Horizontal::Left),
                                 ),
                         )
                         .push(
@@ -825,11 +825,11 @@ impl StarryDex {
                                 .push(widget::text(fl!("spd")).width(Length::Fill))
                                 .push(
                                     widget::text(starry_pokemon.pokemon.stats.speed.to_string())
-                                        .horizontal_alignment(Horizontal::Left),
+                                        .align_x(Horizontal::Left),
                                 ),
                         ),
                 )
-                .style(theme::Container::ContextDrawer)
+                .class(theme::Container::ContextDrawer)
                 .padding([spacing.space_none, spacing.space_xxs]);
 
                 let pokemon_first_row = widget::Row::new()
@@ -837,7 +837,7 @@ impl StarryDex {
                     .push(pokemon_height)
                     .push(pokemon_types)
                     .spacing(8.0)
-                    .align_items(Alignment::Center);
+                    .align_y(Alignment::Center);
 
                 let mut result_col = widget::Column::new()
                     .push(page_title)
@@ -845,14 +845,14 @@ impl StarryDex {
                     .push(pokemon_first_row)
                     .push(pokemon_abilities)
                     .push(pokemon_stats)
-                    .align_items(Alignment::Center)
+                    .align_x(Alignment::Center)
                     .spacing(10.0);
 
                 let show_details = widget::Checkbox::new(
                     fl!("show-encounter-details"),
                     self.wants_pokemon_details,
-                    Message::TogglePokemonDetails,
-                );
+                )
+                .on_toggle(Message::TogglePokemonDetails);
 
                 let encounter_info = match &starry_pokemon.encounter_info {
                     Some(info) => {
@@ -860,7 +860,7 @@ impl StarryDex {
                             let mut version_column = widget::Column::new().width(Length::Fill);
                             version_column = version_column.push(
                                 widget::text(capitalize_string(&ef.city))
-                                    .style(theme::Text::Accent)
+                                    .class(theme::Text::Accent)
                                     .size(Pixels::from(15)),
                             );
 
@@ -872,11 +872,11 @@ impl StarryDex {
                         });
 
                         widget::container::Container::new(Column::with_children(children))
-                            .style(theme::Container::ContextDrawer)
+                            .class(theme::Container::ContextDrawer)
                             .padding([spacing.space_none, spacing.space_xxs])
                     }
                     None => widget::Container::new(widget::Text::new(fl!("no-encounter-info")))
-                        .style(theme::Container::ContextDrawer),
+                        .class(theme::Container::ContextDrawer),
                 };
 
                 let link = widget::button::link(fl!("link-more-info"))
@@ -948,10 +948,11 @@ impl StarryDex {
             .map(|pokemon_type| {
                 let is_checked = self.filters.selected_types.contains(pokemon_type);
                 let checkbox: Element<Message> =
-                    widget::checkbox::Checkbox::new(pokemon_type, is_checked, move |value| {
-                        Message::TypeFilterToggled(value, pokemon_type.to_string())
-                    })
-                    .into();
+                    widget::checkbox::Checkbox::new(pokemon_type, is_checked)
+                        .on_toggle(move |value| {
+                            Message::TypeFilterToggled(value, pokemon_type.to_string())
+                        })
+                        .into();
 
                 widget::Container::new(checkbox).width(Length::Fill).into()
             })
@@ -997,7 +998,7 @@ impl StarryDex {
     }
 
     /// Updates the header and window titles.
-    pub fn update_title(&mut self) -> Command<Message> {
+    pub fn update_title(&mut self) -> Task<Message> {
         let window_title = fl!("app-title");
 
         // if let Some(page) = self.nav.text(self.nav.active()) {
@@ -1005,7 +1006,11 @@ impl StarryDex {
         //     window_title.push_str(page);
         // }
 
-        self.set_window_title(window_title)
+        if let Some(id) = self.core.main_window_id() {
+            self.set_window_title(window_title, id)
+        } else {
+            Task::none()
+        }
     }
 }
 

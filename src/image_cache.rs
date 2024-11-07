@@ -23,7 +23,7 @@ impl ImageCache {
                 let data: &'static [u8] = include_bytes!(concat!("../res/images/", $name, ".png"));
                 cache.insert(
                     ImageCacheKey { name: $name },
-                    image::Handle::from_memory(data.to_vec()),
+                    image::Handle::from_bytes(data.to_vec()),
                 );
             };
         }
