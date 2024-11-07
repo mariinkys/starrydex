@@ -4982,7 +4982,6 @@ dependencies = [
  "i18n-embed",
  "i18n-embed-fl",
  "libcosmic",
- "once_cell",
  "open",
  "reqwest",
  "rust-embed",

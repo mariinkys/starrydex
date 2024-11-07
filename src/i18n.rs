@@ -7,8 +7,8 @@ use i18n_embed::{
     unic_langid::LanguageIdentifier,
     DefaultLocalizer, LanguageLoader, Localizer,
 };
-use once_cell::sync::Lazy;
 use rust_embed::RustEmbed;
+use std::sync::LazyLock;
 
 /// Applies the requested language(s) to requested translations from the `fl!()` macro.
 pub fn init(requested_languages: &[LanguageIdentifier]) {
@@ -27,7 +27,7 @@ pub fn localizer() -> Box<dyn Localizer> {
 #[folder = "i18n/"]
 struct Localizations;
 
-pub static LANGUAGE_LOADER: Lazy<FluentLanguageLoader> = Lazy::new(|| {
+pub static LANGUAGE_LOADER: LazyLock<FluentLanguageLoader> = LazyLock::new(|| {
     let loader: FluentLanguageLoader = fluent_language_loader!();
 
     loader
