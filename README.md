@@ -21,21 +21,13 @@
  </div>
 
 ## Information
-
 > [!TIP]
 > The application can work offline after initial setup is completed.
-
-> [!TIP]
 > If you are updating from a previous version it's recommended you delete the application cache through the settings.
 > The old cache was around 160MB and the new one is about 2MB, deleting the cache through the settings will delete both and generate just the new one.
 
 > [!CAUTION]
 > Right now the application configuration does not get saved and it's lost upon application restart.
-> The application can't follow the system theme when installed as a Flatpak.
-
-> [!WARNING]
-> Beware there are some visual bugs when COSMIC is not installed on the system.
-> (It seems like you do not need to be using COSMIC, but you need to have it installed to avoid visual issues with libcosmic).
 
 Created by [mariinkys](https://github.com/mariinkys). Pokémon and Pokémon character names are trademarks of Nintendo.
 
