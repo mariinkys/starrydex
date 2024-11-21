@@ -5,7 +5,7 @@ use crate::config::{AppTheme, Config, TypeFilteringMode};
 use crate::fl;
 use crate::image_cache::ImageCache;
 use crate::utils::{capitalize_string, remove_dir_contents, scale_numbers};
-use cosmic::app::{Core, Task};
+use cosmic::app::{context_drawer, Core, Task};
 use cosmic::cosmic_config::{self, CosmicConfigEntry};
 use cosmic::iced::alignment::{Horizontal, Vertical};
 use cosmic::iced::{Alignment, Length, Pixels, Subscription};
@@ -232,8 +232,8 @@ impl Application for StarryDex {
             menu::items(
                 &self.key_binds,
                 vec![
-                    menu::Item::Button(fl!("about"), MenuAction::About),
-                    menu::Item::Button(fl!("settings"), MenuAction::Settings),
+                    menu::Item::Button(fl!("about"), None, MenuAction::About),
+                    menu::Item::Button(fl!("settings"), None, MenuAction::Settings),
                 ],
             ),
         )]);
@@ -242,16 +242,32 @@ impl Application for StarryDex {
     }
 
     /// Display a context drawer if the context page is requested.
-    fn context_drawer(&self) -> Option<Element<Self::Message>> {
+    fn context_drawer(&self) -> Option<context_drawer::ContextDrawer<Self::Message>> {
         if !self.core.window.show_context {
             return None;
         }
 
         Some(match self.context_page {
-            ContextPage::About => self.about(),
-            ContextPage::Settings => self.settings(),
-            ContextPage::PokemonPage => self.single_pokemon_page(),
-            ContextPage::FiltersPage => self.filters_page(),
+            ContextPage::About => context_drawer::context_drawer(
+                self.about(),
+                Message::ToggleContextPage(ContextPage::About),
+            )
+            .title(fl!("about")),
+            ContextPage::Settings => context_drawer::context_drawer(
+                self.settings(),
+                Message::ToggleContextPage(ContextPage::Settings),
+            )
+            .title(fl!("settings")),
+            ContextPage::PokemonPage => context_drawer::context_drawer(
+                self.single_pokemon_page(),
+                Message::ToggleContextPage(ContextPage::PokemonPage),
+            )
+            .title(fl!("pokemon-page")),
+            ContextPage::FiltersPage => context_drawer::context_drawer(
+                self.filters_page(),
+                Message::ToggleContextPage(ContextPage::FiltersPage),
+            )
+            .title(fl!("filters-page")),
         })
     }
 
@@ -330,9 +346,6 @@ impl Application for StarryDex {
                     self.context_page = context_page;
                     self.core.window.show_context = true;
                 }
-
-                // Set the title of the context drawer.
-                self.set_context_title(context_page.title());
             }
             Message::UpdateConfig(config) => {
                 self.config = config;
@@ -383,9 +396,6 @@ impl Application for StarryDex {
                 // Open Context Page
                 self.context_page = ContextPage::PokemonPage;
                 self.core.window.show_context = true;
-
-                // Set the title of the context drawer.
-                self.set_context_title(ContextPage::PokemonPage.title());
             }
             Message::TogglePokemonDetails(value) => self.wants_pokemon_details = value,
             Message::Search(value) => {
@@ -1022,17 +1032,6 @@ pub enum ContextPage {
     Settings,
     PokemonPage,
     FiltersPage,
-}
-
-impl ContextPage {
-    fn title(&self) -> String {
-        match self {
-            Self::About => fl!("about"),
-            Self::Settings => fl!("settings"),
-            Self::PokemonPage => fl!("pokemon-page"),
-            Self::FiltersPage => fl!("filters-page"),
-        }
-    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
