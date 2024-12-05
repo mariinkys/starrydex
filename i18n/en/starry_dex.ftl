@@ -5,6 +5,8 @@ view = View
 back = Back
 generic-error = Oops, something has gone wrong...
 loading = Loading...
+repository = Repository
+support = Support
 
 <#-- Appearance -->
 appearance = Appearance

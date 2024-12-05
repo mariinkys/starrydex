@@ -10,21 +10,23 @@ use cosmic::cosmic_config::{self, CosmicConfigEntry};
 use cosmic::iced::alignment::{Horizontal, Vertical};
 use cosmic::iced::{Alignment, Length, Pixels, Subscription};
 use cosmic::iced_core::text::LineHeight;
+use cosmic::widget::about::About;
 use cosmic::widget::{self, menu, Column};
-use cosmic::{cosmic_theme, theme, Application, ApplicationExt, Element};
+use cosmic::{theme, Application, ApplicationExt, Element};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Debug;
 
 const REPOSITORY: &str = "https://github.com/mariinkys/starrydex";
-const APP_ICON: &[u8] =
-    include_bytes!("../res/icons/hicolor/256x256/apps/dev.mariinkys.StarryDex.svg");
+//const APP_ICON: &[u8] = include_bytes!("../res/icons/hicolor/256x256/apps/dev.mariinkys.StarryDex.svg");
 
 /// The application model stores app-specific state used to describe its interface and
 /// drive its logic.
 pub struct StarryDex {
     /// Application state which is managed by the COSMIC runtime.
     core: Core,
+    /// Application about page
+    about: About,
     /// Display a context drawer with the designated page if defined.
     context_page: ContextPage,
     /// Key bindings for the application's menu bar.
@@ -152,9 +154,26 @@ impl Application for StarryDex {
         // Controls if it's the first time the application runs on a system
         let mut first_run_completed = false;
 
+        // Application about page
+        let about = About::default()
+            .name(fl!("app-title"))
+            .icon(Self::APP_ID)
+            .version(env!("CARGO_PKG_VERSION"))
+            .author("mariinkys")
+            .license("GPL-3.0-only")
+            .links([
+                (fl!("repository"), REPOSITORY),
+                (
+                    fl!("support"),
+                    "https://github.com/mariinkys/starrydex/issues",
+                ),
+            ])
+            .developers([("mariinkys", "kysdev.owjga@aleeas.com")]);
+
         // Construct the app model with the runtime's core.
         let mut app = StarryDex {
             core,
+            about,
             context_page: ContextPage::default(),
             key_binds: HashMap::new(),
             // Optional configuration file for an application.
@@ -248,8 +267,9 @@ impl Application for StarryDex {
         }
 
         Some(match self.context_page {
-            ContextPage::About => context_drawer::context_drawer(
-                self.about(),
+            ContextPage::About => context_drawer::about(
+                &self.about,
+                Message::LaunchUrl,
                 Message::ToggleContextPage(ContextPage::About),
             )
             .title(fl!("about")),
@@ -524,43 +544,6 @@ impl Application for StarryDex {
 }
 
 impl StarryDex {
-    /// The about context page for this app.
-    pub fn about(&self) -> Element<Message> {
-        let cosmic_theme::Spacing { space_xxs, .. } = theme::active().cosmic().spacing;
-
-        let icon = widget::svg(widget::svg::Handle::from_memory(APP_ICON));
-
-        let title = widget::text::title3(fl!("app-title"));
-
-        let app_info = widget::text::text(fl!("app-info"));
-
-        let link = widget::button::link(REPOSITORY)
-            .on_press(Message::LaunchUrl(REPOSITORY.to_string()))
-            .padding(0);
-
-        let pokeapi_text = widget::text::text(fl!("pokeapi-text"));
-
-        let nintendo_text = widget::text::text(fl!("nintendo-text"));
-
-        let version_link = widget::button::link(format!("v{}", env!("CARGO_PKG_VERSION")))
-            .on_press(Message::LaunchUrl(
-                "https://github.com/mariinkys/starrydex/releases".to_string(),
-            ))
-            .padding(0);
-
-        widget::column()
-            .push(icon)
-            .push(title)
-            .push(app_info)
-            .push(link)
-            .push(pokeapi_text)
-            .push(nintendo_text)
-            .push(version_link)
-            .align_x(Alignment::Center)
-            .spacing(space_xxs)
-            .into()
-    }
-
     /// The settings context page for this app.
     pub fn settings(&self) -> Element<Message> {
         let app_theme_selected = match self.config.app_theme {
