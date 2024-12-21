@@ -168,7 +168,13 @@ impl Application for StarryDex {
                     "https://github.com/mariinkys/starrydex/issues",
                 ),
             ])
-            .developers([("mariinkys", "kysdev.owjga@aleeas.com")]);
+            .developers([("mariinkys", "kysdev.owjga@aleeas.com")])
+            .comments(format!(
+                "{}\n{}\n{}",
+                fl!("app-info"),
+                fl!("pokeapi-text"),
+                fl!("nintendo-text")
+            ));
 
         // Construct the app model with the runtime's core.
         let mut app = StarryDex {
