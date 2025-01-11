@@ -724,7 +724,7 @@ impl StarryDex {
                         .align_x(Alignment::Center)
                         .width(Length::Fill),
                 )
-                .class(theme::Container::ContextDrawer)
+                .class(theme::Container::Card)
                 .padding([spacing.space_none, spacing.space_xxs]);
 
                 let pokemon_height = widget::container::Container::new(
@@ -740,7 +740,7 @@ impl StarryDex {
                         .align_x(Alignment::Center)
                         .width(Length::Fill),
                 )
-                .class(theme::Container::ContextDrawer)
+                .class(theme::Container::Card)
                 .padding([spacing.space_none, spacing.space_xxs]);
 
                 let pokemon_types = widget::container::Container::new(Column::with_children(
@@ -755,7 +755,7 @@ impl StarryDex {
                             .into()
                     }),
                 ))
-                .class(theme::Container::ContextDrawer)
+                .class(theme::Container::Card)
                 .padding([spacing.space_none, spacing.space_xxs]);
 
                 let pokemon_abilities = widget::container::Container::new(Column::with_children(
@@ -770,7 +770,7 @@ impl StarryDex {
                             .into()
                     }),
                 ))
-                .class(theme::Container::ContextDrawer)
+                .class(theme::Container::Card)
                 .padding([spacing.space_none, spacing.space_xxs]);
 
                 let pokemon_stats = widget::container::Container::new(
@@ -828,7 +828,7 @@ impl StarryDex {
                                 ),
                         ),
                 )
-                .class(theme::Container::ContextDrawer)
+                .class(theme::Container::Card)
                 .padding([spacing.space_none, spacing.space_xxs]);
 
                 let pokemon_first_row = widget::Row::new()
@@ -871,11 +871,11 @@ impl StarryDex {
                         });
 
                         widget::container::Container::new(Column::with_children(children))
-                            .class(theme::Container::ContextDrawer)
+                            .class(theme::Container::Card)
                             .padding([spacing.space_none, spacing.space_xxs])
                     }
                     None => widget::Container::new(widget::Text::new(fl!("no-encounter-info")))
-                        .class(theme::Container::ContextDrawer),
+                        .class(theme::Container::Card),
                 };
 
                 let link = widget::button::link(fl!("link-more-info"))
