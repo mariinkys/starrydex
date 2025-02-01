@@ -73,7 +73,7 @@ pub enum Message {
 
     CompletedFirstRun(Config, BTreeMap<i64, StarryPokemon>),
     LoadedPokemonList(BTreeMap<i64, StarryPokemon>),
-    TypeFilterToggled(bool, String),
+    TypeFilterToggled(bool, PokemonType),
 }
 
 /// Represents a Pokémon in the application
@@ -114,7 +114,92 @@ pub struct StarryPokemonEncounterInfo {
 }
 
 pub struct Filters {
-    pub selected_types: HashSet<String>,
+    pub selected_types: HashSet<PokemonType>,
+}
+
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
+pub struct PokemonType {
+    pub display_name: String,
+    pub name: String,
+}
+
+impl PokemonType {
+    pub fn get_all() -> Vec<PokemonType> {
+        vec![
+            PokemonType {
+                display_name: fl!("normal"),
+                name: String::from("normal"),
+            },
+            PokemonType {
+                display_name: fl!("fire"),
+                name: String::from("fire"),
+            },
+            PokemonType {
+                display_name: fl!("water"),
+                name: String::from("water"),
+            },
+            PokemonType {
+                display_name: fl!("electric"),
+                name: String::from("electric"),
+            },
+            PokemonType {
+                display_name: fl!("grass"),
+                name: String::from("grass"),
+            },
+            PokemonType {
+                display_name: fl!("ice"),
+                name: String::from("ice"),
+            },
+            PokemonType {
+                display_name: fl!("fighting"),
+                name: String::from("fighting"),
+            },
+            PokemonType {
+                display_name: fl!("poison"),
+                name: String::from("poison"),
+            },
+            PokemonType {
+                display_name: fl!("ground"),
+                name: String::from("ground"),
+            },
+            PokemonType {
+                display_name: fl!("flying"),
+                name: String::from("flying"),
+            },
+            PokemonType {
+                display_name: fl!("psychic"),
+                name: String::from("psychic"),
+            },
+            PokemonType {
+                display_name: fl!("bug"),
+                name: String::from("bug"),
+            },
+            PokemonType {
+                display_name: fl!("rock"),
+                name: String::from("rock"),
+            },
+            PokemonType {
+                display_name: fl!("ghost"),
+                name: String::from("ghost"),
+            },
+            PokemonType {
+                display_name: fl!("dragon"),
+                name: String::from("dragon"),
+            },
+            PokemonType {
+                display_name: fl!("dark"),
+                name: String::from("dark"),
+            },
+            PokemonType {
+                display_name: fl!("steel"),
+                name: String::from("steel"),
+            },
+            PokemonType {
+                display_name: fl!("fairy"),
+                name: String::from("fairy"),
+            },
+        ]
+    }
 }
 
 /// Identifies the status of a page in the application.
@@ -460,7 +545,7 @@ impl Application for StarryDex {
                             .filters
                             .selected_types
                             .iter()
-                            .map(|t| t.to_lowercase())
+                            .map(|t| t.name.to_lowercase())
                             .collect();
 
                         self.filtered_pokemon_list = self
@@ -481,7 +566,7 @@ impl Application for StarryDex {
                             .filters
                             .selected_types
                             .iter()
-                            .map(|t| t.to_lowercase())
+                            .map(|t| t.name.to_lowercase())
                             .collect();
 
                         self.filtered_pokemon_list = self
@@ -916,40 +1001,16 @@ impl StarryDex {
 
     /// The filters context page for this app.
     pub fn filters_page(&self) -> Element<Message> {
-        // TODO: Pokémon Types can't be transated because they need to match so the filtering works.
-        //let all_pokemon_types = vec![
-        //    fl!("normal"),
-        //    fl!("fire"),
-        //    fl!("water"),
-        //    fl!("electric"),
-        //    fl!("grass"),
-        //    fl!("ice"),
-        //    fl!("fighting"),
-        //    fl!("poison"),
-        //    fl!("ground"),
-        //    fl!("flying"),
-        //    fl!("psychic"),
-        //    fl!("bug"),
-        //    fl!("rock"),
-        //    fl!("ghost"),
-        //    fl!("dragon"),
-        //    fl!("dark"),
-        //    fl!("steel"),
-        //    fl!("fairy"),
-        //];
-        let all_pokemon_types = vec![
-            "Normal", "Fire", "Water", "Electric", "Grass", "Ice", "Fighting", "Poison", "Ground",
-            "Flying", "Psychic", "Bug", "Rock", "Ghost", "Dragon", "Dark", "Steel", "Fairy",
-        ];
+        let all_pokemon_types = PokemonType::get_all();
 
         let type_checkboxes: Vec<Element<Message>> = all_pokemon_types
             .into_iter()
             .map(|pokemon_type| {
-                let is_checked = self.filters.selected_types.contains(pokemon_type);
+                let is_checked = self.filters.selected_types.contains(&pokemon_type);
                 let checkbox: Element<Message> =
-                    widget::checkbox::Checkbox::new(pokemon_type, is_checked)
+                    widget::checkbox::Checkbox::new(pokemon_type.display_name.clone(), is_checked)
                         .on_toggle(move |value| {
-                            Message::TypeFilterToggled(value, pokemon_type.to_string())
+                            Message::TypeFilterToggled(value, pokemon_type.clone())
                         })
                         .into();
 
