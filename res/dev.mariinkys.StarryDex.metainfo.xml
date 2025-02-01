@@ -65,6 +65,13 @@
     </keywords>
 
     <releases>
+        <release version="0.2.3" date="2025-02-01">
+            <description>
+                <p>Fixed bug with translations on type filters</p>
+                <p>Fixed bug when updating the cache</p>
+                <p>Updated dependencies</p>
+            </description>
+        </release>
         <release version="0.2.2" date="2024-12-21">
             <description>
                 <p>New about page</p>
