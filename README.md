@@ -23,8 +23,6 @@
 ## Information
 > [!TIP]
 > The application can work offline after initial setup is completed.
-> If you are updating from a previous version it's recommended you delete the application cache through the settings.
-> The old cache was around 160MB and the new one is about 2MB, deleting the cache through the settings will delete both and generate just the new one.
 
 > [!CAUTION]
 > Right now the application configuration does not get saved and it's lost upon application restart.
