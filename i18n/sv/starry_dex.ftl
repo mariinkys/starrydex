@@ -5,6 +5,8 @@ view = Visa
 back = Tillbaka
 generic-error = Hoppsan, något har gått fel...
 loading = Laddar...
+repository = Förråd
+support = Support
 
 <#-- Utseende -->
 appearance = Utseende
