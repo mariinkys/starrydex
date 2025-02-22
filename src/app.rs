@@ -5,14 +5,14 @@ use crate::config::{AppTheme, Config, TypeFilteringMode};
 use crate::fl;
 use crate::image_cache::ImageCache;
 use crate::utils::{capitalize_string, remove_dir_contents, scale_numbers};
-use cosmic::app::{context_drawer, Core, Task};
+use cosmic::app::{Core, Task, context_drawer};
 use cosmic::cosmic_config::{self, CosmicConfigEntry};
 use cosmic::iced::alignment::{Horizontal, Vertical};
 use cosmic::iced::{Alignment, Length, Pixels, Subscription};
 use cosmic::iced_core::text::LineHeight;
 use cosmic::widget::about::About;
-use cosmic::widget::{self, menu, Column};
-use cosmic::{theme, Application, ApplicationExt, Element};
+use cosmic::widget::{self, Column, menu};
+use cosmic::{Application, ApplicationExt, Element, theme};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Debug;
@@ -508,7 +508,7 @@ impl Application for StarryDex {
                 self.filtered_pokemon_list = self
                     .pokemon_list
                     .iter()
-                    .filter(|(&_id, pokemon)| {
+                    .filter(|&(&_id, pokemon)| {
                         pokemon
                             .pokemon
                             .name
