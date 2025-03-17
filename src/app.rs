@@ -5,14 +5,15 @@ use crate::config::{AppTheme, Config, TypeFilteringMode};
 use crate::fl;
 use crate::image_cache::ImageCache;
 use crate::utils::{capitalize_string, remove_dir_contents, scale_numbers};
-use cosmic::app::{Core, Task, context_drawer};
+use cosmic::app::context_drawer;
 use cosmic::cosmic_config::{self, CosmicConfigEntry};
 use cosmic::iced::alignment::{Horizontal, Vertical};
 use cosmic::iced::{Alignment, Length, Pixels, Subscription};
 use cosmic::iced_core::text::LineHeight;
+use cosmic::prelude::*;
+use cosmic::theme;
 use cosmic::widget::about::About;
 use cosmic::widget::{self, Column, menu};
-use cosmic::{Application, ApplicationExt, Element, theme};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Debug;
@@ -24,7 +25,7 @@ const REPOSITORY: &str = "https://github.com/mariinkys/starrydex";
 /// drive its logic.
 pub struct StarryDex {
     /// Application state which is managed by the COSMIC runtime.
-    core: Core,
+    core: cosmic::Core,
     /// Application about page
     about: About,
     /// Display a context drawer with the designated page if defined.
@@ -210,7 +211,7 @@ pub enum PageStatus {
 }
 
 /// Create a COSMIC application from the app model
-impl Application for StarryDex {
+impl cosmic::Application for StarryDex {
     /// The async executor that will be used to run your application's tasks.
     type Executor = cosmic::executor::Default;
 
@@ -223,16 +224,19 @@ impl Application for StarryDex {
     /// Unique identifier in RDNN (reverse domain name notation) format.
     const APP_ID: &'static str = "dev.mariinkys.StarryDex";
 
-    fn core(&self) -> &Core {
+    fn core(&self) -> &cosmic::Core {
         &self.core
     }
 
-    fn core_mut(&mut self) -> &mut Core {
+    fn core_mut(&mut self) -> &mut cosmic::Core {
         &mut self.core
     }
 
     /// Initializes the application with any given flags and startup tasks.
-    fn init(core: Core, _flags: Self::Flags) -> (Self, Task<Self::Message>) {
+    fn init(
+        core: cosmic::Core,
+        _flags: Self::Flags,
+    ) -> (Self, Task<cosmic::Action<Self::Message>>) {
         // Tasks that will get executed on the application init
         let mut tasks = vec![];
 
@@ -312,7 +316,7 @@ impl Application for StarryDex {
             tasks.push(cosmic::app::Task::perform(
                 async move { api_clone.load_all_pokemon().await },
                 |pokemon_list| {
-                    cosmic::app::message::app(Message::CompletedFirstRun(
+                    cosmic::action::app(Message::CompletedFirstRun(
                         Config {
                             app_theme: crate::config::AppTheme::System,
                             first_run_completed: true,
@@ -328,7 +332,7 @@ impl Application for StarryDex {
             app.current_page_status = PageStatus::Loading;
             tasks.push(cosmic::app::Task::perform(
                 async move { api_clone.load_all_pokemon().await },
-                |pokemon_list| cosmic::app::message::app(Message::LoadedPokemonList(pokemon_list)),
+                |pokemon_list| cosmic::action::app(Message::LoadedPokemonList(pokemon_list)),
             ));
         }
 
@@ -443,7 +447,7 @@ impl Application for StarryDex {
     ///
     /// Tasks may be returned for asynchronous execution of code in the background
     /// on the application's async runtime.
-    fn update(&mut self, message: Self::Message) -> Task<Self::Message> {
+    fn update(&mut self, message: Self::Message) -> Task<cosmic::Action<Self::Message>> {
         match message {
             Message::LaunchUrl(url) => {
                 _ = open::that_detached(url);
@@ -460,7 +464,7 @@ impl Application for StarryDex {
             }
             Message::UpdateConfig(config) => {
                 self.config = config;
-                return cosmic::app::command::set_theme(self.config.app_theme.theme());
+                return cosmic::command::set_theme(self.config.app_theme.theme());
             }
             Message::UpdateTheme(index) => {
                 let old_config = self.config.clone();
@@ -476,7 +480,7 @@ impl Application for StarryDex {
                     type_filtering_mode: old_config.type_filtering_mode,
                     app_theme,
                 };
-                return cosmic::app::command::set_theme(self.config.app_theme.theme());
+                return cosmic::command::set_theme(self.config.app_theme.theme());
             }
             Message::CompletedFirstRun(config, pokemon_list) => {
                 self.config = config;
@@ -486,7 +490,7 @@ impl Application for StarryDex {
                 self.filtered_pokemon_list = self.pokemon_list.values().cloned().collect();
                 self.current_page_status = PageStatus::Loaded;
 
-                return cosmic::app::command::set_theme(self.config.app_theme.theme());
+                return cosmic::command::set_theme(self.config.app_theme.theme());
             }
             Message::LoadedPokemonList(pokemon_list) => {
                 self.pokemon_list = pokemon_list;
@@ -617,9 +621,7 @@ impl Application for StarryDex {
                 let api_clone = self.api.clone();
                 return cosmic::app::Task::perform(
                     async move { api_clone.load_all_pokemon().await },
-                    |pokemon_list| {
-                        cosmic::app::message::app(Message::LoadedPokemonList(pokemon_list))
-                    },
+                    |pokemon_list| cosmic::action::app(Message::LoadedPokemonList(pokemon_list)),
                 );
             }
         }
@@ -1051,7 +1053,7 @@ impl StarryDex {
     }
 
     /// Updates the header and window titles.
-    pub fn update_title(&mut self) -> Task<Message> {
+    pub fn update_title(&mut self) -> Task<cosmic::Action<Message>> {
         let window_title = fl!("app-title");
 
         // if let Some(page) = self.nav.text(self.nav.active()) {
