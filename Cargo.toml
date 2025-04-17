@@ -10,20 +10,20 @@ license = "GPL-3.0"
 
 [dependencies]
 futures-util = "0.3.31"
-i18n-embed-fl = "0.9.3"
+i18n-embed-fl = "0.9.4"
 open = "5.3.2"
-rust-embed = "8.6.0"
-tokio = { version = "1.44.0", features = ["full"] }
+rust-embed = "8.7.0"
+tokio = { version = "1.44.2", features = ["full"] }
 
-rustemon = { version = "4.0.0" }
+rustemon = { version = "4.2.0" }
 dirs = "6.0.0"
 futures = "0.3.31"
-reqwest = { version = "0.12.14", features = ["json"] }
+reqwest = { version = "0.12.15", features = ["json"] }
 serde = { version = "1.0.219", features = ["serde_derive"] }
 serde_json = "1.0.140"
 
 [dependencies.i18n-embed]
-version = "0.15.3"
+version = "0.15.4"
 features = ["fluent-system", "desktop-requester"]
 
 [dependencies.libcosmic]

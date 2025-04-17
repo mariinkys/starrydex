@@ -193,9 +193,10 @@ impl Api {
             .buffer_unordered(30);
 
         pokemon_stream
-            .collect::<Vec<StarryPokemon>>()
+            .collect::<Vec<Result<StarryPokemon, rustemon::error::Error>>>()
             .await
             .into_iter()
+            .filter_map(Result::ok) // keep only the success TOOD: Not silently fail to load some pokémon
             .map(|pokemon| (pokemon.pokemon.id, pokemon))
             .collect()
     }
@@ -204,14 +205,11 @@ impl Api {
     async fn fetch_pokemon_details(
         name: &str,
         client: &rustemon::client::RustemonClient,
-    ) -> StarryPokemon {
-        let pokemon = rustemon::pokemon::pokemon::get_by_name(name, client)
-            .await
-            .unwrap_or_default();
+    ) -> Result<StarryPokemon, rustemon::error::Error> {
+        let pokemon = rustemon::pokemon::pokemon::get_by_name(name, client).await?;
 
-        let encounter_info = rustemon::pokemon::pokemon::encounters::get_by_id(pokemon.id, client)
-            .await
-            .unwrap_or_default();
+        let encounter_info =
+            rustemon::pokemon::pokemon::encounters::get_by_id(pokemon.id, client).await?;
 
         let resources_path = dirs::data_dir()
             .unwrap()
@@ -281,11 +279,11 @@ impl Api {
             })
             .collect();
 
-        StarryPokemon {
+        Ok(StarryPokemon {
             pokemon: starry_pokemon_data,
             sprite_path: image_path,
             encounter_info: Some(starry_encounter_info),
-        }
+        })
     }
 
     /// Download Pokémon Sprites to the designed folder
@@ -309,9 +307,7 @@ impl Api {
                 async move {
                     let _permit = semaphore.acquire().await.unwrap();
                     let pokemon =
-                        rustemon::pokemon::pokemon::get_by_name(&entry.name, &self.client)
-                            .await
-                            .unwrap_or_default();
+                        rustemon::pokemon::pokemon::get_by_name(&entry.name, &self.client).await?;
                     if let Some(sprite_url) = pokemon.sprites.front_default {
                         download_image(&client, sprite_url, pokemon.name.to_string()).await
                     } else {
