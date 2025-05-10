@@ -65,6 +65,12 @@
     </keywords>
 
     <releases>
+        <release version="0.2.4" date="2025-05-25">
+            <description>
+                <p>Adapt to API changes</p>
+                <p>Updated dependencies</p>
+            </description>
+        </release>
         <release version="0.2.3" date="2025-02-01">
             <description>
                 <p>Fixed bug with translations on type filters</p>
