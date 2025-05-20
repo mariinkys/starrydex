@@ -86,10 +86,10 @@ pub async fn download_image(
         tokio::fs::write(&image_path, &bytes).await?;
         Ok(())
     } else {
-        Err(Box::new(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!("Failed to download image. Status: {}", response.status()),
-        )))
+        Err(Box::new(std::io::Error::other(format!(
+            "Failed to download image. Status: {}",
+            response.status()
+        ))))
     }
 }
 
