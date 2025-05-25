@@ -29,7 +29,7 @@
 
 Created by [mariinkys](https://github.com/mariinkys). Pokémon and Pokémon character names are trademarks of Nintendo.
 
-This application uses [PokeApi](https://github.com/PokeAPI/) and it's resources.
+This application uses [PokeApi](https://github.com/PokeAPI/) and its resources.
 
 ## Install
 
