@@ -23,7 +23,7 @@ once-message = This will only happen once
 
 <#-- About Page -->
 app-info = This application has been made for learning purposes.
-pokeapi-text = This application uses PokéApi and it's resources.
+pokeapi-text = This application uses PokéApi and its resources.
 nintendo-text = Pokémon and Pokémon character names are trademarks of Nintendo.
 
 <#-- Settings Page -->
