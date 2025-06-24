@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-use crate::api::Api;
 use crate::config::{AppTheme, Config, TypeFilteringMode};
+use crate::core::StarryCore;
+use crate::entities::StarryPokemon;
 use crate::fl;
 use crate::image_cache::ImageCache;
 use crate::utils::{capitalize_string, remove_dir_contents, scale_numbers};
@@ -14,9 +15,10 @@ use cosmic::prelude::*;
 use cosmic::theme;
 use cosmic::widget::about::About;
 use cosmic::widget::{self, Column, menu};
-use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap, HashSet};
+use dashmap::DashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
+use std::sync::Arc;
 
 const REPOSITORY: &str = "https://github.com/mariinkys/starrydex";
 //const APP_ICON: &[u8] = include_bytes!("../res/icons/hicolor/256x256/apps/dev.mariinkys.StarryDex.svg");
@@ -36,14 +38,12 @@ pub struct StarryDex {
     config: Config,
     // Application Themes
     app_themes: Vec<String>,
-    // API Client
-    api: Api,
+    // Core StarryDex Client
+    starry_core: Arc<StarryCore>,
     // Status of the main application page
     current_page_status: PageStatus,
     // Holds the list of Pokémon
-    pokemon_list: BTreeMap<i64, StarryPokemon>,
-    // Holds the shown list of Pokémon
-    filtered_pokemon_list: Vec<StarryPokemon>,
+    pokemon_list: Arc<DashMap<i64, StarryPokemon>>,
     // Holds the data of the currently selected Pokémon to show it on the context page
     selected_pokemon: Option<StarryPokemon>,
     // Controls the Pokémon Details Toggle of the Pokémon Context Page
@@ -72,46 +72,8 @@ pub enum Message {
     ClearFilters,
     DeleteCache,
 
-    CompletedFirstRun(Config, BTreeMap<i64, StarryPokemon>),
-    LoadedPokemonList(BTreeMap<i64, StarryPokemon>),
+    LoadedPokemonList(Arc<DashMap<i64, StarryPokemon>>),
     TypeFilterToggled(bool, PokemonType),
-}
-
-/// Represents a Pokémon in the application
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StarryPokemon {
-    pub pokemon: StarryPokemonData,
-    pub sprite_path: Option<String>,
-    pub encounter_info: Option<Vec<StarryPokemonEncounterInfo>>,
-}
-
-/// Data of a Pokémon
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StarryPokemonData {
-    pub id: i64,
-    pub name: String,
-    pub weight: i64,
-    pub height: i64,
-    pub types: Vec<String>,
-    pub abilities: Vec<String>,
-    pub stats: StarryPokemonStats,
-}
-
-/// Represents a Pokémon
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StarryPokemonStats {
-    pub hp: i64,
-    pub attack: i64,
-    pub defense: i64,
-    pub sp_attack: i64,
-    pub sp_defense: i64,
-    pub speed: i64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StarryPokemonEncounterInfo {
-    pub city: String,
-    pub games_method: Vec<String>,
 }
 
 pub struct Filters {
@@ -288,10 +250,9 @@ impl cosmic::Application for StarryDex {
                 })
                 .unwrap_or_default(),
             app_themes: vec![fl!("match-desktop"), fl!("dark"), fl!("light")],
-            api: Api::new(Self::APP_ID),
+            starry_core: Arc::from(StarryCore::init()),
             current_page_status: PageStatus::Loading,
-            pokemon_list: BTreeMap::new(),
-            filtered_pokemon_list: Vec::new(),
+            pokemon_list: Arc::from(DashMap::new()),
             selected_pokemon: None,
             wants_pokemon_details: false,
             search: String::new(),
@@ -307,32 +268,21 @@ impl cosmic::Application for StarryDex {
         let app_data_dir = dirs::data_dir().unwrap().join(Self::APP_ID);
         std::fs::create_dir_all(&app_data_dir).expect("Failed to create the app data directory");
 
-        // Clone the app api in order to use it.
-        let api_clone = app.api.clone();
+        let starry_core = Arc::clone(&app.starry_core);
 
         if !first_run_completed {
             // First application run, construct cache, download sprites and update the config
             app.current_page_status = PageStatus::FirstRun;
             tasks.push(cosmic::app::Task::perform(
-                async move { api_clone.load_all_pokemon().await },
-                |pokemon_list| {
-                    cosmic::action::app(Message::CompletedFirstRun(
-                        Config {
-                            app_theme: crate::config::AppTheme::System,
-                            first_run_completed: true,
-                            pokemon_per_row: 3,
-                            type_filtering_mode: crate::config::TypeFilteringMode::Exclusive,
-                        },
-                        pokemon_list,
-                    ))
-                },
+                async move { starry_core.load_all().await },
+                |list| cosmic::action::app(Message::LoadedPokemonList(list)),
             ));
         } else {
             // Load  the Pokémon List
             app.current_page_status = PageStatus::Loading;
             tasks.push(cosmic::app::Task::perform(
-                async move { api_clone.load_all_pokemon().await },
-                |pokemon_list| cosmic::action::app(Message::LoadedPokemonList(pokemon_list)),
+                async move { starry_core.load_all().await },
+                |list| cosmic::action::app(Message::LoadedPokemonList(list)),
             ));
         }
 
@@ -482,24 +432,19 @@ impl cosmic::Application for StarryDex {
                 };
                 return cosmic::command::set_theme(self.config.app_theme.theme());
             }
-            Message::CompletedFirstRun(config, pokemon_list) => {
-                self.config = config;
-
-                self.pokemon_list = pokemon_list;
-
-                self.filtered_pokemon_list = self.pokemon_list.values().cloned().collect();
-                self.current_page_status = PageStatus::Loaded;
-
-                return cosmic::command::set_theme(self.config.app_theme.theme());
-            }
             Message::LoadedPokemonList(pokemon_list) => {
+                println!(
+                    "Loaded Pokémon List with: {} pokémon",
+                    pokemon_list.as_ref().len()
+                );
                 self.pokemon_list = pokemon_list;
-
-                self.filtered_pokemon_list = self.pokemon_list.values().cloned().collect();
                 self.current_page_status = PageStatus::Loaded;
             }
             Message::LoadPokemon(pokemon_id) => {
-                self.selected_pokemon = self.pokemon_list.get(&pokemon_id).cloned();
+                self.selected_pokemon = self
+                    .pokemon_list
+                    .get(&pokemon_id)
+                    .map(|ref_multi| ref_multi.clone());
 
                 // Open Context Page
                 self.context_page = ContextPage::PokemonPage;
@@ -508,19 +453,21 @@ impl cosmic::Application for StarryDex {
             Message::TogglePokemonDetails(value) => self.wants_pokemon_details = value,
             Message::Search(value) => {
                 // TODO: Improve search speed? Search by id...Search shouldn't erase filters
-                self.search = value;
-                self.filtered_pokemon_list = self
-                    .pokemon_list
-                    .iter()
-                    .filter(|&(&_id, pokemon)| {
-                        pokemon
-                            .pokemon
-                            .name
-                            .to_lowercase()
-                            .contains(&self.search.to_lowercase())
-                    })
-                    .map(|(_, pokemon)| pokemon.clone())
-                    .collect();
+                self.search = value.to_lowercase();
+                self.pokemon_list = Arc::new(
+                    self.pokemon_list
+                        .iter()
+                        .filter(|entry| {
+                            entry
+                                .value()
+                                .pokemon
+                                .name
+                                .to_lowercase()
+                                .contains(&self.search)
+                        })
+                        .map(|entry| (*entry.key(), entry.value().clone()))
+                        .collect(),
+                );
             }
             Message::TypeFilterToggled(value, type_name) => {
                 if value {
@@ -545,17 +492,26 @@ impl cosmic::Application for StarryDex {
                             .map(|t| t.name.to_lowercase())
                             .collect();
 
-                        self.filtered_pokemon_list = self
+                        let filtered: DashMap<i64, StarryPokemon> = self
                             .pokemon_list
-                            .values()
-                            .filter(|pokemon| {
-                                selected_types_lowercase.is_empty()
+                            .iter()
+                            .filter_map(|entry| {
+                                let key = *entry.key();
+                                let pokemon = entry.value();
+
+                                if selected_types_lowercase.is_empty()
                                     || pokemon.pokemon.types.iter().any(|t| {
                                         selected_types_lowercase.contains(&t.to_lowercase())
                                     })
+                                {
+                                    Some((key, pokemon.clone()))
+                                } else {
+                                    None
+                                }
                             })
-                            .cloned()
                             .collect();
+
+                        self.pokemon_list = Arc::new(filtered);
                     }
                     TypeFilteringMode::Exclusive => {
                         // Ej: If fire and ice are selected it will show pokemons that are both fire and ice types
@@ -566,11 +522,14 @@ impl cosmic::Application for StarryDex {
                             .map(|t| t.name.to_lowercase())
                             .collect();
 
-                        self.filtered_pokemon_list = self
+                        let filtered: DashMap<i64, StarryPokemon> = self
                             .pokemon_list
-                            .values()
-                            .filter(|pokemon| {
-                                selected_types_lowercase.is_empty()
+                            .iter()
+                            .filter_map(|entry| {
+                                let key = *entry.key();
+                                let pokemon = entry.value();
+
+                                if selected_types_lowercase.is_empty()
                                     || selected_types_lowercase.iter().all(|selected_type| {
                                         pokemon
                                             .pokemon
@@ -578,20 +537,30 @@ impl cosmic::Application for StarryDex {
                                             .iter()
                                             .any(|t| t.to_lowercase() == *selected_type)
                                     })
+                                {
+                                    Some((key, pokemon.clone()))
+                                } else {
+                                    None
+                                }
                             })
-                            .cloned()
                             .collect();
+
+                        self.pokemon_list = Arc::new(filtered);
                     }
                 }
 
                 self.core.window.show_context = false;
             }
             Message::ClearFilters => {
-                self.filtered_pokemon_list = self.pokemon_list.values().cloned().collect();
                 self.filters = Filters {
                     selected_types: HashSet::new(),
                 };
-                self.current_page_status = PageStatus::Loaded;
+
+                let starry_core_clone = Arc::clone(&self.starry_core);
+                return cosmic::app::Task::perform(
+                    async move { starry_core_clone.load_all().await },
+                    |list| cosmic::action::app(Message::LoadedPokemonList(list)),
+                );
             }
             Message::UpdateTypeFilterMode(index) => {
                 let old_config = self.config.clone();
@@ -617,10 +586,10 @@ impl cosmic::Application for StarryDex {
                 }
 
                 // Reset the API
-                self.api = Api::new(Self::APP_ID);
-                let api_clone = self.api.clone();
+                self.starry_core = Arc::from(StarryCore::init());
+                let starry_core_clone = Arc::clone(&self.starry_core);
                 return cosmic::app::Task::perform(
-                    async move { api_clone.load_all_pokemon().await },
+                    async move { starry_core_clone.load_all().await },
                     |pokemon_list| cosmic::action::app(Message::LoadedPokemonList(pokemon_list)),
                 );
             }
@@ -699,7 +668,7 @@ impl StarryDex {
         let spacing = theme::active().cosmic().spacing;
         let mut pokemon_grid = widget::Grid::new().width(Length::Fill);
 
-        for (index, pokemon) in self.filtered_pokemon_list.iter().enumerate() {
+        for (index, pokemon) in self.pokemon_list.iter().enumerate() {
             let pokemon_image = if let Some(path) = &pokemon.sprite_path {
                 widget::Image::new(path)
                     .content_fit(cosmic::iced::ContentFit::None)
