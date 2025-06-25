@@ -75,6 +75,7 @@ impl StarryCore {
     }
 
     /// Refresh data from API and save to cache (this creates a new StarryCore instance because I can't mutate the Arc easily, skill issue)
+    #[allow(dead_code)]
     pub async fn refresh_data(&self) -> Result<StarryCore, Error> {
         let pokemon_map = self.inner.client.fetch_all_pokemon().await;
         Self::save_to_file(pokemon_map)?;
@@ -108,6 +109,7 @@ impl StarryCore {
     }
 
     /// Get all Pokémon (returns an iterator to avoid loading everything into memory)
+    #[allow(dead_code)]
     pub fn get_all_pokemon(
         &self,
     ) -> Option<impl Iterator<Item = (i64, &rkyv::Archived<StarryPokemon>)>> {
@@ -136,6 +138,7 @@ impl StarryCore {
     }
 
     /// Get a list of all Pokémon (converts to owned data)
+    #[allow(dead_code)]
     pub fn get_pokemon_list(&self) -> Vec<PokemonInfo> {
         if let Some(data) = self.inner.pokemon_data {
             data.iter()
@@ -179,6 +182,60 @@ impl StarryCore {
                         .as_str()
                         .to_lowercase()
                         .contains(&query_lower)
+                })
+                .map(|(id, pokemon)| PokemonInfo {
+                    id: id.to_native(),
+                    name: pokemon.pokemon.name.as_str().to_string(),
+                    sprite_path: pokemon.sprite_path.as_ref().map(|s| s.as_str().to_string()),
+                })
+                .collect()
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Filter pokémon by type (inclusive)
+    pub fn filter_pokemon_inclusive(
+        &self,
+        selected_types: &std::collections::HashSet<String>,
+    ) -> Vec<PokemonInfo> {
+        if let Some(data) = &self.inner.pokemon_data {
+            data.iter()
+                .filter(|(_, pokemon)| {
+                    selected_types.is_empty()
+                        || pokemon
+                            .pokemon
+                            .types
+                            .iter()
+                            .any(|t| selected_types.contains(&t.to_lowercase()))
+                })
+                .map(|(id, pokemon)| PokemonInfo {
+                    id: id.to_native(),
+                    name: pokemon.pokemon.name.as_str().to_string(),
+                    sprite_path: pokemon.sprite_path.as_ref().map(|s| s.as_str().to_string()),
+                })
+                .collect()
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Filter pokémon by type (exclusive)
+    pub fn filter_pokemon_exclusive(
+        &self,
+        selected_types: &std::collections::HashSet<String>,
+    ) -> Vec<PokemonInfo> {
+        if let Some(data) = &self.inner.pokemon_data {
+            data.iter()
+                .filter(|(_, pokemon)| {
+                    selected_types.is_empty()
+                        || selected_types.iter().all(|selected_type| {
+                            pokemon
+                                .pokemon
+                                .types
+                                .iter()
+                                .any(|t| t.to_lowercase() == *selected_type)
+                        })
                 })
                 .map(|(id, pokemon)| PokemonInfo {
                     id: id.to_native(),

@@ -82,7 +82,7 @@ pub enum Message {
 }
 
 #[derive(Debug, Clone)]
-enum PaginationAction {
+pub enum PaginationAction {
     Next,
     Back,
 }
@@ -177,6 +177,7 @@ impl PokemonType {
 }
 
 /// Identifies the status of a page in the application.
+#[derive(PartialEq)]
 pub enum PageStatus {
     FirstRun,
     Loaded,
@@ -491,42 +492,40 @@ impl cosmic::Application for StarryDex {
                 }
             }
             Message::ApplyCurrentFilters => {
-                //TODO: Revisit how to do this without this being necessary, search does not need to be lost?
-                self.search = String::new();
+                if let Some(core) = &self.starry_core {
+                    self.search = String::new();
 
-                match self.config.type_filtering_mode {
-                    TypeFilteringMode::Inclusive => {
-                        // Ej: If fire and ice are selected it will show fire pokemons and ice pokemons
-                        let selected_types_lowercase: HashSet<String> = self
-                            .filters
-                            .selected_types
-                            .iter()
-                            .map(|t| t.name.to_lowercase())
-                            .collect();
+                    let selected_types_lowercase: HashSet<String> = self
+                        .filters
+                        .selected_types
+                        .iter()
+                        .map(|t| t.name.to_lowercase())
+                        .collect();
 
-                        todo!()
+                    match self.config.type_filtering_mode {
+                        TypeFilteringMode::Inclusive => {
+                            // Ej: If fire and ice are selected it will show fire pokemons and ice pokemons
+                            self.pokemon_list =
+                                core.filter_pokemon_inclusive(&selected_types_lowercase);
+                        }
+                        TypeFilteringMode::Exclusive => {
+                            // Ej: If fire and ice are selected it will show pokemons that are both fire and ice types
+                            self.pokemon_list =
+                                core.filter_pokemon_exclusive(&selected_types_lowercase);
+                        }
                     }
-                    TypeFilteringMode::Exclusive => {
-                        // Ej: If fire and ice are selected it will show pokemons that are both fire and ice types
-                        let selected_types_lowercase: HashSet<String> = self
-                            .filters
-                            .selected_types
-                            .iter()
-                            .map(|t| t.name.to_lowercase())
-                            .collect();
 
-                        todo!()
-                    }
+                    self.core.window.show_context = false;
                 }
-
-                self.core.window.show_context = false;
             }
             Message::ClearFilters => {
-                self.filters = Filters {
-                    selected_types: HashSet::new(),
-                };
-
-                todo!()
+                if let Some(core) = &self.starry_core {
+                    self.pokemon_list = core.get_pokemon_page(0, self.items_per_page);
+                    self.filters = Filters {
+                        selected_types: HashSet::new(),
+                    };
+                    self.current_page_status = PageStatus::Loaded;
+                }
             }
             Message::UpdateTypeFilterMode(index) => {
                 let old_config = self.config.clone();
@@ -544,27 +543,25 @@ impl cosmic::Application for StarryDex {
                 };
             }
             Message::DeleteCache => {
-                self.current_page_status = PageStatus::FirstRun;
-                self.set_show_context(false);
+                if self.current_page_status == PageStatus::Loaded {
+                    self.current_page_status = PageStatus::FirstRun;
+                    self.set_show_context(false);
 
-                let data_dir = dirs::data_dir().unwrap().join(Self::APP_ID);
-                if let Err(e) = remove_dir_contents(&data_dir) {
-                    eprintln!("Error deleting cache: {}", e);
+                    let data_dir = dirs::data_dir().unwrap().join(Self::APP_ID);
+                    if let Err(e) = remove_dir_contents(&data_dir) {
+                        eprintln!("Error deleting cache: {}", e);
+                    }
+
+                    return cosmic::app::Task::perform(
+                        async move { StarryCore::initialize().await },
+                        |starry_core| cosmic::action::app(Message::InitializedCore(starry_core)),
+                    );
                 }
-
-                todo!()
-                // // Reset the API
-                // self.starry_core = Arc::from(StarryCore::init());
-                // let starry_core_clone = Arc::clone(&self.starry_core);
-                // return cosmic::app::Task::perform(
-                //     async move { starry_core_clone.load_all().await },
-                //     |pokemon_list| cosmic::action::app(Message::LoadedPokemonList(pokemon_list)),
-                // );
             }
             Message::PaginationActionRequested(action) => match &action {
                 PaginationAction::Next => {
                     if let Some(core) = &self.starry_core {
-                        if self.search.is_empty() {
+                        if self.search.is_empty() && self.filters.selected_types.is_empty() {
                             let new_list = core.get_pokemon_page(
                                 (self.current_page + 1) * self.items_per_page,
                                 self.items_per_page,
@@ -579,7 +576,7 @@ impl cosmic::Application for StarryDex {
                 PaginationAction::Back => {
                     if self.current_page >= 1 {
                         if let Some(core) = &self.starry_core {
-                            if self.search.is_empty() {
+                            if self.search.is_empty() && self.filters.selected_types.is_empty() {
                                 let new_list = core.get_pokemon_page(
                                     (self.current_page - 1) * self.items_per_page,
                                     self.items_per_page,
