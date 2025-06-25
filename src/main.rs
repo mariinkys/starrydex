@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-use image_cache::{ImageCache, IMAGE_CACHE};
+use image_cache::{IMAGE_CACHE, ImageCache};
 
-mod api;
 mod app;
 mod config;
+mod core;
+mod entities;
 mod i18n;
 mod image_cache;
 mod utils;

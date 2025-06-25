@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-use crate::api::Api;
 use crate::config::{AppTheme, Config, TypeFilteringMode};
+use crate::core::StarryCore;
+use crate::entities::{PokemonInfo, StarryPokemon};
 use crate::fl;
 use crate::image_cache::ImageCache;
 use crate::utils::{capitalize_string, remove_dir_contents, scale_numbers};
+use anywho::Error;
 use cosmic::app::context_drawer;
 use cosmic::cosmic_config::{self, CosmicConfigEntry};
 use cosmic::iced::alignment::{Horizontal, Vertical};
@@ -14,8 +16,8 @@ use cosmic::prelude::*;
 use cosmic::theme;
 use cosmic::widget::about::About;
 use cosmic::widget::{self, Column, menu};
-use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap, HashSet};
+use rkyv::rancor;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 
 const REPOSITORY: &str = "https://github.com/mariinkys/starrydex";
@@ -32,28 +34,28 @@ pub struct StarryDex {
     context_page: ContextPage,
     /// Key bindings for the application's menu bar.
     key_binds: HashMap<menu::KeyBind, MenuAction>,
-    // Configuration data that persists between application runs.
+    /// Configuration data that persists between application runs.
     config: Config,
-    // Application Themes
+    /// Application Themes
     app_themes: Vec<String>,
-    // API Client
-    api: Api,
-    // Status of the main application page
-    current_page_status: PageStatus,
-    // Holds the list of Pokémon
-    pokemon_list: BTreeMap<i64, StarryPokemon>,
-    // Holds the shown list of Pokémon
-    filtered_pokemon_list: Vec<StarryPokemon>,
-    // Holds the data of the currently selected Pokémon to show it on the context page
+    // Core StarryDex Client
+    starry_core: Option<StarryCore>,
+    /// List of Pokémon to show on the main page
+    pokemon_list: Vec<PokemonInfo>,
+    /// Holds the data of the currently selected Pokémon to show it on the context page
     selected_pokemon: Option<StarryPokemon>,
-    // Controls the Pokémon Details Toggle of the Pokémon Context Page
+    /// Status of the main application page
+    current_page_status: PageStatus,
+    /// Controls the Pokémon Details Toggle of the Pokémon Context Page
     wants_pokemon_details: bool,
-    // Holds the search input value
+    /// Holds the search input value
     search: String,
-    // Holds the currently applied filters if there are any
+    /// Holds the currently applied filters if there are any
     filters: Filters,
-    // Type Filter Modes
+    /// Type Filter Modes
     type_filter_mode: Vec<String>,
+    /// Controls in which page are we currently
+    current_page: usize,
 }
 
 /// Messages emitted by the application and its widgets.
@@ -67,51 +69,20 @@ pub enum Message {
 
     LoadPokemon(i64),
     TogglePokemonDetails(bool),
-    Search(String),
+    SearchInput(String),
     ApplyCurrentFilters,
     ClearFilters,
     DeleteCache,
+    PaginationActionRequested(PaginationAction),
 
-    CompletedFirstRun(Config, BTreeMap<i64, StarryPokemon>),
-    LoadedPokemonList(BTreeMap<i64, StarryPokemon>),
+    InitializedCore(Result<StarryCore, Error>),
     TypeFilterToggled(bool, PokemonType),
 }
 
-/// Represents a Pokémon in the application
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StarryPokemon {
-    pub pokemon: StarryPokemonData,
-    pub sprite_path: Option<String>,
-    pub encounter_info: Option<Vec<StarryPokemonEncounterInfo>>,
-}
-
-/// Data of a Pokémon
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StarryPokemonData {
-    pub id: i64,
-    pub name: String,
-    pub weight: i64,
-    pub height: i64,
-    pub types: Vec<String>,
-    pub abilities: Vec<String>,
-    pub stats: StarryPokemonStats,
-}
-
-/// Represents a Pokémon
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StarryPokemonStats {
-    pub hp: i64,
-    pub attack: i64,
-    pub defense: i64,
-    pub sp_attack: i64,
-    pub sp_defense: i64,
-    pub speed: i64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StarryPokemonEncounterInfo {
-    pub city: String,
-    pub games_method: Vec<String>,
+#[derive(Debug, Clone)]
+pub enum PaginationAction {
+    Next,
+    Back,
 }
 
 pub struct Filters {
@@ -204,6 +175,7 @@ impl PokemonType {
 }
 
 /// Identifies the status of a page in the application.
+#[derive(PartialEq)]
 pub enum PageStatus {
     FirstRun,
     Loaded,
@@ -288,17 +260,17 @@ impl cosmic::Application for StarryDex {
                 })
                 .unwrap_or_default(),
             app_themes: vec![fl!("match-desktop"), fl!("dark"), fl!("light")],
-            api: Api::new(Self::APP_ID),
-            current_page_status: PageStatus::Loading,
-            pokemon_list: BTreeMap::new(),
-            filtered_pokemon_list: Vec::new(),
+            starry_core: None,
             selected_pokemon: None,
+            pokemon_list: Vec::new(),
+            current_page_status: PageStatus::Loading,
             wants_pokemon_details: false,
             search: String::new(),
             filters: Filters {
                 selected_types: HashSet::new(),
             },
             type_filter_mode: vec![fl!("exclusive"), fl!("inclusive")],
+            current_page: 0,
         };
         // Startup task that sets the window title.
         tasks.push(app.update_title());
@@ -307,33 +279,15 @@ impl cosmic::Application for StarryDex {
         let app_data_dir = dirs::data_dir().unwrap().join(Self::APP_ID);
         std::fs::create_dir_all(&app_data_dir).expect("Failed to create the app data directory");
 
-        // Clone the app api in order to use it.
-        let api_clone = app.api.clone();
+        tasks.push(cosmic::app::Task::perform(
+            async move { StarryCore::initialize().await },
+            |starry_core| cosmic::action::app(Message::InitializedCore(starry_core)),
+        ));
 
         if !first_run_completed {
-            // First application run, construct cache, download sprites and update the config
             app.current_page_status = PageStatus::FirstRun;
-            tasks.push(cosmic::app::Task::perform(
-                async move { api_clone.load_all_pokemon().await },
-                |pokemon_list| {
-                    cosmic::action::app(Message::CompletedFirstRun(
-                        Config {
-                            app_theme: crate::config::AppTheme::System,
-                            first_run_completed: true,
-                            pokemon_per_row: 3,
-                            type_filtering_mode: crate::config::TypeFilteringMode::Exclusive,
-                        },
-                        pokemon_list,
-                    ))
-                },
-            ));
         } else {
-            // Load  the Pokémon List
             app.current_page_status = PageStatus::Loading;
-            tasks.push(cosmic::app::Task::perform(
-                async move { api_clone.load_all_pokemon().await },
-                |pokemon_list| cosmic::action::app(Message::LoadedPokemonList(pokemon_list)),
-            ));
         }
 
         (app, Task::batch(tasks))
@@ -342,7 +296,7 @@ impl cosmic::Application for StarryDex {
     /// Elements to pack at the start of the header bar.
     fn header_start(&self) -> Vec<Element<Self::Message>> {
         let menu_bar = menu::bar(vec![menu::Tree::with_children(
-            menu::root(fl!("view")),
+            Element::from(menu::root(fl!("view"))),
             menu::items(
                 &self.key_binds,
                 vec![
@@ -464,6 +418,10 @@ impl cosmic::Application for StarryDex {
             }
             Message::UpdateConfig(config) => {
                 self.config = config;
+                if let Some(core) = &self.starry_core {
+                    self.current_page = 0;
+                    self.pokemon_list = core.get_pokemon_page(0, self.config.items_per_page);
+                }
                 return cosmic::command::set_theme(self.config.app_theme.theme());
             }
             Message::UpdateTheme(index) => {
@@ -478,49 +436,52 @@ impl cosmic::Application for StarryDex {
                     first_run_completed: old_config.first_run_completed,
                     pokemon_per_row: old_config.pokemon_per_row,
                     type_filtering_mode: old_config.type_filtering_mode,
+                    items_per_page: old_config.items_per_page,
                     app_theme,
                 };
                 return cosmic::command::set_theme(self.config.app_theme.theme());
             }
-            Message::CompletedFirstRun(config, pokemon_list) => {
-                self.config = config;
+            Message::InitializedCore(core_res) => {
+                match core_res {
+                    Ok(core) => {
+                        self.current_page = 0;
+                        self.pokemon_list = core.get_pokemon_page(0, self.config.items_per_page);
+                        self.starry_core = Some(core);
+                        println!("Loaded StarryCore");
+                    }
+                    Err(err) => {
+                        eprintln!("Failed to initialize StarryCore: {err}")
+                    }
+                }
 
-                self.pokemon_list = pokemon_list;
-
-                self.filtered_pokemon_list = self.pokemon_list.values().cloned().collect();
-                self.current_page_status = PageStatus::Loaded;
-
-                return cosmic::command::set_theme(self.config.app_theme.theme());
-            }
-            Message::LoadedPokemonList(pokemon_list) => {
-                self.pokemon_list = pokemon_list;
-
-                self.filtered_pokemon_list = self.pokemon_list.values().cloned().collect();
                 self.current_page_status = PageStatus::Loaded;
             }
             Message::LoadPokemon(pokemon_id) => {
-                self.selected_pokemon = self.pokemon_list.get(&pokemon_id).cloned();
+                if let Some(core) = &self.starry_core {
+                    let pokemon = core.get_pokemon_by_id(pokemon_id).map(|archived_pokemon| {
+                        // TODO: Is unwrap safe here?
+                        rkyv::deserialize::<StarryPokemon, rancor::Error>(archived_pokemon).unwrap()
+                    });
+                    self.selected_pokemon = pokemon;
 
-                // Open Context Page
-                self.context_page = ContextPage::PokemonPage;
-                self.core.window.show_context = true;
+                    // Open Context Page
+                    self.context_page = ContextPage::PokemonPage;
+                    self.core.window.show_context = true;
+                }
             }
             Message::TogglePokemonDetails(value) => self.wants_pokemon_details = value,
-            Message::Search(value) => {
-                // TODO: Improve search speed? Search by id...Search shouldn't erase filters
+            Message::SearchInput(value) => {
                 self.search = value;
-                self.filtered_pokemon_list = self
-                    .pokemon_list
-                    .iter()
-                    .filter(|&(&_id, pokemon)| {
-                        pokemon
-                            .pokemon
-                            .name
-                            .to_lowercase()
-                            .contains(&self.search.to_lowercase())
-                    })
-                    .map(|(_, pokemon)| pokemon.clone())
-                    .collect();
+                if let Some(core) = &self.starry_core {
+                    if self.search.is_empty() {
+                        self.pokemon_list = core.get_pokemon_page(
+                            self.current_page * self.config.items_per_page,
+                            self.config.items_per_page,
+                        );
+                    } else {
+                        self.pokemon_list = core.search_pokemon(&self.search);
+                    }
+                }
             }
             Message::TypeFilterToggled(value, type_name) => {
                 if value {
@@ -532,66 +493,41 @@ impl cosmic::Application for StarryDex {
                 }
             }
             Message::ApplyCurrentFilters => {
-                //TODO: Revisit how to do this without this being necessary, search does not need to be lost?
-                self.search = String::new();
+                if let Some(core) = &self.starry_core {
+                    self.search = String::new();
 
-                match self.config.type_filtering_mode {
-                    TypeFilteringMode::Inclusive => {
-                        // Ej: If fire and ice are selected it will show fire pokemons and ice pokemons
-                        let selected_types_lowercase: HashSet<String> = self
-                            .filters
-                            .selected_types
-                            .iter()
-                            .map(|t| t.name.to_lowercase())
-                            .collect();
+                    let selected_types_lowercase: HashSet<String> = self
+                        .filters
+                        .selected_types
+                        .iter()
+                        .map(|t| t.name.to_lowercase())
+                        .collect();
 
-                        self.filtered_pokemon_list = self
-                            .pokemon_list
-                            .values()
-                            .filter(|pokemon| {
-                                selected_types_lowercase.is_empty()
-                                    || pokemon.pokemon.types.iter().any(|t| {
-                                        selected_types_lowercase.contains(&t.to_lowercase())
-                                    })
-                            })
-                            .cloned()
-                            .collect();
+                    match self.config.type_filtering_mode {
+                        TypeFilteringMode::Inclusive => {
+                            // Ej: If fire and ice are selected it will show fire pokemons and ice pokemons
+                            self.pokemon_list =
+                                core.filter_pokemon_inclusive(&selected_types_lowercase);
+                        }
+                        TypeFilteringMode::Exclusive => {
+                            // Ej: If fire and ice are selected it will show pokemons that are both fire and ice types
+                            self.pokemon_list =
+                                core.filter_pokemon_exclusive(&selected_types_lowercase);
+                        }
                     }
-                    TypeFilteringMode::Exclusive => {
-                        // Ej: If fire and ice are selected it will show pokemons that are both fire and ice types
-                        let selected_types_lowercase: HashSet<String> = self
-                            .filters
-                            .selected_types
-                            .iter()
-                            .map(|t| t.name.to_lowercase())
-                            .collect();
 
-                        self.filtered_pokemon_list = self
-                            .pokemon_list
-                            .values()
-                            .filter(|pokemon| {
-                                selected_types_lowercase.is_empty()
-                                    || selected_types_lowercase.iter().all(|selected_type| {
-                                        pokemon
-                                            .pokemon
-                                            .types
-                                            .iter()
-                                            .any(|t| t.to_lowercase() == *selected_type)
-                                    })
-                            })
-                            .cloned()
-                            .collect();
-                    }
+                    self.core.window.show_context = false;
                 }
-
-                self.core.window.show_context = false;
             }
             Message::ClearFilters => {
-                self.filtered_pokemon_list = self.pokemon_list.values().cloned().collect();
-                self.filters = Filters {
-                    selected_types: HashSet::new(),
-                };
-                self.current_page_status = PageStatus::Loaded;
+                if let Some(core) = &self.starry_core {
+                    self.search = String::new();
+                    self.pokemon_list = core.get_pokemon_page(0, self.config.items_per_page);
+                    self.filters = Filters {
+                        selected_types: HashSet::new(),
+                    };
+                    self.current_page_status = PageStatus::Loaded;
+                }
             }
             Message::UpdateTypeFilterMode(index) => {
                 let old_config = self.config.clone();
@@ -603,27 +539,59 @@ impl cosmic::Application for StarryDex {
                 self.config = Config {
                     first_run_completed: old_config.first_run_completed,
                     pokemon_per_row: old_config.pokemon_per_row,
+                    items_per_page: old_config.items_per_page,
                     type_filtering_mode: filter_mode,
                     app_theme: old_config.app_theme,
                 };
             }
             Message::DeleteCache => {
-                self.current_page_status = PageStatus::FirstRun;
-                self.set_show_context(false);
+                if self.current_page_status == PageStatus::Loaded {
+                    self.current_page_status = PageStatus::FirstRun;
+                    self.set_show_context(false);
 
-                let data_dir = dirs::data_dir().unwrap().join(Self::APP_ID);
-                if let Err(e) = remove_dir_contents(&data_dir) {
-                    eprintln!("Error deleting cache: {}", e);
+                    let data_dir = dirs::data_dir().unwrap().join(Self::APP_ID);
+                    if let Err(e) = remove_dir_contents(&data_dir) {
+                        eprintln!("Error deleting cache: {}", e);
+                    }
+
+                    return cosmic::app::Task::perform(
+                        async move { StarryCore::initialize().await },
+                        |starry_core| cosmic::action::app(Message::InitializedCore(starry_core)),
+                    );
                 }
-
-                // Reset the API
-                self.api = Api::new(Self::APP_ID);
-                let api_clone = self.api.clone();
-                return cosmic::app::Task::perform(
-                    async move { api_clone.load_all_pokemon().await },
-                    |pokemon_list| cosmic::action::app(Message::LoadedPokemonList(pokemon_list)),
-                );
             }
+            Message::PaginationActionRequested(action) => match &action {
+                PaginationAction::Next => {
+                    if let Some(core) = &self.starry_core {
+                        if self.search.is_empty() && self.filters.selected_types.is_empty() {
+                            let new_list = core.get_pokemon_page(
+                                (self.current_page + 1) * self.config.items_per_page,
+                                self.config.items_per_page,
+                            );
+                            if !new_list.is_empty() {
+                                self.current_page += 1;
+                                self.pokemon_list = new_list;
+                            }
+                        }
+                    }
+                }
+                PaginationAction::Back => {
+                    if self.current_page >= 1 {
+                        if let Some(core) = &self.starry_core {
+                            if self.search.is_empty() && self.filters.selected_types.is_empty() {
+                                let new_list = core.get_pokemon_page(
+                                    (self.current_page - 1) * self.config.items_per_page,
+                                    self.config.items_per_page,
+                                );
+                                if !new_list.is_empty() {
+                                    self.current_page -= 1;
+                                    self.pokemon_list = new_list;
+                                }
+                            }
+                        }
+                    }
+                }
+            },
         }
         Task::none()
     }
@@ -643,7 +611,8 @@ impl StarryDex {
             TypeFilteringMode::Exclusive => 0,
         };
 
-        let current_value = self.config.pokemon_per_row as u16;
+        let current_per_row_value = self.config.pokemon_per_row as u16;
+        let current_per_page_value = self.config.items_per_page as u16;
         let old_config = self.config.clone();
 
         widget::settings::view_column(vec![
@@ -658,17 +627,34 @@ impl StarryDex {
                 )
                 .add(
                     widget::settings::item::builder(fl!("pokemon-per-row"))
-                        .description(format!("{}", current_value))
+                        .description(format!("{}", current_per_row_value))
                         .control(
-                            widget::slider(1..=10, current_value, move |new_value| {
+                            widget::slider(1..=10, current_per_row_value, move |new_value| {
                                 Message::UpdateConfig(Config {
                                     app_theme: old_config.app_theme,
                                     first_run_completed: old_config.first_run_completed,
                                     pokemon_per_row: new_value as usize,
+                                    items_per_page: old_config.items_per_page,
                                     type_filtering_mode: old_config.type_filtering_mode,
                                 })
                             })
                             .step(1u16),
+                        ),
+                )
+                .add(
+                    widget::settings::item::builder(fl!("pokemon-per-page"))
+                        .description(format!("{}", current_per_page_value))
+                        .control(
+                            widget::slider(10..=1500, current_per_page_value, move |new_value| {
+                                Message::UpdateConfig(Config {
+                                    app_theme: old_config.app_theme,
+                                    first_run_completed: old_config.first_run_completed,
+                                    pokemon_per_row: old_config.pokemon_per_row,
+                                    items_per_page: new_value as usize,
+                                    type_filtering_mode: old_config.type_filtering_mode,
+                                })
+                            })
+                            .step(10u16),
                         ),
                 )
                 .into(),
@@ -699,9 +685,9 @@ impl StarryDex {
         let spacing = theme::active().cosmic().spacing;
         let mut pokemon_grid = widget::Grid::new().width(Length::Fill);
 
-        for (index, pokemon) in self.filtered_pokemon_list.iter().enumerate() {
-            let pokemon_image = if let Some(path) = &pokemon.sprite_path {
-                widget::Image::new(path)
+        for (index, pokemon) in self.pokemon_list.iter().enumerate() {
+            let pokemon_image = if let Some(path) = &pokemon.sprite_path.as_ref() {
+                widget::Image::new(path.as_str())
                     .content_fit(cosmic::iced::ContentFit::None)
                     .width(Length::Fixed(100.0))
                     .height(Length::Fixed(100.0))
@@ -716,7 +702,7 @@ impl StarryDex {
                 widget::Column::new()
                     .push(pokemon_image.width(Length::Shrink))
                     .push(
-                        widget::text::text(capitalize_string(&pokemon.pokemon.name))
+                        widget::text::text(capitalize_string(&pokemon.name))
                             .width(Length::Shrink)
                             .line_height(LineHeight::Absolute(Pixels::from(15.0))),
                     )
@@ -725,7 +711,7 @@ impl StarryDex {
             )
             .width(Length::Fixed(200.0))
             .height(Length::Fixed(135.0))
-            .on_press_down(Message::LoadPokemon(pokemon.pokemon.id))
+            .on_press_down(Message::LoadPokemon(pokemon.id))
             .class(theme::Button::Image)
             .padding([spacing.space_none, spacing.space_s]);
 
@@ -739,7 +725,7 @@ impl StarryDex {
 
         let search = widget::search_input(fl!("search"), &self.search)
             .style(theme::TextInput::Search)
-            .on_input(Message::Search)
+            .on_input(Message::SearchInput)
             .line_height(LineHeight::Absolute(Pixels(30.0)))
             .width(Length::Fill);
 
@@ -760,16 +746,34 @@ impl StarryDex {
             .spacing(Pixels::from(spacing.space_xxxs))
             .width(Length::Fill);
 
+        let pagination_row = widget::Row::new()
+            .push(widget::horizontal_space())
+            .push(
+                widget::button::suggested("Back")
+                    .on_press(Message::PaginationActionRequested(PaginationAction::Back)),
+            )
+            .push(
+                widget::button::suggested("Next")
+                    .on_press(Message::PaginationActionRequested(PaginationAction::Next)),
+            )
+            .push(widget::horizontal_space())
+            .spacing(Pixels::from(spacing.space_xxxl))
+            .width(Length::Fill)
+            .align_y(Alignment::Center);
+
         widget::Column::new()
             .push(search_row)
             .push(
                 widget::scrollable(
                     widget::Container::new(pokemon_grid).align_x(Horizontal::Center),
                 )
+                .height(Length::FillPortion(8))
                 .width(Length::Fill),
             )
+            .push(pagination_row)
             .width(Length::Fill)
-            .spacing(spacing.space_s)
+            .padding(5.)
+            .spacing(spacing.space_xxs)
             .into()
     }
 

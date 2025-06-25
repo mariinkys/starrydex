@@ -12,6 +12,7 @@ support = Support
 appearance = Appearance
 theme = Theme
 pokemon-per-row = Pokémon per row
+pokemon-per-page = Pokémon per page
 match-desktop = Match desktop
 dark = Dark
 light = Light
