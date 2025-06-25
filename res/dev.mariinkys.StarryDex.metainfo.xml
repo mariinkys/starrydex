@@ -65,6 +65,16 @@
     </keywords>
 
     <releases>
+        <release version="0.2.5" date="2025-06-25">
+            <description>
+                <p>Complete backend rewrite featuring many improvements</p>
+                <p>RAM consumption halved by using memory-mapping</p>
+                <p>Implemented pagination and the ability to customize Pokémon per page</p>
+                <p>Improved overall smoothness of the application</p>
+                <p>Improved cache size</p>
+                <p>Updated dependencies</p>
+            </description>
+        </release>
         <release version="0.2.4" date="2025-05-25">
             <description>
                 <p>Adapt to API changes</p>
