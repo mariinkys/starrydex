@@ -34,25 +34,25 @@ pub struct StarryDex {
     context_page: ContextPage,
     /// Key bindings for the application's menu bar.
     key_binds: HashMap<menu::KeyBind, MenuAction>,
-    // Configuration data that persists between application runs.
+    /// Configuration data that persists between application runs.
     config: Config,
-    // Application Themes
+    /// Application Themes
     app_themes: Vec<String>,
     // Core StarryDex Client
     starry_core: Option<StarryCore>,
     /// List of Pokémon to show on the main page
     pokemon_list: Vec<PokemonInfo>,
-    // Holds the data of the currently selected Pokémon to show it on the context page
+    /// Holds the data of the currently selected Pokémon to show it on the context page
     selected_pokemon: Option<StarryPokemon>,
-    // Status of the main application page
+    /// Status of the main application page
     current_page_status: PageStatus,
-    // Controls the Pokémon Details Toggle of the Pokémon Context Page
+    /// Controls the Pokémon Details Toggle of the Pokémon Context Page
     wants_pokemon_details: bool,
-    // Holds the search input value
+    /// Holds the search input value
     search: String,
-    // Holds the currently applied filters if there are any
+    /// Holds the currently applied filters if there are any
     filters: Filters,
-    // Type Filter Modes
+    /// Type Filter Modes
     type_filter_mode: Vec<String>,
     /// Controls in which page are we currently
     current_page: usize,
@@ -299,7 +299,7 @@ impl cosmic::Application for StarryDex {
     /// Elements to pack at the start of the header bar.
     fn header_start(&self) -> Vec<Element<Self::Message>> {
         let menu_bar = menu::bar(vec![menu::Tree::with_children(
-            menu::root(fl!("view")),
+            Element::from(menu::root(fl!("view"))),
             menu::items(
                 &self.key_binds,
                 vec![
