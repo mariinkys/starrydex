@@ -2,7 +2,7 @@
 
 use crate::config::{AppTheme, Config, TypeFilteringMode};
 use crate::core::StarryCore;
-use crate::entities::StarryPokemon;
+use crate::entities::{PokemonInfo, StarryPokemon};
 use crate::fl;
 use crate::image_cache::ImageCache;
 use crate::utils::{capitalize_string, remove_dir_contents, scale_numbers};
@@ -40,6 +40,8 @@ pub struct StarryDex {
     app_themes: Vec<String>,
     // Core StarryDex Client
     starry_core: Option<StarryCore>,
+    /// List of Pokémon to show on the main page
+    pokemon_list: Vec<PokemonInfo>,
     // Holds the data of the currently selected Pokémon to show it on the context page
     selected_pokemon: Option<StarryPokemon>,
     // Status of the main application page
@@ -52,6 +54,10 @@ pub struct StarryDex {
     filters: Filters,
     // Type Filter Modes
     type_filter_mode: Vec<String>,
+    /// Controls in which page are we currently
+    current_page: usize,
+    /// Number of pokémon per page
+    items_per_page: usize,
 }
 
 /// Messages emitted by the application and its widgets.
@@ -65,13 +71,20 @@ pub enum Message {
 
     LoadPokemon(i64),
     TogglePokemonDetails(bool),
-    Search(String),
+    SearchInput(String),
     ApplyCurrentFilters,
     ClearFilters,
     DeleteCache,
+    PaginationActionRequested(PaginationAction),
 
     InitializedCore(Result<StarryCore, Error>),
     TypeFilterToggled(bool, PokemonType),
+}
+
+#[derive(Debug, Clone)]
+enum PaginationAction {
+    Next,
+    Back,
 }
 
 pub struct Filters {
@@ -250,6 +263,7 @@ impl cosmic::Application for StarryDex {
             app_themes: vec![fl!("match-desktop"), fl!("dark"), fl!("light")],
             starry_core: None,
             selected_pokemon: None,
+            pokemon_list: Vec::new(),
             current_page_status: PageStatus::Loading,
             wants_pokemon_details: false,
             search: String::new(),
@@ -257,6 +271,8 @@ impl cosmic::Application for StarryDex {
                 selected_types: HashSet::new(),
             },
             type_filter_mode: vec![fl!("exclusive"), fl!("inclusive")],
+            current_page: 0,
+            items_per_page: 30,
         };
         // Startup task that sets the window title.
         tasks.push(app.update_title());
@@ -404,6 +420,7 @@ impl cosmic::Application for StarryDex {
             }
             Message::UpdateConfig(config) => {
                 self.config = config;
+
                 return cosmic::command::set_theme(self.config.app_theme.theme());
             }
             Message::UpdateTheme(index) => {
@@ -418,6 +435,7 @@ impl cosmic::Application for StarryDex {
                     first_run_completed: old_config.first_run_completed,
                     pokemon_per_row: old_config.pokemon_per_row,
                     type_filtering_mode: old_config.type_filtering_mode,
+                    items_per_page: old_config.items_per_page,
                     app_theme,
                 };
                 return cosmic::command::set_theme(self.config.app_theme.theme());
@@ -425,6 +443,7 @@ impl cosmic::Application for StarryDex {
             Message::InitializedCore(core_res) => {
                 match core_res {
                     Ok(core) => {
+                        self.pokemon_list = core.get_pokemon_page(0, self.items_per_page);
                         self.starry_core = Some(core);
                         println!("Loaded StarryCore");
                     }
@@ -449,8 +468,18 @@ impl cosmic::Application for StarryDex {
                 }
             }
             Message::TogglePokemonDetails(value) => self.wants_pokemon_details = value,
-            Message::Search(value) => {
-                todo!()
+            Message::SearchInput(value) => {
+                self.search = value;
+                if let Some(core) = &self.starry_core {
+                    if self.search.is_empty() {
+                        self.pokemon_list = core.get_pokemon_page(
+                            self.current_page * self.items_per_page,
+                            self.items_per_page,
+                        );
+                    } else {
+                        self.pokemon_list = core.search_pokemon(&self.search);
+                    }
+                }
             }
             Message::TypeFilterToggled(value, type_name) => {
                 if value {
@@ -509,6 +538,7 @@ impl cosmic::Application for StarryDex {
                 self.config = Config {
                     first_run_completed: old_config.first_run_completed,
                     pokemon_per_row: old_config.pokemon_per_row,
+                    items_per_page: old_config.items_per_page,
                     type_filtering_mode: filter_mode,
                     app_theme: old_config.app_theme,
                 };
@@ -531,6 +561,38 @@ impl cosmic::Application for StarryDex {
                 //     |pokemon_list| cosmic::action::app(Message::LoadedPokemonList(pokemon_list)),
                 // );
             }
+            Message::PaginationActionRequested(action) => match &action {
+                PaginationAction::Next => {
+                    if let Some(core) = &self.starry_core {
+                        if self.search.is_empty() {
+                            let new_list = core.get_pokemon_page(
+                                (self.current_page + 1) * self.items_per_page,
+                                self.items_per_page,
+                            );
+                            if !new_list.is_empty() {
+                                self.current_page += 1;
+                                self.pokemon_list = new_list;
+                            }
+                        }
+                    }
+                }
+                PaginationAction::Back => {
+                    if self.current_page >= 1 {
+                        if let Some(core) = &self.starry_core {
+                            if self.search.is_empty() {
+                                let new_list = core.get_pokemon_page(
+                                    (self.current_page - 1) * self.items_per_page,
+                                    self.items_per_page,
+                                );
+                                if !new_list.is_empty() {
+                                    self.current_page -= 1;
+                                    self.pokemon_list = new_list;
+                                }
+                            }
+                        }
+                    }
+                }
+            },
         }
         Task::none()
     }
@@ -550,7 +612,8 @@ impl StarryDex {
             TypeFilteringMode::Exclusive => 0,
         };
 
-        let current_value = self.config.pokemon_per_row as u16;
+        let current_per_row_value = self.config.pokemon_per_row as u16;
+        let current_per_page_value = self.config.items_per_page as u16;
         let old_config = self.config.clone();
 
         widget::settings::view_column(vec![
@@ -565,17 +628,34 @@ impl StarryDex {
                 )
                 .add(
                     widget::settings::item::builder(fl!("pokemon-per-row"))
-                        .description(format!("{}", current_value))
+                        .description(format!("{}", current_per_row_value))
                         .control(
-                            widget::slider(1..=10, current_value, move |new_value| {
+                            widget::slider(1..=10, current_per_row_value, move |new_value| {
                                 Message::UpdateConfig(Config {
                                     app_theme: old_config.app_theme,
                                     first_run_completed: old_config.first_run_completed,
-                                    pokemon_per_row: new_value as i64,
+                                    pokemon_per_row: new_value as usize,
+                                    items_per_page: old_config.items_per_page,
                                     type_filtering_mode: old_config.type_filtering_mode,
                                 })
                             })
                             .step(1u16),
+                        ),
+                )
+                .add(
+                    widget::settings::item::builder(fl!("pokemon-per-page"))
+                        .description(format!("{}", current_per_page_value))
+                        .control(
+                            widget::slider(10..=500, current_per_page_value, move |new_value| {
+                                Message::UpdateConfig(Config {
+                                    app_theme: old_config.app_theme,
+                                    first_run_completed: old_config.first_run_completed,
+                                    pokemon_per_row: old_config.pokemon_per_row,
+                                    items_per_page: new_value as usize,
+                                    type_filtering_mode: old_config.type_filtering_mode,
+                                })
+                            })
+                            .step(10u16),
                         ),
                 )
                 .into(),
@@ -606,85 +686,96 @@ impl StarryDex {
         let spacing = theme::active().cosmic().spacing;
         let mut pokemon_grid = widget::Grid::new().width(Length::Fill);
 
-        let content = if let Some(core) = &self.starry_core {
-            let pokemons = core.get_all_pokemon().unwrap();
+        for (index, pokemon) in self.pokemon_list.iter().enumerate() {
+            let pokemon_image = if let Some(path) = &pokemon.sprite_path.as_ref() {
+                widget::Image::new(path.as_str())
+                    .content_fit(cosmic::iced::ContentFit::None)
+                    .width(Length::Fixed(100.0))
+                    .height(Length::Fixed(100.0))
+            } else {
+                widget::Image::new(ImageCache::get("fallback"))
+                    .content_fit(cosmic::iced::ContentFit::None)
+                    .width(Length::Fixed(100.0))
+                    .height(Length::Fixed(100.0))
+            };
 
-            for (index, pokemon) in pokemons {
-                let pokemon_image = if let Some(path) = &pokemon.sprite_path.as_ref() {
-                    widget::Image::new(path.as_str())
-                        .content_fit(cosmic::iced::ContentFit::None)
-                        .width(Length::Fixed(100.0))
-                        .height(Length::Fixed(100.0))
-                } else {
-                    widget::Image::new(ImageCache::get("fallback"))
-                        .content_fit(cosmic::iced::ContentFit::None)
-                        .width(Length::Fixed(100.0))
-                        .height(Length::Fixed(100.0))
-                };
+            let pokemon_container = widget::button::custom(
+                widget::Column::new()
+                    .push(pokemon_image.width(Length::Shrink))
+                    .push(
+                        widget::text::text(capitalize_string(&pokemon.name))
+                            .width(Length::Shrink)
+                            .line_height(LineHeight::Absolute(Pixels::from(15.0))),
+                    )
+                    .width(Length::Fill)
+                    .align_x(Alignment::Center),
+            )
+            .width(Length::Fixed(200.0))
+            .height(Length::Fixed(135.0))
+            .on_press_down(Message::LoadPokemon(pokemon.id))
+            .class(theme::Button::Image)
+            .padding([spacing.space_none, spacing.space_s]);
 
-                let pokemon_container = widget::button::custom(
-                    widget::Column::new()
-                        .push(pokemon_image.width(Length::Shrink))
-                        .push(
-                            widget::text::text(capitalize_string(&pokemon.pokemon.name))
-                                .width(Length::Shrink)
-                                .line_height(LineHeight::Absolute(Pixels::from(15.0))),
-                        )
-                        .width(Length::Fill)
-                        .align_x(Alignment::Center),
-                )
-                .width(Length::Fixed(200.0))
-                .height(Length::Fixed(135.0))
-                .on_press_down(Message::LoadPokemon(pokemon.pokemon.id.into()))
-                .class(theme::Button::Image)
-                .padding([spacing.space_none, spacing.space_s]);
-
-                // Insert a new row before adding the first Pokémon of each row
-                if index % self.config.pokemon_per_row == 0 {
-                    pokemon_grid = pokemon_grid.insert_row();
-                }
-
-                pokemon_grid = pokemon_grid.push(pokemon_container);
+            // Insert a new row before adding the first Pokémon of each row
+            if index % self.config.pokemon_per_row == 0 {
+                pokemon_grid = pokemon_grid.insert_row();
             }
 
-            let search = widget::search_input(fl!("search"), &self.search)
-                .style(theme::TextInput::Search)
-                .on_input(Message::Search)
-                .line_height(LineHeight::Absolute(Pixels(30.0)))
-                .width(Length::Fill);
+            pokemon_grid = pokemon_grid.push(pokemon_container);
+        }
 
-            let filters = widget::button::standard(fl!("filter"))
-                .class(theme::Button::Suggested)
-                .on_press(Message::ToggleContextPage(ContextPage::FiltersPage))
-                .width(Length::Shrink);
+        let search = widget::search_input(fl!("search"), &self.search)
+            .style(theme::TextInput::Search)
+            .on_input(Message::SearchInput)
+            .line_height(LineHeight::Absolute(Pixels(30.0)))
+            .width(Length::Fill);
 
-            let clear_filters = widget::button::standard(fl!("clear-filters"))
-                .class(theme::Button::Destructive)
-                .on_press(Message::ClearFilters)
-                .width(Length::Shrink);
+        let filters = widget::button::standard(fl!("filter"))
+            .class(theme::Button::Suggested)
+            .on_press(Message::ToggleContextPage(ContextPage::FiltersPage))
+            .width(Length::Shrink);
 
-            let search_row = widget::Row::new()
-                .push(search)
-                .push(filters)
-                .push(clear_filters)
-                .spacing(Pixels::from(spacing.space_xxxs))
-                .width(Length::Fill);
+        let clear_filters = widget::button::standard(fl!("clear-filters"))
+            .class(theme::Button::Destructive)
+            .on_press(Message::ClearFilters)
+            .width(Length::Shrink);
 
-            widget::Column::new()
-                .push(search_row)
-                .push(
-                    widget::scrollable(
-                        widget::Container::new(pokemon_grid).align_x(Horizontal::Center),
-                    )
-                    .width(Length::Fill),
+        let search_row = widget::Row::new()
+            .push(search)
+            .push(filters)
+            .push(clear_filters)
+            .spacing(Pixels::from(spacing.space_xxxs))
+            .width(Length::Fill);
+
+        let pagination_row = widget::Row::new()
+            .push(widget::horizontal_space())
+            .push(
+                widget::button::suggested("Back")
+                    .on_press(Message::PaginationActionRequested(PaginationAction::Back)),
+            )
+            .push(
+                widget::button::suggested("Next")
+                    .on_press(Message::PaginationActionRequested(PaginationAction::Next)),
+            )
+            .push(widget::horizontal_space())
+            .spacing(Pixels::from(spacing.space_xxxl))
+            .width(Length::Fill)
+            .align_y(Alignment::Center);
+
+        widget::Column::new()
+            .push(search_row)
+            .push(
+                widget::scrollable(
+                    widget::Container::new(pokemon_grid).align_x(Horizontal::Center),
                 )
-                .width(Length::Fill)
-                .spacing(spacing.space_s)
-        } else {
-            widget::Column::new().push(widget::text("Error, no StarryCore found"))
-        };
-
-        content.into()
+                .height(Length::FillPortion(8))
+                .width(Length::Fill),
+            )
+            .push(pagination_row)
+            .width(Length::Fill)
+            .padding(5.)
+            .spacing(spacing.space_xxs)
+            .into()
     }
 
     /// The pokemon details context page for this app.

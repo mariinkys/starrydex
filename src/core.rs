@@ -11,7 +11,7 @@ use rustemon::client::{
 use tokio::sync::Semaphore;
 
 use crate::{
-    entities::{StarryPokemon, StarryPokemonData, StarryPokemonEncounterInfo},
+    entities::{PokemonInfo, StarryPokemon, StarryPokemonData, StarryPokemonEncounterInfo},
     utils::{capitalize_string, parse_pokemon_stats},
 };
 use futures::StreamExt;
@@ -136,20 +136,59 @@ impl StarryCore {
     }
 
     /// Get a list of all Pokémon (converts to owned data)
-    #[allow(dead_code)]
-    pub fn get_pokemon_list(&self) -> Vec<StarryPokemon> {
-        todo!()
-        // if let Some(data) = self.inner.pokemon_data {
-        //     data.iter()
-        //         .map(|(id, pokemon)| StarryPokemon {
-        //             pokemon: pokemon.pokemon,
-        //             sprite_path: pokemon.sprite_path.as_ref().map(|s| s.as_str().to_string()),
-        //             encounter_info: pokemon.encounter_info,
-        //         })
-        //         .collect()
-        // } else {
-        //     Vec::new()
-        // }
+    pub fn get_pokemon_list(&self) -> Vec<PokemonInfo> {
+        if let Some(data) = self.inner.pokemon_data {
+            data.iter()
+                .map(|(id, pokemon)| PokemonInfo {
+                    id: id.to_native(),
+                    name: pokemon.pokemon.name.as_str().to_string(),
+                    sprite_path: pokemon.sprite_path.as_ref().map(|s| s.as_str().to_string()),
+                })
+                .collect()
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Get a subset of Pokémon for pagination
+    pub fn get_pokemon_page(&self, offset: usize, limit: usize) -> Vec<PokemonInfo> {
+        if let Some(data) = self.inner.pokemon_data {
+            data.iter()
+                .skip(offset)
+                .take(limit)
+                .map(|(id, pokemon)| PokemonInfo {
+                    id: id.to_native(),
+                    name: pokemon.pokemon.name.as_str().to_string(),
+                    sprite_path: pokemon.sprite_path.as_ref().map(|s| s.as_str().to_string()),
+                })
+                .collect()
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Search Pokémon by name
+    pub fn search_pokemon(&self, query: &str) -> Vec<PokemonInfo> {
+        if let Some(data) = self.inner.pokemon_data {
+            let query_lower = query.to_lowercase();
+            data.iter()
+                .filter(|(_, pokemon)| {
+                    pokemon
+                        .pokemon
+                        .name
+                        .as_str()
+                        .to_lowercase()
+                        .contains(&query_lower)
+                })
+                .map(|(id, pokemon)| PokemonInfo {
+                    id: id.to_native(),
+                    name: pokemon.pokemon.name.as_str().to_string(),
+                    sprite_path: pokemon.sprite_path.as_ref().map(|s| s.as_str().to_string()),
+                })
+                .collect()
+        } else {
+            Vec::new()
+        }
     }
 
     fn save_to_file(pokemons: BTreeMap<i64, StarryPokemon>) -> Result<(), Error> {

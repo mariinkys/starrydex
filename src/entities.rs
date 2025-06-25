@@ -43,3 +43,11 @@ pub struct StarryPokemonEncounterInfo {
     pub city: String,
     pub games_method: Vec<String>,
 }
+
+// Simple owned data structure, for list Page
+#[derive(Debug, Clone)]
+pub struct PokemonInfo {
+    pub id: i64,
+    pub name: String,
+    pub sprite_path: Option<String>,
+}
