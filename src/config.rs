@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 pub struct Config {
     pub app_theme: AppTheme,
     pub first_run_completed: bool,
-    pub pokemon_per_row: usize,
+    pub pokemon_per_row: i64,
     pub type_filtering_mode: TypeFilteringMode,
 }
 

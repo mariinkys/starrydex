@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-use serde::{Deserialize, Serialize};
+use bytecheck::CheckBytes;
+use rkyv::{Archive, Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Archive, CheckBytes, Serialize, Deserialize, Debug)]
+#[rkyv(derive(Debug))]
 pub struct StarryPokemon {
     pub pokemon: StarryPokemonData,
     pub sprite_path: Option<String>,
@@ -10,7 +12,8 @@ pub struct StarryPokemon {
 }
 
 /// Core Pokémon data
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Archive, CheckBytes, Serialize, Deserialize, Debug)]
+#[rkyv(derive(Debug))]
 pub struct StarryPokemonData {
     pub id: i64,
     pub name: String,
@@ -22,7 +25,8 @@ pub struct StarryPokemonData {
 }
 
 /// Pokémon statistics
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Archive, CheckBytes, Serialize, Deserialize, Debug)]
+#[rkyv(derive(Debug))]
 pub struct StarryPokemonStats {
     pub hp: i64,
     pub attack: i64,
@@ -33,7 +37,8 @@ pub struct StarryPokemonStats {
 }
 
 /// Pokémon encounter information
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Archive, CheckBytes, Serialize, Deserialize, Debug, Clone)]
+#[rkyv(derive(Debug))]
 pub struct StarryPokemonEncounterInfo {
     pub city: String,
     pub games_method: Vec<String>,

@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-use std::{collections::BTreeMap, fs::File, sync::Arc, time::Duration};
+use std::{collections::BTreeMap, io::Write, sync::Arc, time::Duration};
 
-use anyhow::{Error, anyhow};
-use dashmap::DashMap;
-use futures::StreamExt;
-use memmap2::Mmap;
+use anywho::{Error, anywho};
+use memmap2::{Mmap, MmapOptions};
+use rkyv::rancor;
 use rustemon::client::{
     CacheMode, CacheOptions, MokaManager, RustemonClient, RustemonClientBuilder,
 };
@@ -13,24 +12,193 @@ use tokio::sync::Semaphore;
 
 use crate::{
     entities::{StarryPokemon, StarryPokemonData, StarryPokemonEncounterInfo},
-    utils::{StarryError, capitalize_string, parse_pokemon_stats},
+    utils::{capitalize_string, parse_pokemon_stats},
 };
+use futures::StreamExt;
 
 const APP_ID: &str = "dev.mariinkys.StarryDex";
 
-#[derive(Clone)]
+type ArchivedStarryPokemonMap = rkyv::Archived<BTreeMap<i64, StarryPokemon>>;
+
+#[derive(Debug, Clone)]
 pub struct StarryCore {
-    cache: StarryCache,
-    api: StarryApi,
+    inner: Arc<StarryCoreInner>,
+}
+
+#[derive(Debug)]
+struct StarryCoreInner {
+    // we need to keep the mmap alive
+    _mmap: Option<Mmap>,
+    // this points to the archived data in the mmap
+    pokemon_data: Option<&'static ArchivedStarryPokemonMap>,
+    client: StarryApi,
 }
 
 impl StarryCore {
-    pub fn init() -> Self {
-        let cache = StarryCache {
-            cache: Arc::new(DashMap::new()),
+    /// Initialize the core by loading data from file or fetching from API
+    pub async fn initialize() -> Result<Self, Error> {
+        use std::result::Result::Ok;
+
+        let mut inner = StarryCoreInner {
+            _mmap: None,
+            pokemon_data: None,
+            client: StarryApi::default(),
         };
 
-        let api = StarryApi {
+        // try to load from cache first
+        match Self::load_from_file() {
+            Ok(mmap) => {
+                // access the archived data from the mmap
+                let archived_data =
+                    rkyv::access::<ArchivedStarryPokemonMap, rancor::Error>(&mmap[..])
+                        .map_err(|e| anywho!("Failed to access archived data: {}", e))?;
+
+                // extend the lifetime of the archived data to 'static
+                // This is safe (I think) because we keep the mmap alive in _mmap field
+                let static_data: &'static ArchivedStarryPokemonMap =
+                    unsafe { std::mem::transmute(archived_data) };
+
+                inner._mmap = Some(mmap);
+                inner.pokemon_data = Some(static_data);
+                println!("Loaded {} Pokémon from cache", static_data.len());
+            }
+            Err(_) => {
+                // if loading from cache fails, fetch from API and save to cache
+                println!("Cache not found, fetching from API...");
+                Self::refresh_data_internal(&mut inner).await?;
+            }
+        }
+
+        Ok(StarryCore {
+            inner: Arc::new(inner),
+        })
+    }
+
+    /// Refresh data from API and save to cache (this creates a new StarryCore instance because I can't mutate the Arc easily, skill issue)
+    pub async fn refresh_data(&self) -> Result<StarryCore, Error> {
+        let pokemon_map = self.inner.client.fetch_all_pokemon().await;
+        Self::save_to_file(pokemon_map)?;
+
+        // new instance with the refreshed data
+        Self::initialize().await
+    }
+
+    async fn refresh_data_internal(inner: &mut StarryCoreInner) -> Result<(), Error> {
+        let pokemon_map = inner.client.fetch_all_pokemon().await;
+        Self::save_to_file(pokemon_map)?;
+
+        let mmap = Self::load_from_file()?;
+        let archived_data = rkyv::access::<ArchivedStarryPokemonMap, rancor::Error>(&mmap[..])
+            .map_err(|e| anywho!("Failed to access archived data: {}", e))?;
+
+        // extend the lifetime of the archived data to 'static
+        // This is safe (I think) because we keep the mmap alive in _mmap field
+        let static_data: &'static ArchivedStarryPokemonMap =
+            unsafe { std::mem::transmute(archived_data) };
+
+        inner._mmap = Some(mmap);
+        inner.pokemon_data = Some(static_data);
+
+        println!("Downloading Sprites");
+        if let Err(e) = inner.client.download_all_pokemon_sprites().await {
+            eprintln!("Error downloading sprites: {}", e);
+        }
+
+        Ok(())
+    }
+
+    /// Get all Pokémon (returns an iterator to avoid loading everything into memory)
+    pub fn get_all_pokemon(
+        &self,
+    ) -> Option<impl Iterator<Item = (i64, &rkyv::Archived<StarryPokemon>)>> {
+        self.inner
+            .pokemon_data
+            .map(|data| data.iter().map(|(id, pokemon)| (id.to_native(), pokemon)))
+    }
+
+    /// Get a single Pokémon by ID
+    pub fn get_pokemon_by_id(&self, id: i64) -> Option<&rkyv::Archived<StarryPokemon>> {
+        self.inner
+            .pokemon_data?
+            .get(&rkyv::rend::i64_le::from_native(id))
+    }
+
+    /// Get Pokémon count
+    #[allow(dead_code)]
+    pub fn pokemon_count(&self) -> usize {
+        self.inner.pokemon_data.map_or(0, |data| data.len())
+    }
+
+    /// Check if data is loaded
+    #[allow(dead_code)]
+    pub fn is_loaded(&self) -> bool {
+        self.inner.pokemon_data.is_some()
+    }
+
+    /// Get a list of all Pokémon (converts to owned data)
+    #[allow(dead_code)]
+    pub fn get_pokemon_list(&self) -> Vec<StarryPokemon> {
+        todo!()
+        // if let Some(data) = self.inner.pokemon_data {
+        //     data.iter()
+        //         .map(|(id, pokemon)| StarryPokemon {
+        //             pokemon: pokemon.pokemon,
+        //             sprite_path: pokemon.sprite_path.as_ref().map(|s| s.as_str().to_string()),
+        //             encounter_info: pokemon.encounter_info,
+        //         })
+        //         .collect()
+        // } else {
+        //     Vec::new()
+        // }
+    }
+
+    fn save_to_file(pokemons: BTreeMap<i64, StarryPokemon>) -> Result<(), Error> {
+        let cache_dir = dirs::data_dir().unwrap().join(APP_ID);
+
+        std::fs::create_dir_all(&cache_dir)?;
+
+        let cache_path = cache_dir.join("pokemon_cache.bin");
+
+        let bytes = rkyv::to_bytes::<rancor::Error>(&pokemons)
+            .map_err(|e| anywho!("Failed to serialize data: {}", e))?;
+
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(cache_path)?;
+
+        file.write_all(&bytes)?;
+        file.flush()?;
+
+        Ok(())
+    }
+
+    fn load_from_file() -> Result<Mmap, Error> {
+        let cache_path = dirs::data_dir()
+            .unwrap()
+            .join(APP_ID)
+            .join("pokemon_cache.bin");
+
+        let file = std::fs::File::open(cache_path).map_err(|_| anywho!("Cache file not found"))?;
+
+        let mmap = unsafe { MmapOptions::new().map(&file)? };
+
+        rkyv::access::<ArchivedStarryPokemonMap, rancor::Error>(&mmap[..])
+            .map_err(|e| anywho!("Failed to access archived data: {}", e))?;
+
+        Ok(mmap)
+    }
+}
+
+#[derive(Debug, Clone)]
+struct StarryApi {
+    client: Arc<RustemonClient>,
+}
+
+impl Default for StarryApi {
+    fn default() -> Self {
+        Self {
             client: Arc::new(
                 RustemonClientBuilder::default()
                     .with_manager(MokaManager::default())
@@ -44,60 +212,43 @@ impl StarryCore {
                     .try_build()
                     .unwrap(),
             ),
-        };
-
-        StarryCore { cache, api }
+        }
     }
-
-    /// Loads all the Pokémon data, tries to load it from cache, if not fetches the data and saves the cache
-    pub async fn load_all(&self) -> Arc<DashMap<i64, StarryPokemon>> {
-        self.cache.load_or_init(&self.api).await
-    }
-}
-
-#[derive(Clone)]
-struct StarryApi {
-    client: Arc<RustemonClient>,
 }
 
 impl StarryApi {
-    async fn fetch_all_pokemon(&self) -> Arc<DashMap<i64, StarryPokemon>> {
+    async fn fetch_all_pokemon(&self) -> BTreeMap<i64, StarryPokemon> {
         let all_entries = rustemon::pokemon::pokemon::get_all_entries(&self.client)
             .await
             .unwrap_or_default();
 
         let semaphore = Arc::new(Semaphore::new(30));
-        let map = Arc::new(DashMap::with_capacity(all_entries.len()));
 
-        println!("Downloading Pokémon data...");
-
-        futures::stream::iter(all_entries)
-            .for_each_concurrent(50, |entry| {
+        let pokemon_stream = futures::stream::iter(all_entries)
+            .map(|entry| {
                 let client = self.client.clone();
                 let sem = Arc::clone(&semaphore);
-                let map = Arc::clone(&map);
-
                 async move {
                     let _permit = sem.acquire().await.unwrap();
-                    match Self::fetch_pokemon_details(&entry.name, &client).await {
-                        Ok(pokemon) => {
-                            map.insert(pokemon.pokemon.id, pokemon);
-                        }
-                        Err(_) => {
-                            eprintln!("Failed to fetch details for: {}", entry.name);
-                        }
-                    }
+                    Self::fetch_pokemon_details(&entry.name, &client).await
                 }
             })
-            .await;
+            .buffer_unordered(30);
 
-        map
+        pokemon_stream
+            .collect::<Vec<Result<StarryPokemon, Error>>>()
+            .await
+            .into_iter()
+            .filter_map(Result::ok) // keep only the success
+            .map(|pokemon| (pokemon.pokemon.id, pokemon))
+            .collect()
     }
 
+    /// Retrieve a single Pokémon Data from PokéApi
     async fn fetch_pokemon_details(
         name: &str,
         client: &rustemon::client::RustemonClient,
-    ) -> Result<StarryPokemon, rustemon::error::Error> {
+    ) -> Result<StarryPokemon, Error> {
         let pokemon = rustemon::pokemon::pokemon::get_by_name(name, client).await?;
 
         let encounter_info =
@@ -178,7 +329,8 @@ impl StarryApi {
         })
     }
 
-    async fn download_all_sprites(&self) -> Result<(), Error> {
+    /// Download Pokémon Sprites to the designed folder
+    async fn download_all_pokemon_sprites(&self) -> Result<(), Error> {
         let all_entries = rustemon::pokemon::pokemon::get_all_entries(&self.client)
             .await
             .unwrap_or_default();
@@ -189,8 +341,6 @@ impl StarryApi {
 
         let semaphore = Arc::new(Semaphore::new(20));
 
-        println!("Downloading sprites...");
-
         let results = futures::stream::iter(all_entries)
             .map(|entry| {
                 let client = client.clone();
@@ -200,7 +350,7 @@ impl StarryApi {
                     let pokemon =
                         rustemon::pokemon::pokemon::get_by_name(&entry.name, &self.client).await?;
                     if let Some(sprite_url) = pokemon.sprites.front_default {
-                        Self::download_image(&client, sprite_url, pokemon.name.to_string()).await
+                        download_image(&client, sprite_url, pokemon.name.to_string()).await
                     } else {
                         Ok(())
                     }
@@ -218,116 +368,44 @@ impl StarryApi {
 
         Ok(())
     }
-
-    async fn download_image(
-        client: &reqwest::Client,
-        image_url: String,
-        pokemon_name: String,
-    ) -> Result<(), Error> {
-        let resources_path = dirs::data_dir()
-            .unwrap()
-            .join(APP_ID)
-            .join("resources")
-            .join("sprites");
-
-        if !resources_path.exists() {
-            std::fs::create_dir_all(&resources_path).expect("Failed to create the resources path");
-        }
-
-        let image_filename = format!("{}_front.png", pokemon_name);
-        let image_path = resources_path.join(&pokemon_name).join(&image_filename);
-
-        // Check if file already exists
-        if tokio::fs::metadata(&image_path).await.is_ok() {
-            return Ok(());
-        }
-
-        let response = client.get(&image_url).send().await?;
-        if response.status().is_success() {
-            let bytes = response.bytes().await?;
-            let path = std::path::PathBuf::from(&image_path);
-            if let Some(parent) = path.parent() {
-                tokio::fs::create_dir_all(parent).await?;
-            }
-            tokio::fs::write(&image_path, &bytes).await?;
-            Ok(())
-        } else {
-            Err(anyhow!(
-                "Failed to download image. Status: {}",
-                response.status()
-            ))
-        }
-    }
 }
 
-#[derive(Clone)]
-struct StarryCache {
-    cache: Arc<DashMap<i64, StarryPokemon>>,
-}
+async fn download_image(
+    client: &reqwest::Client,
+    image_url: String,
+    pokemon_name: String,
+) -> Result<(), Error> {
+    let resources_path = dirs::data_dir()
+        .unwrap()
+        .join(APP_ID)
+        .join("resources")
+        .join("sprites");
 
-impl StarryCache {
-    async fn load_or_init(&self, api: &StarryApi) -> Arc<DashMap<i64, StarryPokemon>> {
-        if let Err(e) = self.load().await {
-            eprintln!("Failed to load cache: {}", e);
-        }
-
-        if !self.cache.is_empty() {
-            return self.cache.clone(); // Already loaded
-        }
-
-        if let Err(e) = api.download_all_sprites().await {
-            eprintln!("Error downloading sprites: {}", e);
-        }
-
-        let pokemon = api.fetch_all_pokemon().await;
-        pokemon.iter().for_each(|entry| {
-            self.cache.insert(*entry.key(), entry.value().clone());
-        });
-
-        if let Err(e) = self.save_cache().await {
-            eprintln!("Failed to save cache: {}", e);
-        }
-
-        self.cache.clone()
+    if !resources_path.exists() {
+        std::fs::create_dir_all(&resources_path).expect("Failed to create the resources path");
     }
 
-    async fn load(&self) -> Result<(), StarryError> {
-        let path = dirs::data_dir()
-            .unwrap()
-            .join(APP_ID)
-            .join("pokemon_cache.json");
-        if !path.exists() {
-            return Err(StarryError::NoCacheFound);
-        }
+    let image_filename = format!("{}_front.png", pokemon_name);
+    let image_path = resources_path.join(&pokemon_name).join(&image_filename);
 
-        let file = File::open(path)?;
-        let mmap = unsafe { Mmap::map(&file)? };
-        let reader = std::io::Cursor::new(&mmap[..]);
-
-        let pokemon_map: BTreeMap<i64, StarryPokemon> = serde_json::from_reader(reader)?;
-
-        for (id, pokemon) in pokemon_map {
-            self.cache.insert(id, pokemon);
-        }
-
-        Ok(())
+    // Check if file already exists
+    if tokio::fs::metadata(&image_path).await.is_ok() {
+        return Ok(());
     }
 
-    async fn save_cache(&self) -> Result<(), Error> {
-        let path = dirs::data_dir()
-            .unwrap()
-            .join(APP_ID)
-            .join("pokemon_cache.json");
-        let map_snapshot: BTreeMap<_, _> = self
-            .cache
-            .iter()
-            .map(|entry| (*entry.key(), entry.value().clone()))
-            .collect();
-
-        let serialized_data =
-            tokio::task::spawn_blocking(move || serde_json::to_string(&map_snapshot)).await??;
-        tokio::fs::write(path, serialized_data).await?;
-
+    let response = client.get(&image_url).send().await?;
+    if response.status().is_success() {
+        let bytes = response.bytes().await?;
+        let path = std::path::PathBuf::from(&image_path);
+        if let Some(parent) = path.parent() {
+            tokio::fs::create_dir_all(parent).await?;
+        }
+        tokio::fs::write(&image_path, &bytes).await?;
         Ok(())
+    } else {
+        Err(anywho!(
+            "Failed to download image. Status: {}",
+            response.status()
+        ))
     }
 }

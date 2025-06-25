@@ -1,9 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-use std::fmt::Display;
-
-use anyhow::Error;
-
 use crate::entities::StarryPokemonStats;
 
 pub fn capitalize_string(input: &str) -> String {
@@ -65,31 +61,4 @@ pub fn remove_dir_contents<P: AsRef<std::path::Path>>(path: P) -> std::io::Resul
         }
     }
     Ok(())
-}
-
-#[derive(Debug)]
-pub enum StarryError {
-    Generic(Error),
-    NoCacheFound,
-}
-
-impl Display for StarryError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self {
-            StarryError::Generic(error) => write!(f, "{}", error),
-            StarryError::NoCacheFound => write!(f, "No cache found!"),
-        }
-    }
-}
-
-impl From<std::io::Error> for StarryError {
-    fn from(value: std::io::Error) -> Self {
-        Self::Generic(value.into())
-    }
-}
-
-impl From<serde_json::Error> for StarryError {
-    fn from(value: serde_json::Error) -> Self {
-        Self::Generic(value.into())
-    }
 }
