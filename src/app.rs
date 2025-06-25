@@ -56,8 +56,6 @@ pub struct StarryDex {
     type_filter_mode: Vec<String>,
     /// Controls in which page are we currently
     current_page: usize,
-    /// Number of pokémon per page
-    items_per_page: usize,
 }
 
 /// Messages emitted by the application and its widgets.
@@ -273,7 +271,6 @@ impl cosmic::Application for StarryDex {
             },
             type_filter_mode: vec![fl!("exclusive"), fl!("inclusive")],
             current_page: 0,
-            items_per_page: 30,
         };
         // Startup task that sets the window title.
         tasks.push(app.update_title());
@@ -421,7 +418,10 @@ impl cosmic::Application for StarryDex {
             }
             Message::UpdateConfig(config) => {
                 self.config = config;
-
+                if let Some(core) = &self.starry_core {
+                    self.current_page = 0;
+                    self.pokemon_list = core.get_pokemon_page(0, self.config.items_per_page);
+                }
                 return cosmic::command::set_theme(self.config.app_theme.theme());
             }
             Message::UpdateTheme(index) => {
@@ -444,7 +444,8 @@ impl cosmic::Application for StarryDex {
             Message::InitializedCore(core_res) => {
                 match core_res {
                     Ok(core) => {
-                        self.pokemon_list = core.get_pokemon_page(0, self.items_per_page);
+                        self.current_page = 0;
+                        self.pokemon_list = core.get_pokemon_page(0, self.config.items_per_page);
                         self.starry_core = Some(core);
                         println!("Loaded StarryCore");
                     }
@@ -474,8 +475,8 @@ impl cosmic::Application for StarryDex {
                 if let Some(core) = &self.starry_core {
                     if self.search.is_empty() {
                         self.pokemon_list = core.get_pokemon_page(
-                            self.current_page * self.items_per_page,
-                            self.items_per_page,
+                            self.current_page * self.config.items_per_page,
+                            self.config.items_per_page,
                         );
                     } else {
                         self.pokemon_list = core.search_pokemon(&self.search);
@@ -520,7 +521,8 @@ impl cosmic::Application for StarryDex {
             }
             Message::ClearFilters => {
                 if let Some(core) = &self.starry_core {
-                    self.pokemon_list = core.get_pokemon_page(0, self.items_per_page);
+                    self.search = String::new();
+                    self.pokemon_list = core.get_pokemon_page(0, self.config.items_per_page);
                     self.filters = Filters {
                         selected_types: HashSet::new(),
                     };
@@ -563,8 +565,8 @@ impl cosmic::Application for StarryDex {
                     if let Some(core) = &self.starry_core {
                         if self.search.is_empty() && self.filters.selected_types.is_empty() {
                             let new_list = core.get_pokemon_page(
-                                (self.current_page + 1) * self.items_per_page,
-                                self.items_per_page,
+                                (self.current_page + 1) * self.config.items_per_page,
+                                self.config.items_per_page,
                             );
                             if !new_list.is_empty() {
                                 self.current_page += 1;
@@ -578,8 +580,8 @@ impl cosmic::Application for StarryDex {
                         if let Some(core) = &self.starry_core {
                             if self.search.is_empty() && self.filters.selected_types.is_empty() {
                                 let new_list = core.get_pokemon_page(
-                                    (self.current_page - 1) * self.items_per_page,
-                                    self.items_per_page,
+                                    (self.current_page - 1) * self.config.items_per_page,
+                                    self.config.items_per_page,
                                 );
                                 if !new_list.is_empty() {
                                     self.current_page -= 1;
@@ -643,7 +645,7 @@ impl StarryDex {
                     widget::settings::item::builder(fl!("pokemon-per-page"))
                         .description(format!("{}", current_per_page_value))
                         .control(
-                            widget::slider(10..=500, current_per_page_value, move |new_value| {
+                            widget::slider(10..=1500, current_per_page_value, move |new_value| {
                                 Message::UpdateConfig(Config {
                                     app_theme: old_config.app_theme,
                                     first_run_completed: old_config.first_run_completed,

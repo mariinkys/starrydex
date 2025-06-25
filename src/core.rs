@@ -156,9 +156,20 @@ impl StarryCore {
     /// Get a subset of Pokémon for pagination
     pub fn get_pokemon_page(&self, offset: usize, limit: usize) -> Vec<PokemonInfo> {
         if let Some(data) = self.inner.pokemon_data {
+            let total_count = data.len();
+
+            if total_count == 0 || limit == 0 {
+                eprintln!("Either data is empty or limit is 0");
+                return Vec::new();
+            }
+
+            // Clamp offset to valid range
+            let adjusted_offset = std::cmp::min(offset, total_count.saturating_sub(1));
+            let actual_limit = std::cmp::min(limit, total_count - adjusted_offset);
+
             data.iter()
                 .skip(offset)
-                .take(limit)
+                .take(actual_limit)
                 .map(|(id, pokemon)| PokemonInfo {
                     id: id.to_native(),
                     name: pokemon.pokemon.name.as_str().to_string(),
