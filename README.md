@@ -27,10 +27,6 @@
 > [!CAUTION]
 > Right now the application configuration does not get saved and it's lost upon application restart.
 
-Created by [mariinkys](https://github.com/mariinkys). Pokémon and Pokémon character names are trademarks of Nintendo.
-
-This application uses [PokeApi](https://github.com/PokeAPI/) and its resources.
-
 ## Install
 
 To install your COSMIC application, you will need [just](https://github.com/casey/just), if you're on Pop!\_OS, you can install it with the following command:
@@ -45,3 +41,17 @@ After you install it, you can run the following commands to build and install yo
 just build-release
 sudo just install
 ```
+
+# Attribution
+
+> "[Pop Icons](http://github.com/pop-os/icon-theme)" by [System76](http://system76.com/) is licensed under [CC-SA-4.0](http://creativecommons.org/licenses/by-sa/4.0/)
+
+Pokémon and Pokémon character names are trademarks of Nintendo.
+
+This application uses [PokeApi](https://github.com/PokeAPI/) and its resources.
+
+# Copyright and Licensing
+
+Copyright 2024 © Alex Marín
+
+Released under the terms of the [GPL-3.0](https://github.com/mariinkys/oboete/blob/main/LICENSE)

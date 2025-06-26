@@ -3,9 +3,9 @@
 use crate::config::{AppTheme, Config, TypeFilteringMode};
 use crate::core::StarryCore;
 use crate::entities::{PokemonInfo, StarryPokemon};
-use crate::fl;
 use crate::image_cache::ImageCache;
 use crate::utils::{capitalize_string, remove_dir_contents, scale_numbers};
+use crate::{fl, icon_cache};
 use anywho::Error;
 use cosmic::app::context_drawer;
 use cosmic::cosmic_config::{self, CosmicConfigEntry};
@@ -75,6 +75,7 @@ pub enum Message {
     ClearFilters,
     DeleteCache,
     PaginationActionRequested(PaginationAction),
+    SinglePokemonPagination(PaginationAction),
 
     InitializedCore(Result<StarryCore, Error>),
     TypeFilterToggled(bool, PokemonType),
@@ -595,6 +596,64 @@ impl cosmic::Application for StarryDex {
                     }
                 }
             },
+            Message::SinglePokemonPagination(action) => match &action {
+                PaginationAction::Next => {
+                    if let Some(core) = &self.starry_core {
+                        if !self.pokemon_list.is_empty() {
+                            if let Some(current_pokemon) = &self.selected_pokemon {
+                                let current_id = current_pokemon.pokemon.id;
+                                if let Some(current_index) =
+                                    self.pokemon_list.iter().position(|p| p.id == current_id)
+                                {
+                                    let next_index = (current_index + 1) % self.pokemon_list.len();
+                                    let next_pokemon_id = self.pokemon_list[next_index].id;
+                                    let pokemon = core.get_pokemon_by_id(next_pokemon_id).map(
+                                        |archived_pokemon| {
+                                            // TODO: Is unwrap safe here?
+                                            rkyv::deserialize::<StarryPokemon, rancor::Error>(
+                                                archived_pokemon,
+                                            )
+                                            .unwrap()
+                                        },
+                                    );
+
+                                    self.selected_pokemon = pokemon;
+                                }
+                            }
+                        }
+                    }
+                }
+                PaginationAction::Back => {
+                    if let Some(core) = &self.starry_core {
+                        if !self.pokemon_list.is_empty() {
+                            if let Some(current_pokemon) = &self.selected_pokemon {
+                                let current_id = current_pokemon.pokemon.id;
+                                if let Some(current_index) =
+                                    self.pokemon_list.iter().position(|p| p.id == current_id)
+                                {
+                                    let prev_index = if current_index == 0 {
+                                        self.pokemon_list.len() - 1
+                                    } else {
+                                        current_index - 1
+                                    };
+                                    let prev_pokemon_id = self.pokemon_list[prev_index].id;
+                                    let pokemon = core.get_pokemon_by_id(prev_pokemon_id).map(
+                                        |archived_pokemon| {
+                                            // TODO: Is unwrap safe here?
+                                            rkyv::deserialize::<StarryPokemon, rancor::Error>(
+                                                archived_pokemon,
+                                            )
+                                            .unwrap()
+                                        },
+                                    );
+
+                                    self.selected_pokemon = pokemon;
+                                }
+                            }
+                        }
+                    }
+                }
+            },
         }
         Task::none()
     }
@@ -732,15 +791,16 @@ impl StarryDex {
             .line_height(LineHeight::Absolute(Pixels(30.0)))
             .width(Length::Fill);
 
-        let filters = widget::button::standard(fl!("filter"))
+        let filters = widget::button::icon(icon_cache::get_handle("filter-symbolic", 18))
             .class(theme::Button::Suggested)
             .on_press(Message::ToggleContextPage(ContextPage::FiltersPage))
             .width(Length::Shrink);
 
-        let clear_filters = widget::button::standard(fl!("clear-filters"))
-            .class(theme::Button::Destructive)
-            .on_press(Message::ClearFilters)
-            .width(Length::Shrink);
+        let clear_filters =
+            widget::button::icon(icon_cache::get_handle("edit-clear-all-symbolic", 18))
+                .class(theme::Button::Destructive)
+                .on_press(Message::ClearFilters)
+                .width(Length::Shrink);
 
         let search_row = widget::Row::new()
             .push(search)
@@ -752,7 +812,7 @@ impl StarryDex {
         let pagination_row = widget::container(
             widget::Row::new()
                 .push(
-                    widget::button::suggested("Back")
+                    widget::button::icon(icon_cache::get_handle("go-previous-symbolic", 18))
                         .on_press(Message::PaginationActionRequested(PaginationAction::Back)),
                 )
                 .push(text(format!(
@@ -761,7 +821,7 @@ impl StarryDex {
                     (&self.current_page + 1)
                 )))
                 .push(
-                    widget::button::suggested("Next")
+                    widget::button::icon(icon_cache::get_handle("go-next-symbolic", 18))
                         .on_press(Message::PaginationActionRequested(PaginationAction::Next)),
                 )
                 .spacing(Pixels::from(spacing.space_xxl))
@@ -792,10 +852,28 @@ impl StarryDex {
 
         let content: widget::Column<_> = match &self.selected_pokemon {
             Some(starry_pokemon) => {
-                let page_title =
-                    widget::text::title1(capitalize_string(starry_pokemon.pokemon.name.as_str()))
-                        .width(Length::Fill)
-                        .align_x(Horizontal::Center);
+                let page_title = widget::container(
+                    widget::Row::new()
+                        .push(
+                            widget::button::icon(icon_cache::get_handle(
+                                "go-previous-symbolic",
+                                18,
+                            ))
+                            .on_press(Message::SinglePokemonPagination(PaginationAction::Back)),
+                        )
+                        .push(widget::text::title1(capitalize_string(
+                            starry_pokemon.pokemon.name.as_str(),
+                        )))
+                        .push(
+                            widget::button::icon(icon_cache::get_handle("go-next-symbolic", 18))
+                                .on_press(Message::SinglePokemonPagination(PaginationAction::Next)),
+                        )
+                        .spacing(spacing.space_s)
+                        .align_y(Alignment::Center),
+                )
+                .width(Length::Fill)
+                .align_y(Alignment::Center)
+                .align_x(Alignment::Center);
 
                 let pokemon_image = if let Some(path) = &starry_pokemon.sprite_path {
                     widget::Image::new(path).content_fit(cosmic::iced::ContentFit::Fill)

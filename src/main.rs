@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
+use icon_cache::{ICON_CACHE, IconCache};
 use image_cache::{IMAGE_CACHE, ImageCache};
 
 mod app;
@@ -7,6 +8,7 @@ mod config;
 mod core;
 mod entities;
 mod i18n;
+mod icon_cache;
 mod image_cache;
 mod utils;
 
@@ -19,6 +21,9 @@ fn main() -> cosmic::iced::Result {
 
     // Init the image cache
     IMAGE_CACHE.get_or_init(|| std::sync::Mutex::new(ImageCache::new()));
+
+    // Init the icon cache
+    ICON_CACHE.get_or_init(|| std::sync::Mutex::new(IconCache::new()));
 
     // Settings for configuring the application window and iced runtime.
     let settings = cosmic::app::Settings::default().size(cosmic::iced::Size::new(1200.0, 800.0));
