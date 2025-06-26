@@ -11,6 +11,7 @@ mod i18n;
 mod icon_cache;
 mod image_cache;
 mod utils;
+mod widgets;
 
 fn main() -> cosmic::iced::Result {
     // Get the system's preferred languages.

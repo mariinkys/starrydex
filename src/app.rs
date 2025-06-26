@@ -5,6 +5,7 @@ use crate::core::StarryCore;
 use crate::entities::{PokemonInfo, StarryPokemon};
 use crate::image_cache::ImageCache;
 use crate::utils::{capitalize_string, remove_dir_contents, scale_numbers};
+use crate::widgets::barchart::BarChart;
 use crate::{fl, icon_cache};
 use anywho::Error;
 use cosmic::app::context_drawer;
@@ -942,59 +943,14 @@ impl StarryDex {
                 .class(theme::Container::Card)
                 .padding([spacing.space_none, spacing.space_xxs]);
 
-                let pokemon_stats = widget::container(
-                    Column::new()
-                        .push(
-                            widget::Row::new()
-                                .push(text(fl!("hp")).width(Length::Fill))
-                                .push(
-                                    text(starry_pokemon.pokemon.stats.hp.to_string())
-                                        .align_x(Horizontal::Left),
-                                ),
-                        )
-                        .push(
-                            widget::Row::new()
-                                .push(text(fl!("attack")).width(Length::Fill))
-                                .push(
-                                    text(starry_pokemon.pokemon.stats.attack.to_string())
-                                        .align_x(Horizontal::Left),
-                                ),
-                        )
-                        .push(
-                            widget::Row::new()
-                                .push(text(fl!("defense")).width(Length::Fill))
-                                .push(
-                                    text(starry_pokemon.pokemon.stats.defense.to_string())
-                                        .align_x(Horizontal::Left),
-                                ),
-                        )
-                        .push(
-                            widget::Row::new()
-                                .push(text(fl!("sp-a")).width(Length::Fill))
-                                .push(
-                                    text(starry_pokemon.pokemon.stats.sp_attack.to_string())
-                                        .align_x(Horizontal::Left),
-                                ),
-                        )
-                        .push(
-                            widget::Row::new()
-                                .push(text(fl!("sp-d")).width(Length::Fill))
-                                .push(
-                                    text(starry_pokemon.pokemon.stats.sp_defense.to_string())
-                                        .align_x(Horizontal::Left),
-                                ),
-                        )
-                        .push(
-                            widget::Row::new()
-                                .push(text(fl!("spd")).width(Length::Fill))
-                                .push(
-                                    text(starry_pokemon.pokemon.stats.speed.to_string())
-                                        .align_x(Horizontal::Left),
-                                ),
-                        ),
-                )
-                .class(theme::Container::Card)
-                .padding([spacing.space_none, spacing.space_xxs]);
+                let pokemon_stats = BarChart::new()
+                    .column_spacing(3.)
+                    .push(fl!("hp"), starry_pokemon.pokemon.stats.hp as f32)
+                    .push(fl!("attack"), starry_pokemon.pokemon.stats.attack as f32)
+                    .push(fl!("defense"), starry_pokemon.pokemon.stats.defense as f32)
+                    .push(fl!("sp-a"), starry_pokemon.pokemon.stats.sp_attack as f32)
+                    .push(fl!("sp-d"), starry_pokemon.pokemon.stats.sp_defense as f32)
+                    .push(fl!("spd"), starry_pokemon.pokemon.stats.speed as f32);
 
                 let pokemon_first_row = widget::Row::new()
                     .push(pokemon_weight)
