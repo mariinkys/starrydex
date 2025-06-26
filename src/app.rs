@@ -957,7 +957,14 @@ impl StarryDex {
                         .push(fl!("defense"), starry_pokemon.pokemon.stats.defense as f32)
                         .push(fl!("sp-a"), starry_pokemon.pokemon.stats.sp_attack as f32)
                         .push(fl!("sp-d"), starry_pokemon.pokemon.stats.sp_defense as f32)
-                        .push(fl!("spd"), starry_pokemon.pokemon.stats.speed as f32)
+                        .push(fl!("spd"), starry_pokemon.pokemon.stats.speed as f32),
+                    widget::text(format!(
+                        "{}: {}",
+                        fl!("total"),
+                        starry_pokemon.get_total_stats()
+                    ))
+                    .width(Length::Fill)
+                    .align_x(Alignment::Center)
                 ])
                 .padding(10.)
                 .class(theme::Container::Card);
