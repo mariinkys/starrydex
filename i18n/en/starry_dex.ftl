@@ -40,6 +40,7 @@ landing-page-title = All Pokémon
 search = Search
 filter = Filter
 clear-filters = Clear
+page = Page
 
 <#-- Pokemon Details Page -->
 pokemon-page = Pokémon

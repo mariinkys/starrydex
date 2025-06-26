@@ -12,6 +12,7 @@ use cosmic::cosmic_config::{self, CosmicConfigEntry};
 use cosmic::iced::alignment::{Horizontal, Vertical};
 use cosmic::iced::{Alignment, Length, Pixels, Subscription};
 use cosmic::iced_core::text::LineHeight;
+use cosmic::iced_widget::text;
 use cosmic::prelude::*;
 use cosmic::theme;
 use cosmic::widget::about::About;
@@ -495,6 +496,7 @@ impl cosmic::Application for StarryDex {
             Message::ApplyCurrentFilters => {
                 if let Some(core) = &self.starry_core {
                     self.search = String::new();
+                    self.current_page = 0;
 
                     let selected_types_lowercase: HashSet<String> = self
                         .filters
@@ -522,6 +524,7 @@ impl cosmic::Application for StarryDex {
             Message::ClearFilters => {
                 if let Some(core) = &self.starry_core {
                     self.search = String::new();
+                    self.current_page = 0;
                     self.pokemon_list = core.get_pokemon_page(0, self.config.items_per_page);
                     self.filters = Filters {
                         selected_types: HashSet::new(),
@@ -752,6 +755,11 @@ impl StarryDex {
                 widget::button::suggested("Back")
                     .on_press(Message::PaginationActionRequested(PaginationAction::Back)),
             )
+            .push(text(format!(
+                "{} - {}",
+                fl!("page"),
+                (&self.current_page + 1)
+            )))
             .push(
                 widget::button::suggested("Next")
                     .on_press(Message::PaginationActionRequested(PaginationAction::Next)),
