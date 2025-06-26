@@ -350,20 +350,20 @@ impl cosmic::Application for StarryDex {
 
         let content = match self.current_page_status {
             PageStatus::FirstRun => Column::new()
-                //.push(widget::text::text(fl!("downloading-sprites")))
-                //.push(widget::text::text(fl!("estimate")))
-                //.push(widget::text::text(fl!("once-message")))
+                //.push(text(fl!("downloading-sprites")))
+                //.push(text(fl!("estimate")))
+                //.push(text(fl!("once-message")))
                 // TODO: This is temporal because settings do not get saved and are lost upon app restart.
-                .push(widget::text::text("Loading..."))
-                .push(widget::text::text("First load may take a minute"))
-                .push(widget::text::text("It will go faster after the first load"))
+                .push(text("Loading..."))
+                .push(text("First load may take a minute"))
+                .push(text("It will go faster after the first load"))
                 .align_x(Alignment::Center)
                 .width(Length::Fill)
                 .spacing(space_s)
                 .into(),
             PageStatus::Loaded => self.landing(),
             PageStatus::Loading => Column::new()
-                .push(widget::text::text(fl!("loading")))
+                .push(text(fl!("loading")))
                 .align_x(Alignment::Center)
                 .width(Length::Fill)
                 .spacing(space_s)
@@ -705,7 +705,7 @@ impl StarryDex {
                 widget::Column::new()
                     .push(pokemon_image.width(Length::Shrink))
                     .push(
-                        widget::text::text(capitalize_string(&pokemon.name))
+                        text(capitalize_string(&pokemon.name))
                             .width(Length::Shrink)
                             .line_height(LineHeight::Absolute(Pixels::from(15.0))),
                     )
@@ -775,11 +775,9 @@ impl StarryDex {
         widget::Column::new()
             .push(search_row)
             .push(
-                widget::scrollable(
-                    widget::Container::new(pokemon_grid).align_x(Horizontal::Center),
-                )
-                .height(Length::FillPortion(8))
-                .width(Length::Fill),
+                widget::scrollable(widget::container(pokemon_grid).align_x(Horizontal::Center))
+                    .height(Length::FillPortion(8))
+                    .width(Length::Fill),
             )
             .push(pagination_row)
             .width(Length::Fill)
@@ -806,11 +804,11 @@ impl StarryDex {
                         .content_fit(cosmic::iced::ContentFit::Fill)
                 };
 
-                let pokemon_weight = widget::container::Container::new(
+                let pokemon_weight = widget::container(
                     widget::Column::new()
                         .push(widget::text::title3(fl!("weight")))
                         .push(
-                            widget::text::text(format!(
+                            text(format!(
                                 "{} Kg",
                                 scale_numbers(starry_pokemon.pokemon.weight)
                             ))
@@ -822,11 +820,11 @@ impl StarryDex {
                 .class(theme::Container::Card)
                 .padding([spacing.space_none, spacing.space_xxs]);
 
-                let pokemon_height = widget::container::Container::new(
+                let pokemon_height = widget::container(
                     widget::Column::new()
                         .push(widget::text::title3(fl!("height")))
                         .push(
-                            widget::text::text(format!(
+                            text(format!(
                                 "{} m",
                                 scale_numbers(starry_pokemon.pokemon.height)
                             ))
@@ -838,11 +836,11 @@ impl StarryDex {
                 .class(theme::Container::Card)
                 .padding([spacing.space_none, spacing.space_xxs]);
 
-                let pokemon_types = widget::container::Container::new(Column::with_children(
+                let pokemon_types = widget::container(Column::with_children(
                     starry_pokemon.pokemon.types.iter().map(|poke_type| {
                         widget::Row::new()
                             .push(
-                                widget::text(poke_type.to_uppercase())
+                                text(poke_type.to_uppercase())
                                     .width(Length::Fill)
                                     .align_x(Horizontal::Center),
                             )
@@ -853,11 +851,11 @@ impl StarryDex {
                 .class(theme::Container::Card)
                 .padding([spacing.space_none, spacing.space_xxs]);
 
-                let pokemon_abilities = widget::container::Container::new(Column::with_children(
+                let pokemon_abilities = widget::container(Column::with_children(
                     starry_pokemon.pokemon.abilities.iter().map(|poke_ability| {
                         widget::Row::new()
                             .push(
-                                widget::text(poke_ability.to_uppercase())
+                                text(poke_ability.to_uppercase())
                                     .width(Length::Fill)
                                     .align_x(Horizontal::Center),
                             )
@@ -868,57 +866,53 @@ impl StarryDex {
                 .class(theme::Container::Card)
                 .padding([spacing.space_none, spacing.space_xxs]);
 
-                let pokemon_stats = widget::container::Container::new(
+                let pokemon_stats = widget::container(
                     Column::new()
                         .push(
                             widget::Row::new()
-                                .push(widget::text(fl!("hp")).width(Length::Fill))
+                                .push(text(fl!("hp")).width(Length::Fill))
                                 .push(
-                                    widget::text(starry_pokemon.pokemon.stats.hp.to_string())
+                                    text(starry_pokemon.pokemon.stats.hp.to_string())
                                         .align_x(Horizontal::Left),
                                 ),
                         )
                         .push(
                             widget::Row::new()
-                                .push(widget::text(fl!("attack")).width(Length::Fill))
+                                .push(text(fl!("attack")).width(Length::Fill))
                                 .push(
-                                    widget::text(starry_pokemon.pokemon.stats.attack.to_string())
+                                    text(starry_pokemon.pokemon.stats.attack.to_string())
                                         .align_x(Horizontal::Left),
                                 ),
                         )
                         .push(
                             widget::Row::new()
-                                .push(widget::text(fl!("defense")).width(Length::Fill))
+                                .push(text(fl!("defense")).width(Length::Fill))
                                 .push(
-                                    widget::text(starry_pokemon.pokemon.stats.defense.to_string())
+                                    text(starry_pokemon.pokemon.stats.defense.to_string())
                                         .align_x(Horizontal::Left),
                                 ),
                         )
                         .push(
                             widget::Row::new()
-                                .push(widget::text(fl!("sp-a")).width(Length::Fill))
+                                .push(text(fl!("sp-a")).width(Length::Fill))
                                 .push(
-                                    widget::text(
-                                        starry_pokemon.pokemon.stats.sp_attack.to_string(),
-                                    )
-                                    .align_x(Horizontal::Left),
+                                    text(starry_pokemon.pokemon.stats.sp_attack.to_string())
+                                        .align_x(Horizontal::Left),
                                 ),
                         )
                         .push(
                             widget::Row::new()
-                                .push(widget::text(fl!("sp-d")).width(Length::Fill))
+                                .push(text(fl!("sp-d")).width(Length::Fill))
                                 .push(
-                                    widget::text(
-                                        starry_pokemon.pokemon.stats.sp_defense.to_string(),
-                                    )
-                                    .align_x(Horizontal::Left),
+                                    text(starry_pokemon.pokemon.stats.sp_defense.to_string())
+                                        .align_x(Horizontal::Left),
                                 ),
                         )
                         .push(
                             widget::Row::new()
-                                .push(widget::text(fl!("spd")).width(Length::Fill))
+                                .push(text(fl!("spd")).width(Length::Fill))
                                 .push(
-                                    widget::text(starry_pokemon.pokemon.stats.speed.to_string())
+                                    text(starry_pokemon.pokemon.stats.speed.to_string())
                                         .align_x(Horizontal::Left),
                                 ),
                         ),
@@ -953,23 +947,23 @@ impl StarryDex {
                         let children = info.iter().map(|ef| {
                             let mut version_column = widget::Column::new().width(Length::Fill);
                             version_column = version_column.push(
-                                widget::text(capitalize_string(&ef.city))
+                                text(capitalize_string(&ef.city))
                                     .class(theme::Text::Accent)
                                     .size(Pixels::from(15)),
                             );
 
                             for method in &ef.games_method {
-                                version_column = version_column.push(widget::text(method));
+                                version_column = version_column.push(text(method));
                             }
 
                             version_column.into()
                         });
 
-                        widget::container::Container::new(Column::with_children(children))
+                        widget::container(Column::with_children(children))
                             .class(theme::Container::Card)
                             .padding([spacing.space_none, spacing.space_xxs])
                     }
-                    None => widget::Container::new(widget::Text::new(fl!("no-encounter-info")))
+                    None => widget::container(text(fl!("no-encounter-info")))
                         .class(theme::Container::Card),
                 };
 
@@ -1024,7 +1018,7 @@ impl StarryDex {
                         })
                         .into();
 
-                widget::Container::new(checkbox).width(Length::Fill).into()
+                widget::container(checkbox).width(Length::Fill).into()
             })
             .collect();
 
@@ -1054,7 +1048,7 @@ impl StarryDex {
             .width(Length::Fill)
             .push(types_column)
             .push(
-                widget::Container::new(
+                widget::container(
                     widget::button::suggested(fl!("apply-filters"))
                         .on_press(Message::ApplyCurrentFilters)
                         .width(Length::Shrink),
@@ -1064,7 +1058,7 @@ impl StarryDex {
             )
             .spacing(Pixels::from(30.0));
 
-        widget::Container::new(result_column).into()
+        widget::container(result_column).into()
     }
 
     /// Updates the header and window titles.
