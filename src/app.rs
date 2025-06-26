@@ -12,11 +12,11 @@ use cosmic::cosmic_config::{self, CosmicConfigEntry};
 use cosmic::iced::alignment::{Horizontal, Vertical};
 use cosmic::iced::{Alignment, Length, Pixels, Subscription};
 use cosmic::iced_core::text::LineHeight;
-use cosmic::iced_widget::text;
+use cosmic::iced_widget::{Row, text};
 use cosmic::prelude::*;
 use cosmic::theme;
 use cosmic::widget::about::About;
-use cosmic::widget::{self, Column, menu};
+use cosmic::widget::{self, Column, container, menu};
 use rkyv::rancor;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
@@ -914,20 +914,18 @@ impl StarryDex {
                 .class(theme::Container::Card)
                 .padding([spacing.space_none, spacing.space_xxs]);
 
-                let pokemon_types = widget::container(Column::with_children(
-                    starry_pokemon.pokemon.types.iter().map(|poke_type| {
-                        widget::Row::new()
-                            .push(
-                                text(poke_type.to_uppercase())
-                                    .width(Length::Fill)
-                                    .align_x(Horizontal::Center),
-                            )
-                            .width(Length::Fill)
-                            .into()
-                    }),
-                ))
-                .class(theme::Container::Card)
-                .padding([spacing.space_none, spacing.space_xxs]);
+                let mut pokemon_types_row = Row::new().spacing(spacing.space_s);
+                for poke_type in &starry_pokemon.pokemon.types {
+                    pokemon_types_row = pokemon_types_row.push(widget::tooltip(
+                        widget::icon(icon_cache::get_handle_owned(
+                            format!("type-{}", poke_type),
+                            18,
+                        )),
+                        text(capitalize_string(poke_type)),
+                        widget::tooltip::Position::Bottom,
+                    ));
+                }
+                let pokemon_types = container(pokemon_types_row).align_x(Alignment::Center);
 
                 let pokemon_abilities = widget::container(Column::with_children(
                     starry_pokemon.pokemon.abilities.iter().map(|poke_ability| {
@@ -1001,13 +999,13 @@ impl StarryDex {
                 let pokemon_first_row = widget::Row::new()
                     .push(pokemon_weight)
                     .push(pokemon_height)
-                    .push(pokemon_types)
                     .spacing(8.0)
                     .align_y(Alignment::Center);
 
                 let mut result_col = widget::Column::new()
                     .push(page_title)
                     .push(pokemon_image)
+                    .push(pokemon_types)
                     .push(pokemon_first_row)
                     .push(pokemon_abilities)
                     .push(pokemon_stats)
