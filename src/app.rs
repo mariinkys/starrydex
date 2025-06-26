@@ -749,25 +749,28 @@ impl StarryDex {
             .spacing(Pixels::from(spacing.space_xxxs))
             .width(Length::Fill);
 
-        let pagination_row = widget::Row::new()
-            .push(widget::horizontal_space())
-            .push(
-                widget::button::suggested("Back")
-                    .on_press(Message::PaginationActionRequested(PaginationAction::Back)),
-            )
-            .push(text(format!(
-                "{} - {}",
-                fl!("page"),
-                (&self.current_page + 1)
-            )))
-            .push(
-                widget::button::suggested("Next")
-                    .on_press(Message::PaginationActionRequested(PaginationAction::Next)),
-            )
-            .push(widget::horizontal_space())
-            .spacing(Pixels::from(spacing.space_xxxl))
-            .width(Length::Fill)
-            .align_y(Alignment::Center);
+        let pagination_row = widget::container(
+            widget::Row::new()
+                .push(
+                    widget::button::suggested("Back")
+                        .on_press(Message::PaginationActionRequested(PaginationAction::Back)),
+                )
+                .push(text(format!(
+                    "{} - {}",
+                    fl!("page"),
+                    (&self.current_page + 1)
+                )))
+                .push(
+                    widget::button::suggested("Next")
+                        .on_press(Message::PaginationActionRequested(PaginationAction::Next)),
+                )
+                .spacing(Pixels::from(spacing.space_xxl))
+                .width(Length::Shrink)
+                .align_y(Alignment::Center),
+        )
+        .width(Length::Fill)
+        .align_x(Alignment::Center)
+        .align_y(Alignment::Center);
 
         widget::Column::new()
             .push(search_row)
