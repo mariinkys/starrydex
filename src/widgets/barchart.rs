@@ -38,10 +38,8 @@ pub struct BarChart<'a, Message> {
     show_values: bool,
     /// Show labels below bars
     show_labels: bool,
-    /// Minimum bar height (for visual purposes)
+    /// Minimum bar height
     min_bar_height: f32,
-    /// Chart title
-    title: Option<String>,
     _phantom: std::marker::PhantomData<&'a Message>,
 }
 
@@ -71,7 +69,6 @@ impl<'a, Message> BarChart<'a, Message> {
             show_values: true,
             show_labels: true,
             min_bar_height: 5.0,
-            title: None,
             _phantom: std::marker::PhantomData,
         }
     }
@@ -142,12 +139,6 @@ impl<'a, Message> BarChart<'a, Message> {
     /// Set minimum bar height for visual purposes
     pub fn min_bar_height(mut self, height: f32) -> Self {
         self.min_bar_height = height;
-        self
-    }
-
-    /// Set chart title
-    pub fn title(mut self, title: impl Into<String>) -> Self {
-        self.title = Some(title.into());
         self
     }
 
@@ -258,16 +249,12 @@ impl<'a, Message: 'static + Clone> Widget<Message, cosmic::Theme, cosmic::Render
             height: bounds.height - self.padding.vertical(),
         };
 
-        let title_height = if self.title.is_some() { 30.0 } else { 0.0 };
         let label_height = if self.show_labels { 25.0 } else { 0.0 };
         let value_height = if self.show_values { 20.0 } else { 0.0 };
 
-        let chart_height = content_bounds.height
-            - title_height
-            - label_height
-            - value_height
-            - self.row_spacing * 2.0;
-        let chart_y = content_bounds.y + title_height + value_height + self.row_spacing;
+        let chart_height =
+            content_bounds.height - label_height - value_height - self.row_spacing * 2.0;
+        let chart_y = content_bounds.y + value_height + self.row_spacing;
 
         // find max value for scaling
         let max_value = self
@@ -281,26 +268,6 @@ impl<'a, Message: 'static + Clone> Widget<Message, cosmic::Theme, cosmic::Render
         let total_spacing = self.column_spacing * (self.columns.len() - 1) as f32;
         let available_width = content_bounds.width - total_spacing;
         let column_width = available_width / self.columns.len() as f32;
-
-        // Draw title
-        if let Some(ref title) = self.title {
-            renderer.fill_text(
-                cosmic::iced_core::text::Text {
-                    content: title.to_owned(),
-                    bounds: Size::new(content_bounds.width, title_height),
-                    size: cosmic::iced::Pixels(16.0),
-                    line_height: cosmic::iced_core::text::LineHeight::default(),
-                    font: cosmic::font::Font::default(),
-                    horizontal_alignment: Horizontal::Center,
-                    vertical_alignment: Vertical::Center,
-                    shaping: cosmic::iced::advanced::text::Shaping::Advanced,
-                    wrapping: cosmic::iced_core::text::Wrapping::Word,
-                },
-                Point::new(content_bounds.x, content_bounds.y),
-                theme.cosmic().accent_color().into(),
-                bounds,
-            );
-        }
 
         // draw bars, values, and labels
         for (i, column) in self.columns.iter().enumerate() {
