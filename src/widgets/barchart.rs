@@ -345,7 +345,7 @@ impl<'a, Message: 'static + Clone> Widget<Message, cosmic::Theme, cosmic::Render
                         shaping: cosmic::iced::advanced::text::Shaping::Basic,
                         wrapping: cosmic::iced_core::text::Wrapping::Word,
                     },
-                    Point::new(text_x, bar_y - value_height - 2.0),
+                    Point::new(text_x, bar_y - value_height + 10.), // we know value height is 20 if we are here
                     theme.cosmic().on_bg_color().into(),
                     bounds,
                 );
@@ -359,12 +359,12 @@ impl<'a, Message: 'static + Clone> Widget<Message, cosmic::Theme, cosmic::Render
                     cosmic::iced_core::text::Text {
                         content: column.label.clone(),
                         bounds: Size::new(column_width, label_height),
-                        size: cosmic::iced::Pixels(11.0),
-                        line_height: cosmic::iced_core::text::LineHeight::default(),
+                        size: cosmic::iced::Pixels(9.0),
+                        line_height: cosmic::iced_core::text::LineHeight::Relative(1.1),
                         font: cosmic::font::Font::default(),
                         horizontal_alignment: Horizontal::Center,
-                        vertical_alignment: Vertical::Center,
-                        shaping: cosmic::iced::advanced::text::Shaping::Basic,
+                        vertical_alignment: Vertical::Top,
+                        shaping: cosmic::iced::advanced::text::Shaping::Advanced,
                         wrapping: cosmic::iced_core::text::Wrapping::Word,
                     },
                     Point::new(text_x, chart_y + chart_height + self.row_spacing),
