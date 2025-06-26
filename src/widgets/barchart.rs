@@ -304,7 +304,7 @@ impl<'a, Message: 'static + Clone> Widget<Message, cosmic::Theme, cosmic::Render
 
         // draw bars, values, and labels
         for (i, column) in self.columns.iter().enumerate() {
-            let x = content_bounds.x + i as f32 * (column_width + self.column_spacing);
+            let bar_x = content_bounds.x + i as f32 * (column_width + self.column_spacing);
 
             // Calculate bar height (ensure minimum height for visual purposes)
             let normalized_height = (column.value / max_value) * chart_height;
@@ -313,7 +313,7 @@ impl<'a, Message: 'static + Clone> Widget<Message, cosmic::Theme, cosmic::Render
 
             // bar
             let bar_rect = Rectangle {
-                x,
+                x: bar_x,
                 y: bar_y,
                 width: column_width,
                 height: bar_height,
@@ -331,6 +331,8 @@ impl<'a, Message: 'static + Clone> Widget<Message, cosmic::Theme, cosmic::Render
             // value on top of bar
             if self.show_values {
                 let value_text = format!("{:.1}", column.value);
+                let text_x = bar_x + column_width / 2.0;
+
                 renderer.fill_text(
                     cosmic::iced_core::text::Text {
                         content: value_text,
@@ -340,10 +342,10 @@ impl<'a, Message: 'static + Clone> Widget<Message, cosmic::Theme, cosmic::Render
                         font: cosmic::font::Font::default(),
                         horizontal_alignment: Horizontal::Center,
                         vertical_alignment: Vertical::Center,
-                        shaping: cosmic::iced::advanced::text::Shaping::Advanced,
+                        shaping: cosmic::iced::advanced::text::Shaping::Basic,
                         wrapping: cosmic::iced_core::text::Wrapping::Word,
                     },
-                    Point::new(x, bar_y - value_height - 2.0),
+                    Point::new(text_x, bar_y - value_height - 2.0),
                     theme.cosmic().on_bg_color().into(),
                     bounds,
                 );
@@ -351,6 +353,8 @@ impl<'a, Message: 'static + Clone> Widget<Message, cosmic::Theme, cosmic::Render
 
             // label below chart
             if self.show_labels {
+                let text_x = bar_x + column_width / 2.0;
+
                 renderer.fill_text(
                     cosmic::iced_core::text::Text {
                         content: column.label.clone(),
@@ -360,10 +364,10 @@ impl<'a, Message: 'static + Clone> Widget<Message, cosmic::Theme, cosmic::Render
                         font: cosmic::font::Font::default(),
                         horizontal_alignment: Horizontal::Center,
                         vertical_alignment: Vertical::Center,
-                        shaping: cosmic::iced::advanced::text::Shaping::Advanced,
+                        shaping: cosmic::iced::advanced::text::Shaping::Basic,
                         wrapping: cosmic::iced_core::text::Wrapping::Word,
                     },
-                    Point::new(x, chart_y + chart_height + self.row_spacing),
+                    Point::new(text_x, chart_y + chart_height + self.row_spacing),
                     theme.cosmic().on_bg_color().into(),
                     bounds,
                 );
