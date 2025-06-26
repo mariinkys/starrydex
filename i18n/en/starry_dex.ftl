@@ -77,6 +77,7 @@ fairy = Fairy
 
 
 <#-- Pokemon Stats -->
+poke-stats = Pokémon Stats
 hp = HP
 attack = Attack
 defense = Defense

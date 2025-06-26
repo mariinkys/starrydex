@@ -158,14 +158,12 @@ impl<'a, Message> BarChart<'a, Message> {
         } else {
             // Default color palette
             let default_colors = [
-                Color::from_rgb(0.2, 0.6, 0.9), // Blue
-                Color::from_rgb(0.9, 0.6, 0.2), // Orange
-                Color::from_rgb(0.2, 0.9, 0.6), // Green
-                Color::from_rgb(0.9, 0.2, 0.6), // Pink
-                Color::from_rgb(0.6, 0.2, 0.9), // Purple
-                Color::from_rgb(0.9, 0.9, 0.2), // Yellow
-                Color::from_rgb(0.6, 0.9, 0.9), // Cyan
-                Color::from_rgb(0.9, 0.6, 0.6), // Light Red
+                Color::from_rgb8(160, 200, 120), // light green (hp)
+                Color::from_rgb8(229, 80, 80),   // light red (attack)
+                Color::from_rgb8(145, 200, 228), // light blue (defense)
+                Color::from_rgb8(255, 144, 187), // light pink (spa)
+                Color::from_rgb8(165, 148, 249), // light purple (spdef)
+                Color::from_rgb8(255, 235, 85),  // light yellow (spd)
             ];
             default_colors[index % default_colors.len()]
         }
