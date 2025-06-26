@@ -49,6 +49,7 @@ weight = WEIGHT
 show-encounter-details = Show Encounter Details
 no-encounter-info = No encounter info...
 link-more-info = More Info
+pokemon-abilities = Pokémon Abilities
 
 <#-- Filters Page -->
 filters-page = Filters

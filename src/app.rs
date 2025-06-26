@@ -928,20 +928,22 @@ impl StarryDex {
                 }
                 let pokemon_types = container(pokemon_types_row).align_x(Alignment::Center);
 
-                let pokemon_abilities = widget::container(Column::with_children(
-                    starry_pokemon.pokemon.abilities.iter().map(|poke_ability| {
-                        widget::Row::new()
-                            .push(
-                                text(poke_ability.to_uppercase())
-                                    .width(Length::Fill)
-                                    .align_x(Horizontal::Center),
-                            )
+                let mut pokemon_abilities_column = widget::Column::new().push(
+                    widget::text::title3(fl!("pokemon-abilities"))
+                        .width(Length::Fill)
+                        .align_x(Alignment::Center),
+                );
+                for ability in &starry_pokemon.pokemon.abilities {
+                    pokemon_abilities_column = pokemon_abilities_column.push(
+                        text(capitalize_string(ability))
                             .width(Length::Fill)
-                            .into()
-                    }),
-                ))
-                .class(theme::Container::Card)
-                .padding([spacing.space_none, spacing.space_xxs]);
+                            .align_x(Alignment::Center),
+                    );
+                }
+                let pokemon_abilities = widget::container(pokemon_abilities_column)
+                    .width(Length::Fill)
+                    .class(theme::Container::Card)
+                    .padding([spacing.space_none, spacing.space_xxs]);
 
                 let pokemon_stats = widget::container(column![
                     widget::text::title3(fl!("poke-stats"))
