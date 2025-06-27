@@ -55,6 +55,8 @@ pokemon-abilities = Pokémon Abilities
 filters-page = Filters
 apply-filters = Apply Filters
 type-filters = Filter by Type
+stats-filter = Filter by Pokémon Stats
+minimum-poke-stats = Minimum Pokémon Stats
 
 <#-- Pokemon Types -->
 normal = Normal

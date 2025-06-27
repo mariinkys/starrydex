@@ -80,6 +80,8 @@ pub enum Message {
 
     InitializedCore(Result<StarryCore, Error>),
     TypeFilterToggled(bool, PokemonType),
+    StatsFilterToggled(bool),
+    StatsFilterUpdated(i64),
 }
 
 #[derive(Debug, Clone)]
@@ -90,6 +92,7 @@ pub enum PaginationAction {
 
 pub struct Filters {
     pub selected_types: HashSet<PokemonType>,
+    pub total_stats: (bool, i64),
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
@@ -271,6 +274,7 @@ impl cosmic::Application for StarryDex {
             search: String::new(),
             filters: Filters {
                 selected_types: HashSet::new(),
+                total_stats: (false, 50),
             },
             type_filter_mode: vec![fl!("exclusive"), fl!("inclusive")],
             current_page: 0,
@@ -497,26 +501,41 @@ impl cosmic::Application for StarryDex {
             }
             Message::ApplyCurrentFilters => {
                 if let Some(core) = &self.starry_core {
-                    self.search = String::new();
-                    self.current_page = 0;
+                    if !self.filters.selected_types.is_empty() {
+                        self.search = String::new();
+                        self.current_page = 0;
 
-                    let selected_types_lowercase: HashSet<String> = self
-                        .filters
-                        .selected_types
-                        .iter()
-                        .map(|t| t.name.to_lowercase())
-                        .collect();
+                        let selected_types_lowercase: HashSet<String> = self
+                            .filters
+                            .selected_types
+                            .iter()
+                            .map(|t| t.name.to_lowercase())
+                            .collect();
 
-                    match self.config.type_filtering_mode {
-                        TypeFilteringMode::Inclusive => {
-                            // Ej: If fire and ice are selected it will show fire pokemons and ice pokemons
-                            self.pokemon_list =
-                                core.filter_pokemon_inclusive(&selected_types_lowercase);
+                        match self.config.type_filtering_mode {
+                            TypeFilteringMode::Inclusive => {
+                                // Ej: If fire and ice are selected it will show fire pokemons and ice pokemons
+                                self.pokemon_list =
+                                    core.filter_pokemon_inclusive(&selected_types_lowercase);
+                            }
+                            TypeFilteringMode::Exclusive => {
+                                // Ej: If fire and ice are selected it will show pokemons that are both fire and ice types
+                                self.pokemon_list =
+                                    core.filter_pokemon_exclusive(&selected_types_lowercase);
+                            }
                         }
-                        TypeFilteringMode::Exclusive => {
-                            // Ej: If fire and ice are selected it will show pokemons that are both fire and ice types
+                    }
+
+                    // Apply total stats filter
+                    if self.filters.total_stats.0 && self.filters.total_stats.1 > 0 {
+                        if self.filters.selected_types.is_empty() {
                             self.pokemon_list =
-                                core.filter_pokemon_exclusive(&selected_types_lowercase);
+                                core.filter_pokemon_stats(self.filters.total_stats.1);
+                        } else {
+                            self.pokemon_list = core.filter_pokemon_stats_with_list(
+                                &self.pokemon_list,
+                                self.filters.total_stats.1,
+                            );
                         }
                     }
 
@@ -530,6 +549,7 @@ impl cosmic::Application for StarryDex {
                     self.pokemon_list = core.get_pokemon_page(0, self.config.items_per_page);
                     self.filters = Filters {
                         selected_types: HashSet::new(),
+                        total_stats: (false, 50),
                     };
                     self.current_page_status = PageStatus::Loaded;
                 }
@@ -568,7 +588,10 @@ impl cosmic::Application for StarryDex {
             Message::PaginationActionRequested(action) => match &action {
                 PaginationAction::Next => {
                     if let Some(core) = &self.starry_core {
-                        if self.search.is_empty() && self.filters.selected_types.is_empty() {
+                        if self.search.is_empty()
+                            && self.filters.selected_types.is_empty()
+                            && !self.filters.total_stats.0
+                        {
                             let new_list = core.get_pokemon_page(
                                 (self.current_page + 1) * self.config.items_per_page,
                                 self.config.items_per_page,
@@ -583,7 +606,10 @@ impl cosmic::Application for StarryDex {
                 PaginationAction::Back => {
                     if self.current_page >= 1 {
                         if let Some(core) = &self.starry_core {
-                            if self.search.is_empty() && self.filters.selected_types.is_empty() {
+                            if self.search.is_empty()
+                                && self.filters.selected_types.is_empty()
+                                && !self.filters.total_stats.0
+                            {
                                 let new_list = core.get_pokemon_page(
                                     (self.current_page - 1) * self.config.items_per_page,
                                     self.config.items_per_page,
@@ -655,6 +681,12 @@ impl cosmic::Application for StarryDex {
                     }
                 }
             },
+            Message::StatsFilterToggled(new_value) => {
+                self.filters.total_stats.0 = new_value;
+            }
+            Message::StatsFilterUpdated(new_value) => {
+                self.filters.total_stats.1 = new_value;
+            }
         }
         Task::none()
     }
@@ -1092,9 +1124,35 @@ impl StarryDex {
             types_column = types_column.push(current_row);
         }
 
+        let poke_stats_row = widget::Row::new()
+            .push(
+                widget::Checkbox::new(fl!("stats-filter"), self.filters.total_stats.0)
+                    .on_toggle(Message::StatsFilterToggled)
+                    .width(Length::Fill),
+            )
+            .push(
+                column![
+                    text(format!(
+                        "{}: {}",
+                        fl!("minimum-poke-stats"),
+                        &self.filters.total_stats.1
+                    )),
+                    widget::slider(
+                        0.0..=800.0,
+                        self.filters.total_stats.1 as f64,
+                        move |new_value| Message::StatsFilterUpdated(new_value as i64),
+                    )
+                    .step(10.0)
+                ]
+                .spacing(2.),
+            )
+            .align_y(Alignment::Center)
+            .width(Length::Fill);
+
         let result_column = widget::Column::new()
             .width(Length::Fill)
             .push(types_column)
+            .push(poke_stats_row)
             .push(
                 widget::container(
                     widget::button::suggested(fl!("apply-filters"))

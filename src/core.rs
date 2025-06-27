@@ -259,6 +259,65 @@ impl StarryCore {
         }
     }
 
+    /// Filter the provided Pokémon list by pokémon that have at least X total_power
+    pub fn filter_pokemon_stats_with_list(
+        &self,
+        pokemon_list: &[PokemonInfo],
+        total_power: i64,
+    ) -> Vec<PokemonInfo> {
+        pokemon_list
+            .iter()
+            .filter(|pokemon_info| {
+                if let Some(data) = &self.inner.pokemon_data {
+                    if let Some(archived_pokemon) = data.get(&pokemon_info.id.into()) {
+                        if let Ok(pokemon) =
+                            rkyv::deserialize::<StarryPokemon, rancor::Error>(archived_pokemon)
+                        {
+                            pokemon.get_total_stats() >= total_power
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            })
+            .cloned()
+            .collect()
+    }
+
+    /// Filter by pokémon that have at least X total_power
+    pub fn filter_pokemon_stats(&self, total_power: i64) -> Vec<PokemonInfo> {
+        if let Some(data) = &self.inner.pokemon_data {
+            data.iter()
+                .filter_map(|(id, archived_pokemon)| {
+                    if let Ok(pokemon) =
+                        rkyv::deserialize::<StarryPokemon, rancor::Error>(archived_pokemon)
+                    {
+                        if pokemon.get_total_stats() >= total_power {
+                            Some(PokemonInfo {
+                                id: id.to_native(),
+                                name: pokemon.pokemon.name.as_str().to_string(),
+                                sprite_path: pokemon
+                                    .sprite_path
+                                    .as_ref()
+                                    .map(|s| s.as_str().to_string()),
+                            })
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        } else {
+            Vec::new()
+        }
+    }
+
     fn save_to_file(pokemons: BTreeMap<i64, StarryPokemon>) -> Result<(), Error> {
         let cache_dir = dirs::data_dir().unwrap().join(APP_ID);
 
