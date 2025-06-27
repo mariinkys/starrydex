@@ -1016,12 +1016,11 @@ impl StarryDex {
                         .class(theme::Container::Card),
                 };
 
-                let link = widget::button::link(fl!("link-more-info")).on_press(
-                    Message::LaunchUrl(format!(
+                let link = widget::button::link(format!("{} (Bulbapedia)", fl!("link-more-info")))
+                    .on_press(Message::LaunchUrl(format!(
                         "https://bulbapedia.bulbagarden.net/w/index.php?search={}",
                         &starry_pokemon.pokemon.name
-                    )),
-                );
+                    )));
 
                 if starry_pokemon.encounter_info.is_some()
                     && !starry_pokemon.encounter_info.clone().unwrap().is_empty()
