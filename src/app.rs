@@ -576,7 +576,7 @@ impl cosmic::Application for StarryDex {
 
                     let data_dir = dirs::data_dir().unwrap().join(Self::APP_ID);
                     if let Err(e) = remove_dir_contents(&data_dir) {
-                        eprintln!("Error deleting cache: {}", e);
+                        eprintln!("Error deleting cache: {e}");
                     }
 
                     return cosmic::app::Task::perform(
@@ -724,7 +724,7 @@ impl StarryDex {
                 )
                 .add(
                     widget::settings::item::builder(fl!("pokemon-per-row"))
-                        .description(format!("{}", current_per_row_value))
+                        .description(format!("{current_per_row_value}"))
                         .control(
                             widget::slider(1..=10, current_per_row_value, move |new_value| {
                                 Message::UpdateConfig(Config {
@@ -740,7 +740,7 @@ impl StarryDex {
                 )
                 .add(
                     widget::settings::item::builder(fl!("pokemon-per-page"))
-                        .description(format!("{}", current_per_page_value))
+                        .description(format!("{current_per_page_value}"))
                         .control(
                             widget::slider(10..=1500, current_per_page_value, move |new_value| {
                                 Message::UpdateConfig(Config {
@@ -953,7 +953,7 @@ impl StarryDex {
                 for poke_type in &starry_pokemon.pokemon.types {
                     pokemon_types_row = pokemon_types_row.push(widget::tooltip(
                         widget::icon(icon_cache::get_handle_owned(
-                            format!("type-{}", poke_type),
+                            format!("type-{poke_type}"),
                             18,
                         )),
                         text(capitalize_string(poke_type)),

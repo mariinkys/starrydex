@@ -102,7 +102,7 @@ impl StarryCore {
 
         println!("Downloading Sprites");
         if let Err(e) = inner.client.download_all_pokemon_sprites().await {
-            eprintln!("Error downloading sprites: {}", e);
+            eprintln!("Error downloading sprites: {e}");
         }
 
         Ok(())
@@ -528,7 +528,7 @@ impl StarryApi {
 
         for result in results {
             if let Err(e) = result {
-                eprintln!("Error downloading sprite: {}", e);
+                eprintln!("Error downloading sprite: {e}");
             }
         }
 
@@ -551,7 +551,7 @@ async fn download_image(
         std::fs::create_dir_all(&resources_path).expect("Failed to create the resources path");
     }
 
-    let image_filename = format!("{}_front.png", pokemon_name);
+    let image_filename = format!("{pokemon_name}_front.png");
     let image_path = resources_path.join(&pokemon_name).join(&image_filename);
 
     // Check if file already exists
