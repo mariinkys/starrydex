@@ -24,7 +24,8 @@ impl Debug for StarryPokemon {
 impl StarryPokemon {
     /// Returns the total value of all the stats of the Pokémon
     pub fn get_total_stats(&self) -> i64 {
-        self.pokemon.stats.attack
+        self.pokemon.stats.hp
+            + self.pokemon.stats.attack
             + self.pokemon.stats.defense
             + self.pokemon.stats.sp_attack
             + self.pokemon.stats.sp_defense
