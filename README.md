@@ -24,9 +24,6 @@
 > [!TIP]
 > The application can work offline after initial setup is completed.
 
-> [!CAUTION]
-> Right now the application configuration does not get saved and it's lost upon application restart.
-
 ## Install
 
 To install your COSMIC application, you will need [just](https://github.com/casey/just), if you're on Pop!\_OS, you can install it with the following command:
