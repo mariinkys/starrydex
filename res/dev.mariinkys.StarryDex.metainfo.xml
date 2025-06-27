@@ -65,6 +65,19 @@
     </keywords>
 
     <releases>
+        <release version="0.2.6" date="2025-06-27">
+            <description>
+                <p>Allow filtering by Pokémon total stats</p>
+                <p>Add total stats count to Pokémon details page</p>
+                <p>Improved overall design of the application with new icons</p>
+                <p>Pokémon types are now displayed as a nice icon below the Pokémon</p>
+                <p>Pokémon stats are now displayed with a nice bar chart instead of plain text</p>
+                <p>Allow switching detail Pokémon from the details page</p>
+                <p>Improved behavior on smaller screens</p>
+                <p>General bug fixes and improvements</p>
+                <p>Updated dependencies</p>
+            </description>
+        </release>
         <release version="0.2.5" date="2025-06-25">
             <description>
                 <p>Complete backend rewrite featuring many improvements</p>
