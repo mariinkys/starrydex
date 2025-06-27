@@ -47,11 +47,14 @@ weight = PESO
 show-encounter-details = Detalles de encuentro
 no-encounter-info = No hay detalles de encuentro...
 link-more-info = Más Información
+pokemon-abilities = Habilidades
 
 <#-- Filters Page -->
 filters-page = Filtros
 apply-filters = Aplicar Filtros
 type-filters = Fitrar por Tipo
+stats-filter = Filterar por Estadísticas
+minimum-poke-stats = Estadísticas Mínimas
 
 <#-- Pokemon Types -->
 normal = Normal
@@ -75,6 +78,7 @@ fairy = Hada
 
 
 <#-- Pokemon Stats -->
+poke-stats = Estadísticas del Pokémon
 hp = Vida
 attack = Ataque
 defense = Defensa
