@@ -57,6 +57,7 @@ apply-filters = Apply Filters
 type-filters = Filter by Type
 stats-filter = Filter by Pokémon Stats
 minimum-poke-stats = Minimum Pokémon Stats
+enabled = Enabled
 
 <#-- Pokemon Types -->
 normal = Normal

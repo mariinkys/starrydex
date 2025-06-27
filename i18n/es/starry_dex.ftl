@@ -55,6 +55,7 @@ apply-filters = Aplicar Filtros
 type-filters = Fitrar por Tipo
 stats-filter = Filterar por Estadísticas
 minimum-poke-stats = Estadísticas Mínimas
+enabled = Enabled
 
 <#-- Pokemon Types -->
 normal = Normal

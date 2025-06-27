@@ -685,7 +685,9 @@ impl cosmic::Application for StarryDex {
                 self.filters.total_stats.0 = new_value;
             }
             Message::StatsFilterUpdated(new_value) => {
-                self.filters.total_stats.1 = new_value;
+                if self.filters.total_stats.0 {
+                    self.filters.total_stats.1 = new_value;
+                }
             }
         }
         Task::none()
@@ -1124,35 +1126,38 @@ impl StarryDex {
             types_column = types_column.push(current_row);
         }
 
-        let poke_stats_row = widget::Row::new()
-            .push(
-                widget::Checkbox::new(fl!("stats-filter"), self.filters.total_stats.0)
-                    .on_toggle(Message::StatsFilterToggled)
-                    .width(Length::Fill),
-            )
-            .push(
-                column![
-                    text(format!(
-                        "{}: {}",
-                        fl!("minimum-poke-stats"),
-                        &self.filters.total_stats.1
-                    )),
-                    widget::slider(
-                        0.0..=800.0,
-                        self.filters.total_stats.1 as f64,
-                        move |new_value| Message::StatsFilterUpdated(new_value as i64),
-                    )
-                    .step(10.0)
-                ]
-                .spacing(2.),
-            )
-            .align_y(Alignment::Center)
-            .width(Length::Fill);
+        let poke_stats_column = column![
+            widget::text::title3(fl!("stats-filter")),
+            widget::Row::new()
+                .push(
+                    widget::Checkbox::new(fl!("enabled"), self.filters.total_stats.0)
+                        .on_toggle(Message::StatsFilterToggled)
+                        .width(Length::Fill),
+                )
+                .push(
+                    column![
+                        text(format!(
+                            "{}: {}",
+                            fl!("minimum-poke-stats"),
+                            &self.filters.total_stats.1
+                        )),
+                        widget::slider(
+                            0.0..=800.0,
+                            self.filters.total_stats.1 as f64,
+                            move |new_value| Message::StatsFilterUpdated(new_value as i64),
+                        )
+                        .step(10.0)
+                    ]
+                    .spacing(2.),
+                )
+                .align_y(Alignment::Center)
+                .width(Length::Fill)
+        ];
 
         let result_column = widget::Column::new()
             .width(Length::Fill)
             .push(types_column)
-            .push(poke_stats_row)
+            .push(poke_stats_column)
             .push(
                 widget::container(
                     widget::button::suggested(fl!("apply-filters"))
@@ -1162,7 +1167,7 @@ impl StarryDex {
                 .width(Length::Fill)
                 .align_x(Horizontal::Center),
             )
-            .spacing(Pixels::from(30.0));
+            .spacing(15.);
 
         widget::container(result_column).into()
     }
