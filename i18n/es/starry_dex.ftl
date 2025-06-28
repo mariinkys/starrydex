@@ -48,6 +48,7 @@ show-encounter-details = Detalles de encuentro
 no-encounter-info = No hay detalles de encuentro...
 link-more-info = Más Información
 pokemon-abilities = Habilidades
+no-flavor-text = Sin descripción...
 
 <#-- Filters Page -->
 filters-page = Filtros

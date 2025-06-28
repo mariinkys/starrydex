@@ -1011,6 +1011,16 @@ impl StarryDex {
                 .padding(10.)
                 .class(theme::Container::Card);
 
+                let pokemon_flavor_text = if let Some(specie_info) = &starry_pokemon.specie {
+                    widget::text::body(specie_info.flavor_text.clone().unwrap_or_default())
+                        .align_x(Alignment::Center)
+                        .width(Length::Fill)
+                } else {
+                    widget::text::body(fl!("no-flavor-text"))
+                        .align_x(Alignment::Center)
+                        .width(Length::Fill)
+                };
+
                 let pokemon_first_row = widget::Row::new()
                     .push(pokemon_weight)
                     .push(pokemon_height)
@@ -1021,6 +1031,7 @@ impl StarryDex {
                     .push(page_title)
                     .push(pokemon_image)
                     .push(pokemon_types)
+                    .push(pokemon_flavor_text)
                     .push(pokemon_first_row)
                     .push(pokemon_abilities)
                     .push(pokemon_stats)

@@ -11,7 +11,10 @@ use rustemon::client::{
 use tokio::sync::Semaphore;
 
 use crate::{
-    entities::{PokemonInfo, StarryPokemon, StarryPokemonData, StarryPokemonEncounterInfo},
+    entities::{
+        PokemonInfo, StarryPokemon, StarryPokemonData, StarryPokemonEncounterInfo,
+        StarryPokemonSpecie,
+    },
     utils::{capitalize_string, parse_pokemon_stats},
 };
 use futures::StreamExt;
@@ -420,6 +423,8 @@ impl StarryApi {
         let encounter_info =
             rustemon::pokemon::pokemon::encounters::get_by_id(pokemon.id, client).await?;
 
+        let specie_info = rustemon::pokemon::pokemon_species::get_by_name(name, client).await;
+
         let resources_path = dirs::data_dir()
             .unwrap()
             .join(APP_ID)
@@ -488,8 +493,32 @@ impl StarryApi {
             })
             .collect();
 
+        // Parse specie info
+        let starry_specie_info = if let Ok(specie_info) = specie_info {
+            Some(StarryPokemonSpecie {
+                evolution_chain_url: specie_info.evolution_chain.as_ref().map(|x| x.url.clone()),
+                flavor_text: specie_info
+                    .flavor_text_entries
+                    .iter()
+                    .find(|x| x.language.name == "en")
+                    .map(|x| {
+                        x.flavor_text
+                            .chars()
+                            .map(|c| if c.is_control() { ' ' } else { c })
+                            .collect::<String>()
+                            .split_whitespace()
+                            .collect::<Vec<&str>>()
+                            .join(" ")
+                    }),
+                generation: specie_info.generation.name,
+            })
+        } else {
+            None
+        };
+
         Ok(StarryPokemon {
             pokemon: starry_pokemon_data,
+            specie: starry_specie_info,
             sprite_path: image_path,
             encounter_info: Some(starry_encounter_info),
         })
