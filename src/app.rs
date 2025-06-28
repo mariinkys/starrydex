@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-use crate::config::{AppTheme, Config, TypeFilteringMode};
+use crate::config::{AppTheme, StarryConfig, TypeFilteringMode};
 use crate::core::StarryCore;
-use crate::entities::{PokemonInfo, StarryPokemon};
+use crate::entities::{PokemonInfo, PokemonType, StarryPokemon};
 use crate::image_cache::ImageCache;
 use crate::utils::{capitalize_string, remove_dir_contents, scale_numbers};
 use crate::widgets::barchart::BarChart;
 use crate::{fl, icon_cache};
 use anywho::Error;
 use cosmic::app::context_drawer;
-use cosmic::cosmic_config::{self, CosmicConfigEntry};
 use cosmic::iced::alignment::{Horizontal, Vertical};
 use cosmic::iced::{Alignment, Length, Pixels, Subscription};
 use cosmic::iced_core::text::LineHeight;
@@ -23,7 +22,6 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 
 const REPOSITORY: &str = "https://github.com/mariinkys/starrydex";
-//const APP_ICON: &[u8] = include_bytes!("../res/icons/hicolor/256x256/apps/dev.mariinkys.StarryDex.svg");
 
 /// The application model stores app-specific state used to describe its interface and
 /// drive its logic.
@@ -36,8 +34,10 @@ pub struct StarryDex {
     context_page: ContextPage,
     /// Key bindings for the application's menu bar.
     key_binds: HashMap<menu::KeyBind, MenuAction>,
+    /// Application configuration handler
+    config_handler: Option<cosmic::cosmic_config::Config>,
     /// Configuration data that persists between application runs.
-    config: Config,
+    config: StarryConfig,
     /// Application Themes
     app_themes: Vec<String>,
     // Core StarryDex Client
@@ -65,7 +65,7 @@ pub struct StarryDex {
 pub enum Message {
     LaunchUrl(String),
     ToggleContextPage(ContextPage),
-    UpdateConfig(Config),
+    UpdateConfig(StarryConfig),
     UpdateTheme(usize),
     UpdateTypeFilterMode(usize),
 
@@ -84,100 +84,17 @@ pub enum Message {
     StatsFilterUpdated(i64),
 }
 
+/// Identifies an action related to Pagination
 #[derive(Debug, Clone)]
 pub enum PaginationAction {
     Next,
     Back,
 }
 
+/// Different filters you can apply to the Pokémon List
 pub struct Filters {
     pub selected_types: HashSet<PokemonType>,
     pub total_stats: (bool, i64),
-}
-
-#[derive(Debug, Clone, Eq, Hash, PartialEq)]
-pub struct PokemonType {
-    pub display_name: String,
-    pub name: String,
-}
-
-impl PokemonType {
-    pub fn get_all() -> Vec<PokemonType> {
-        vec![
-            PokemonType {
-                display_name: fl!("normal"),
-                name: String::from("normal"),
-            },
-            PokemonType {
-                display_name: fl!("fire"),
-                name: String::from("fire"),
-            },
-            PokemonType {
-                display_name: fl!("water"),
-                name: String::from("water"),
-            },
-            PokemonType {
-                display_name: fl!("electric"),
-                name: String::from("electric"),
-            },
-            PokemonType {
-                display_name: fl!("grass"),
-                name: String::from("grass"),
-            },
-            PokemonType {
-                display_name: fl!("ice"),
-                name: String::from("ice"),
-            },
-            PokemonType {
-                display_name: fl!("fighting"),
-                name: String::from("fighting"),
-            },
-            PokemonType {
-                display_name: fl!("poison"),
-                name: String::from("poison"),
-            },
-            PokemonType {
-                display_name: fl!("ground"),
-                name: String::from("ground"),
-            },
-            PokemonType {
-                display_name: fl!("flying"),
-                name: String::from("flying"),
-            },
-            PokemonType {
-                display_name: fl!("psychic"),
-                name: String::from("psychic"),
-            },
-            PokemonType {
-                display_name: fl!("bug"),
-                name: String::from("bug"),
-            },
-            PokemonType {
-                display_name: fl!("rock"),
-                name: String::from("rock"),
-            },
-            PokemonType {
-                display_name: fl!("ghost"),
-                name: String::from("ghost"),
-            },
-            PokemonType {
-                display_name: fl!("dragon"),
-                name: String::from("dragon"),
-            },
-            PokemonType {
-                display_name: fl!("dark"),
-                name: String::from("dark"),
-            },
-            PokemonType {
-                display_name: fl!("steel"),
-                name: String::from("steel"),
-            },
-            PokemonType {
-                display_name: fl!("fairy"),
-                name: String::from("fairy"),
-            },
-        ]
-    }
 }
 
 /// Identifies the status of a page in the application.
@@ -194,7 +111,7 @@ impl cosmic::Application for StarryDex {
     type Executor = cosmic::executor::Default;
 
     /// Data that your application receives to its init method.
-    type Flags = ();
+    type Flags = crate::flags::Flags;
 
     /// Messages which the application and its widgets will emit.
     type Message = Message;
@@ -211,15 +128,9 @@ impl cosmic::Application for StarryDex {
     }
 
     /// Initializes the application with any given flags and startup tasks.
-    fn init(
-        core: cosmic::Core,
-        _flags: Self::Flags,
-    ) -> (Self, Task<cosmic::Action<Self::Message>>) {
+    fn init(core: cosmic::Core, flags: Self::Flags) -> (Self, Task<cosmic::Action<Self::Message>>) {
         // Tasks that will get executed on the application init
         let mut tasks = vec![];
-
-        // Controls if it's the first time the application runs on a system
-        let mut first_run_completed = false;
 
         // Application about page
         let about = About::default()
@@ -249,22 +160,8 @@ impl cosmic::Application for StarryDex {
             about,
             context_page: ContextPage::default(),
             key_binds: HashMap::new(),
-            // Optional configuration file for an application.
-            config: cosmic_config::Config::new(Self::APP_ID, Config::VERSION)
-                .map(|context| match Config::get_entry(&context) {
-                    Ok(config) => {
-                        first_run_completed = config.first_run_completed;
-                        config
-                    }
-                    Err((_errors, config)) => {
-                        // for why in errors {
-                        //     tracing::error!(%why, "error loading app config");
-                        // }
-
-                        config
-                    }
-                })
-                .unwrap_or_default(),
+            config_handler: flags.config_handler,
+            config: flags.config,
             app_themes: vec![fl!("match-desktop"), fl!("dark"), fl!("light")],
             starry_core: None,
             selected_pokemon: None,
@@ -281,18 +178,26 @@ impl cosmic::Application for StarryDex {
         };
         // Startup task that sets the window title.
         tasks.push(app.update_title());
+        // Set correct theme on startup
+        tasks.push(cosmic::command::set_theme(app.config.app_theme.theme()));
 
         // Create the directory where all of our application data will exist
         let app_data_dir = dirs::data_dir().unwrap().join(Self::APP_ID);
         std::fs::create_dir_all(&app_data_dir).expect("Failed to create the app data directory");
 
+        // Init application core
         tasks.push(cosmic::app::Task::perform(
             async move { StarryCore::initialize().await },
             |starry_core| cosmic::action::app(Message::InitializedCore(starry_core)),
         ));
 
-        if !first_run_completed {
+        if !app.config.first_run_completed {
             app.current_page_status = PageStatus::FirstRun;
+            if let Some(handler) = &app.config_handler {
+                if let Err(err) = app.config.set_first_run_completed(handler, true) {
+                    eprintln!("{err}")
+                }
+            }
         } else {
             app.current_page_status = PageStatus::Loading;
         }
@@ -356,13 +261,9 @@ impl cosmic::Application for StarryDex {
 
         let content = match self.current_page_status {
             PageStatus::FirstRun => Column::new()
-                //.push(text(fl!("downloading-sprites")))
-                //.push(text(fl!("estimate")))
-                //.push(text(fl!("once-message")))
-                // TODO: This is temporal because settings do not get saved and are lost upon app restart.
-                .push(text("Loading..."))
-                .push(text("First load may take a minute"))
-                .push(text("It will go faster after the first load"))
+                .push(text(fl!("downloading-sprites")))
+                .push(text(fl!("estimate")))
+                .push(text(fl!("once-message")))
                 .align_x(Alignment::Center)
                 .width(Length::Fill)
                 .spacing(space_s)
@@ -393,7 +294,7 @@ impl cosmic::Application for StarryDex {
         Subscription::batch(vec![
             // Watch for application configuration changes.
             self.core()
-                .watch_config::<Config>(Self::APP_ID)
+                .watch_config::<StarryConfig>(Self::APP_ID)
                 .map(|update| {
                     // for why in update.errors {
                     //     tracing::error!(?why, "app config error");
@@ -423,8 +324,8 @@ impl cosmic::Application for StarryDex {
                     self.core.window.show_context = true;
                 }
             }
-            Message::UpdateConfig(config) => {
-                self.config = config;
+            Message::UpdateConfig(new_config) => {
+                self.update_all_config_fields(&new_config);
                 if let Some(core) = &self.starry_core {
                     self.current_page = 0;
                     self.pokemon_list = core.get_pokemon_page(0, self.config.items_per_page);
@@ -432,21 +333,23 @@ impl cosmic::Application for StarryDex {
                 return cosmic::command::set_theme(self.config.app_theme.theme());
             }
             Message::UpdateTheme(index) => {
-                let old_config = self.config.clone();
-
                 let app_theme = match index {
                     1 => AppTheme::Dark,
                     2 => AppTheme::Light,
                     _ => AppTheme::System,
                 };
-                self.config = Config {
-                    first_run_completed: old_config.first_run_completed,
-                    pokemon_per_row: old_config.pokemon_per_row,
-                    type_filtering_mode: old_config.type_filtering_mode,
-                    items_per_page: old_config.items_per_page,
-                    app_theme,
-                };
-                return cosmic::command::set_theme(self.config.app_theme.theme());
+
+                if let Some(handler) = &self.config_handler {
+                    if let Err(err) = self.config.set_app_theme(handler, app_theme) {
+                        eprintln!("{err}");
+                        // even if it fails we update the config (it won't get saved after restart)
+                        let mut old_config = self.config.clone();
+                        old_config.app_theme = app_theme;
+                        self.config = old_config;
+                    }
+
+                    return cosmic::command::set_theme(self.config.app_theme.theme());
+                }
             }
             Message::InitializedCore(core_res) => {
                 match core_res {
@@ -555,19 +458,20 @@ impl cosmic::Application for StarryDex {
                 }
             }
             Message::UpdateTypeFilterMode(index) => {
-                let old_config = self.config.clone();
-
                 let filter_mode = match index {
                     1 => TypeFilteringMode::Inclusive,
                     _ => TypeFilteringMode::Exclusive,
                 };
-                self.config = Config {
-                    first_run_completed: old_config.first_run_completed,
-                    pokemon_per_row: old_config.pokemon_per_row,
-                    items_per_page: old_config.items_per_page,
-                    type_filtering_mode: filter_mode,
-                    app_theme: old_config.app_theme,
-                };
+
+                if let Some(handler) = &self.config_handler {
+                    if let Err(err) = self.config.set_type_filtering_mode(handler, filter_mode) {
+                        eprintln!("{err}");
+                        // even if it fails we update the config (it won't get saved after restart)
+                        let mut old_config = self.config.clone();
+                        old_config.type_filtering_mode = filter_mode;
+                        self.config = old_config;
+                    }
+                }
             }
             Message::DeleteCache => {
                 if self.current_page_status == PageStatus::Loaded {
@@ -708,8 +612,6 @@ impl StarryDex {
             TypeFilteringMode::Exclusive => 0,
         };
 
-        let current_per_row_value = self.config.pokemon_per_row as u16;
-        let current_per_page_value = self.config.items_per_page as u16;
         let old_config = self.config.clone();
 
         widget::settings::view_column(vec![
@@ -726,15 +628,19 @@ impl StarryDex {
                     widget::settings::item::builder(fl!("pokemon-per-row"))
                         .description(format!("{current_per_row_value}"))
                         .control(
-                            widget::slider(1..=10, current_per_row_value, move |new_value| {
-                                Message::UpdateConfig(Config {
-                                    app_theme: old_config.app_theme,
-                                    first_run_completed: old_config.first_run_completed,
-                                    pokemon_per_row: new_value as usize,
-                                    items_per_page: old_config.items_per_page,
-                                    type_filtering_mode: old_config.type_filtering_mode,
-                                })
-                            })
+                            widget::slider(
+                                1..=10,
+                                self.config.pokemon_per_row as u16,
+                                move |new_value| {
+                                    Message::UpdateConfig(StarryConfig {
+                                        app_theme: old_config.app_theme,
+                                        first_run_completed: old_config.first_run_completed,
+                                        pokemon_per_row: new_value as usize,
+                                        items_per_page: old_config.items_per_page,
+                                        type_filtering_mode: old_config.type_filtering_mode,
+                                    })
+                                },
+                            )
                             .step(1u16),
                         ),
                 )
@@ -742,15 +648,19 @@ impl StarryDex {
                     widget::settings::item::builder(fl!("pokemon-per-page"))
                         .description(format!("{current_per_page_value}"))
                         .control(
-                            widget::slider(10..=1500, current_per_page_value, move |new_value| {
-                                Message::UpdateConfig(Config {
-                                    app_theme: old_config.app_theme,
-                                    first_run_completed: old_config.first_run_completed,
-                                    pokemon_per_row: old_config.pokemon_per_row,
-                                    items_per_page: new_value as usize,
-                                    type_filtering_mode: old_config.type_filtering_mode,
-                                })
-                            })
+                            widget::slider(
+                                10..=1500,
+                                self.config.items_per_page as u16,
+                                move |new_value| {
+                                    Message::UpdateConfig(StarryConfig {
+                                        app_theme: old_config.app_theme,
+                                        first_run_completed: old_config.first_run_completed,
+                                        pokemon_per_row: old_config.pokemon_per_row,
+                                        items_per_page: new_value as usize,
+                                        type_filtering_mode: old_config.type_filtering_mode,
+                                    })
+                                },
+                            )
                             .step(10u16),
                         ),
                 )
@@ -1184,15 +1094,52 @@ impl StarryDex {
     pub fn update_title(&mut self) -> Task<cosmic::Action<Message>> {
         let window_title = fl!("app-title");
 
-        // if let Some(page) = self.nav.text(self.nav.active()) {
-        //     window_title.push_str(" — ");
-        //     window_title.push_str(page);
-        // }
-
         if let Some(id) = self.core.main_window_id() {
             self.set_window_title(window_title, id)
         } else {
             Task::none()
+        }
+    }
+
+    fn update_all_config_fields(&mut self, new_config: &StarryConfig) {
+        if let Some(handler) = &self.config_handler {
+            if let Err(err) = self.config.set_app_theme(handler, new_config.app_theme) {
+                eprintln!("{err}");
+                // If for some reason the handler fails we update the config anyways, even if it won't save after restart.
+                self.config = new_config.clone();
+            }
+            if let Err(err) = self
+                .config
+                .set_first_run_completed(handler, new_config.first_run_completed)
+            {
+                eprintln!("{err}");
+                // If for some reason the handler fails we update the config anyways, even if it won't save after restart.
+                self.config = new_config.clone();
+            }
+            if let Err(err) = self
+                .config
+                .set_items_per_page(handler, new_config.items_per_page)
+            {
+                eprintln!("{err}");
+                // If for some reason the handler fails we update the config anyways, even if it won't save after restart.
+                self.config = new_config.clone();
+            }
+            if let Err(err) = self
+                .config
+                .set_pokemon_per_row(handler, new_config.pokemon_per_row)
+            {
+                eprintln!("{err}");
+                // If for some reason the handler fails we update the config anyways, even if it won't save after restart.
+                self.config = new_config.clone();
+            }
+            if let Err(err) = self
+                .config
+                .set_type_filtering_mode(handler, new_config.type_filtering_mode)
+            {
+                eprintln!("{err}");
+                // If for some reason the handler fails we update the config anyways, even if it won't save after restart.
+                self.config = new_config.clone();
+            }
         }
     }
 }

@@ -3,7 +3,9 @@
   "runtime": "org.freedesktop.Platform",
   "runtime-version": "24.08",
   "sdk": "org.freedesktop.Sdk",
-  "sdk-extensions": ["org.freedesktop.Sdk.Extension.rust-stable"],
+  "sdk-extensions": [
+    "org.freedesktop.Sdk.Extension.rust-stable"
+  ],
   "command": "starry-dex",
   "finish-args": [
     "--share=ipc",
@@ -11,7 +13,7 @@
     "--socket=wayland",
     "--device=dri",
     "--share=network",
-    "--filesystem=xdg-config/cosmic:ro",
+    "--filesystem=xdg-config/cosmic:rw",
     "--talk-name=com.system76.CosmicSettingsDaemon"
   ],
   "build-options": {
