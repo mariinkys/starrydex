@@ -626,7 +626,7 @@ impl StarryDex {
                 )
                 .add(
                     widget::settings::item::builder(fl!("pokemon-per-row"))
-                        .description(format!("{current_per_row_value}"))
+                        .description(format!("{}", self.config.pokemon_per_row))
                         .control(
                             widget::slider(
                                 1..=10,
@@ -646,7 +646,7 @@ impl StarryDex {
                 )
                 .add(
                     widget::settings::item::builder(fl!("pokemon-per-page"))
-                        .description(format!("{current_per_page_value}"))
+                        .description(format!("{}", self.config.items_per_page))
                         .control(
                             widget::slider(
                                 10..=1500,
