@@ -626,7 +626,7 @@ impl StarryDex {
                 )
                 .add(
                     widget::settings::item::builder(fl!("pokemon-per-row"))
-                        .description(format!("{}", self.config.pokemon_per_row))
+                        .description(format!("{current_per_row_value}"))
                         .control(
                             widget::slider(
                                 1..=10,
@@ -646,7 +646,7 @@ impl StarryDex {
                 )
                 .add(
                     widget::settings::item::builder(fl!("pokemon-per-page"))
-                        .description(format!("{}", self.config.items_per_page))
+                        .description(format!("{current_per_page_value}"))
                         .control(
                             widget::slider(
                                 10..=1500,
@@ -798,23 +798,31 @@ impl StarryDex {
         let content: widget::Column<_> = match &self.selected_pokemon {
             Some(starry_pokemon) => {
                 let page_title = widget::container(
-                    widget::Row::new()
-                        .push(
-                            widget::button::icon(icon_cache::get_handle(
-                                "go-previous-symbolic",
-                                18,
-                            ))
-                            .on_press(Message::SinglePokemonPagination(PaginationAction::Back)),
-                        )
-                        .push(widget::text::title1(capitalize_string(
-                            starry_pokemon.pokemon.name.as_str(),
-                        )))
-                        .push(
-                            widget::button::icon(icon_cache::get_handle("go-next-symbolic", 18))
+                    column![
+                        widget::Row::new()
+                            .push(
+                                widget::button::icon(icon_cache::get_handle(
+                                    "go-previous-symbolic",
+                                    18,
+                                ))
+                                .on_press(Message::SinglePokemonPagination(PaginationAction::Back)),
+                            )
+                            .push(widget::text::title1(capitalize_string(
+                                starry_pokemon.pokemon.name.as_str(),
+                            )))
+                            .push(
+                                widget::button::icon(icon_cache::get_handle(
+                                    "go-next-symbolic",
+                                    18
+                                ))
                                 .on_press(Message::SinglePokemonPagination(PaginationAction::Next)),
-                        )
-                        .spacing(spacing.space_s)
-                        .align_y(Alignment::Center),
+                            )
+                            .spacing(spacing.space_s)
+                            .align_y(Alignment::Center),
+                        widget::text::title4(format!("#{}", &starry_pokemon.pokemon.id))
+                    ]
+                    .align_x(Alignment::Center)
+                    .width(Length::Fill),
                 )
                 .width(Length::Fill)
                 .align_y(Alignment::Center)
