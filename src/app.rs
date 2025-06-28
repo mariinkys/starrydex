@@ -341,10 +341,14 @@ impl cosmic::Application for StarryDex {
 
                 if let Some(handler) = &self.config_handler {
                     if let Err(err) = self.config.set_app_theme(handler, app_theme) {
-                        eprintln!("{err}")
-                    } else {
-                        return cosmic::command::set_theme(self.config.app_theme.theme());
+                        eprintln!("{err}");
+                        // even if it fails we update the config (it won't get saved after restart)
+                        let mut old_config = self.config.clone();
+                        old_config.app_theme = app_theme;
+                        self.config = old_config;
                     }
+
+                    return cosmic::command::set_theme(self.config.app_theme.theme());
                 }
             }
             Message::InitializedCore(core_res) => {
@@ -461,7 +465,11 @@ impl cosmic::Application for StarryDex {
 
                 if let Some(handler) = &self.config_handler {
                     if let Err(err) = self.config.set_type_filtering_mode(handler, filter_mode) {
-                        eprintln!("{err}")
+                        eprintln!("{err}");
+                        // even if it fails we update the config (it won't get saved after restart)
+                        let mut old_config = self.config.clone();
+                        old_config.type_filtering_mode = filter_mode;
+                        self.config = old_config;
                     }
                 }
             }
@@ -1085,34 +1093,44 @@ impl StarryDex {
         }
     }
 
-    fn update_all_config_fields(&mut self, config: &StarryConfig) {
+    fn update_all_config_fields(&mut self, new_config: &StarryConfig) {
         if let Some(handler) = &self.config_handler {
-            if let Err(err) = self.config.set_app_theme(handler, config.app_theme) {
-                eprintln!("{err}")
+            if let Err(err) = self.config.set_app_theme(handler, new_config.app_theme) {
+                eprintln!("{err}");
+                // If for some reason the handler fails we update the config anyways, even if it won't save after restart.
+                self.config = new_config.clone();
             }
             if let Err(err) = self
                 .config
-                .set_first_run_completed(handler, config.first_run_completed)
+                .set_first_run_completed(handler, new_config.first_run_completed)
             {
-                eprintln!("{err}")
+                eprintln!("{err}");
+                // If for some reason the handler fails we update the config anyways, even if it won't save after restart.
+                self.config = new_config.clone();
             }
             if let Err(err) = self
                 .config
-                .set_items_per_page(handler, config.items_per_page)
+                .set_items_per_page(handler, new_config.items_per_page)
             {
-                eprintln!("{err}")
+                eprintln!("{err}");
+                // If for some reason the handler fails we update the config anyways, even if it won't save after restart.
+                self.config = new_config.clone();
             }
             if let Err(err) = self
                 .config
-                .set_pokemon_per_row(handler, config.pokemon_per_row)
+                .set_pokemon_per_row(handler, new_config.pokemon_per_row)
             {
-                eprintln!("{err}")
+                eprintln!("{err}");
+                // If for some reason the handler fails we update the config anyways, even if it won't save after restart.
+                self.config = new_config.clone();
             }
             if let Err(err) = self
                 .config
-                .set_type_filtering_mode(handler, config.type_filtering_mode)
+                .set_type_filtering_mode(handler, new_config.type_filtering_mode)
             {
-                eprintln!("{err}")
+                eprintln!("{err}");
+                // If for some reason the handler fails we update the config anyways, even if it won't save after restart.
+                self.config = new_config.clone();
             }
         }
     }
