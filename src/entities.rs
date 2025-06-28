@@ -9,6 +9,7 @@ use rkyv::{Archive, Deserialize, Serialize};
 #[rkyv(derive(Debug))]
 pub struct StarryPokemon {
     pub pokemon: StarryPokemonData,
+    pub specie: Option<StarryPokemonSpecie>,
     pub sprite_path: Option<String>,
     pub encounter_info: Option<Vec<StarryPokemonEncounterInfo>>,
 }
@@ -98,4 +99,13 @@ impl Debug for PokemonInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("PokemonInfo").field("id", &self.id).finish()
     }
+}
+
+/// Pokémon specie
+#[derive(Archive, CheckBytes, Serialize, Deserialize)]
+#[rkyv(derive(Debug))]
+pub struct StarryPokemonSpecie {
+    pub evolution_chain_url: Option<String>,
+    pub flavor_text: Option<String>,
+    pub generation: String,
 }
