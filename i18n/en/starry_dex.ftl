@@ -50,6 +50,7 @@ show-encounter-details = Show Encounter Details
 no-encounter-info = No encounter info...
 link-more-info = More Info
 pokemon-abilities = Pokémon Abilities
+no-flavor-text = No flavor text available...
 
 <#-- Filters Page -->
 filters-page = Filters
@@ -89,3 +90,15 @@ defense = Defense
 sp-a = Special Attack
 sp-d = Special Defense
 spd = Speed
+
+<#-- Pokemon Generations -->
+gen-i = Gen I 
+gen-ii = Gen II 
+gen-iii = Gen III
+gen-iv = Gen IV 
+gen-v = Gen V
+gen-vi = Gen VI
+gen-vii = Gen VII
+gen-viii = Gen VIII
+gen-ix = Gen IX 
+unknown = Unknown

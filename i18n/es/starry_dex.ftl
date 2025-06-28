@@ -48,6 +48,7 @@ show-encounter-details = Detalles de encuentro
 no-encounter-info = No hay detalles de encuentro...
 link-more-info = Más Información
 pokemon-abilities = Habilidades
+no-flavor-text = Sin descripción...
 
 <#-- Filters Page -->
 filters-page = Filtros
@@ -77,7 +78,6 @@ dark = Siniestro
 steel = Acero
 fairy = Hada
 
-
 <#-- Pokemon Stats -->
 poke-stats = Estadísticas del Pokémon
 hp = Vida
@@ -86,3 +86,15 @@ defense = Defensa
 sp-a = Ataque Especial
 sp-d = Defensa Especial
 spd = Velocidad
+
+<#-- Pokemon Generations -->
+gen-i = Gen I 
+gen-ii = Gen II 
+gen-iii = Gen III
+gen-iv = Gen IV 
+gen-v = Gen V
+gen-vi = Gen VI
+gen-vii = Gen VII
+gen-viii = Gen VIII
+gen-ix = Gen IX 
+unknown = Desconocida

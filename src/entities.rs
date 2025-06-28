@@ -11,6 +11,7 @@ use crate::fl;
 #[rkyv(derive(Debug))]
 pub struct StarryPokemon {
     pub pokemon: StarryPokemonData,
+    pub specie: Option<StarryPokemonSpecie>,
     pub sprite_path: Option<String>,
     pub encounter_info: Option<Vec<StarryPokemonEncounterInfo>>,
 }
@@ -185,5 +186,65 @@ impl PokemonType {
                 name: String::from("fairy"),
             },
         ]
+    }
+}
+
+/// Pokémon specie
+#[derive(Archive, CheckBytes, Serialize, Deserialize)]
+#[rkyv(derive(Debug))]
+pub struct StarryPokemonSpecie {
+    pub evolution_chain_url: Option<String>,
+    pub flavor_text: Option<String>,
+    pub generation: StarryPokemonGeneration,
+}
+
+#[derive(Archive, Serialize, Deserialize, Default)]
+#[rkyv(derive(Debug))]
+pub enum StarryPokemonGeneration {
+    #[default]
+    Unknown,
+    One,
+    Two,
+    Three,
+    Four,
+    Five,
+    Six,
+    Seven,
+    Eight,
+    Nine,
+}
+
+impl std::fmt::Display for StarryPokemonGeneration {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            StarryPokemonGeneration::Unknown => write!(f, "{}", fl!("unknown")),
+            StarryPokemonGeneration::One => write!(f, "{}", fl!("gen-i")),
+            StarryPokemonGeneration::Two => write!(f, "{}", fl!("gen-ii")),
+            StarryPokemonGeneration::Three => write!(f, "{}", fl!("gen-iii")),
+            StarryPokemonGeneration::Four => write!(f, "{}", fl!("gen-iv")),
+            StarryPokemonGeneration::Five => write!(f, "{}", fl!("gen-v")),
+            StarryPokemonGeneration::Six => write!(f, "{}", fl!("gen-vi")),
+            StarryPokemonGeneration::Seven => write!(f, "{}", fl!("gen-vii")),
+            StarryPokemonGeneration::Eight => write!(f, "{}", fl!("gen-viii")),
+            StarryPokemonGeneration::Nine => write!(f, "{}", fl!("gen-ix")),
+        }
+    }
+}
+
+impl StarryPokemonGeneration {
+    /// Parses a generation name to the StarryPokemonGeneration enum
+    pub fn from_name(name: &str) -> Self {
+        match name.to_lowercase().as_str() {
+            "generation-i" => StarryPokemonGeneration::One,
+            "generation-ii" => StarryPokemonGeneration::Two,
+            "generation-iii" => StarryPokemonGeneration::Three,
+            "generation-iv" => StarryPokemonGeneration::Four,
+            "generation-v" => StarryPokemonGeneration::Five,
+            "generation-vi" => StarryPokemonGeneration::Six,
+            "generation-vii" => StarryPokemonGeneration::Seven,
+            "generation-viii" => StarryPokemonGeneration::Eight,
+            "generation-ix" => StarryPokemonGeneration::Nine,
+            _ => StarryPokemonGeneration::Unknown,
+        }
     }
 }
