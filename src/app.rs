@@ -964,7 +964,7 @@ impl StarryDex {
                     }
 
                     column![
-                        widget::text::title3("Pokémon Evolution Data")
+                        widget::text::title3(fl!("poke-evo-data"))
                             .width(Length::Fill)
                             .align_x(Alignment::Center),
                         container(evo_data_row)
@@ -975,10 +975,10 @@ impl StarryDex {
                     .align_x(Alignment::Center)
                 } else {
                     column![
-                        widget::text::title3("Pokémon Evolution Data")
+                        widget::text::title3(fl!("poke-evo-data"))
                             .width(Length::Fill)
                             .align_x(Alignment::Center),
-                        widget::text("No evolution data available..."),
+                        widget::text(fl!("no-evo-data")),
                     ]
                     .width(Length::Fill)
                     .align_x(Alignment::Center)

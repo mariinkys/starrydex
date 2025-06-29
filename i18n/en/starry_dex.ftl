@@ -102,3 +102,7 @@ gen-vii = Gen VII
 gen-viii = Gen VIII
 gen-ix = Gen IX 
 unknown = Unknown
+
+<#-- Pokemon Evolution Data -->
+poke-evo-data = Pokémon Evolution Data
+no-evo-data = No evolution data available...
