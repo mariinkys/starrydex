@@ -19,9 +19,9 @@
         Embark on your Pokémon journey with StarryDex, a simple Pokédex application.
       </p>
       <ul>
-        <li>Simple Pokédex, access information on all Pokémon species, including stats...</li>
-        <li>Easily find Pokémon by name.</li>
-        <li>Works offline after initial setup is completed.</li>
+        <li>Browse detailed info on all Pokémon species, including stats, evolution requirements, and more.</li>
+        <li>Quickly search Pokémon by name, type, stats, and other filters.</li>
+        <li>Works offline after the initial setup is complete.</li>
       </ul>
     </description>
 
@@ -46,8 +46,8 @@
     </screenshots>
 
     <branding>
-      <color type="primary" scheme_preference="light">#FF0000</color>
-      <color type="primary" scheme_preference="dark">#B30000</color>
+      <color type="primary" scheme_preference="light">#E63946</color>
+      <color type="primary" scheme_preference="dark">#F1C6F5</color>
     </branding>
 
     <categories>
