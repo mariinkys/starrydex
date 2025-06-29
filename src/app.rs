@@ -930,6 +930,64 @@ impl StarryDex {
                 .padding(10.)
                 .class(theme::Container::Card);
 
+                let evolution_data_content = if let Some(specie) = &starry_pokemon.specie
+                    && !specie.evolution_data.is_empty()
+                {
+                    let mut evo_data_row =
+                        widget::Row::new().align_y(Alignment::Center).spacing(5.);
+
+                    for data in &specie.evolution_data {
+                        let pokemon_image = if let Some(path) = &data.sprite_path {
+                            widget::tooltip(
+                                widget::Image::new(path)
+                                    .content_fit(cosmic::iced::ContentFit::Fill),
+                                widget::text(data.name.to_owned()),
+                                widget::tooltip::Position::Top,
+                            )
+                        } else {
+                            widget::tooltip(
+                                widget::Image::new(ImageCache::get("fallback"))
+                                    .content_fit(cosmic::iced::ContentFit::Fill),
+                                widget::text(data.name.to_owned()),
+                                widget::tooltip::Position::Top,
+                            )
+                        };
+
+                        if let Some(n) = &data.needs_to_evolve {
+                            evo_data_row = evo_data_row.push(widget::tooltip(
+                                widget::icon(icon_cache::get_handle("go-next-symbolic", 18)),
+                                widget::text(n.to_owned()),
+                                widget::tooltip::Position::Top,
+                            ));
+                        }
+                        evo_data_row = evo_data_row.push(pokemon_image);
+                    }
+
+                    column![
+                        widget::text::title3("Pokémon Evolution Data")
+                            .width(Length::Fill)
+                            .align_x(Alignment::Center),
+                        container(evo_data_row)
+                            .align_x(Alignment::Center)
+                            .width(Length::Fill),
+                    ]
+                    .width(Length::Fill)
+                    .align_x(Alignment::Center)
+                } else {
+                    column![
+                        widget::text::title3("Pokémon Evolution Data")
+                            .width(Length::Fill)
+                            .align_x(Alignment::Center),
+                        widget::text("No evolution data available..."),
+                    ]
+                    .width(Length::Fill)
+                    .align_x(Alignment::Center)
+                };
+                let evolution_data = widget::container(evolution_data_content)
+                    .align_x(Alignment::Center)
+                    .padding(10.)
+                    .class(theme::Container::Card);
+
                 let pokemon_first_row = widget::Row::new()
                     .push(pokemon_weight)
                     .push(pokemon_height)
@@ -943,6 +1001,7 @@ impl StarryDex {
                     .push(pokemon_first_row)
                     .push(pokemon_abilities)
                     .push(pokemon_stats)
+                    .push(evolution_data)
                     .align_x(Alignment::Center)
                     .spacing(10.0);
 

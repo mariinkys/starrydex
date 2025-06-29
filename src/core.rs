@@ -12,8 +12,8 @@ use tokio::sync::Semaphore;
 
 use crate::{
     entities::{
-        PokemonInfo, StarryPokemon, StarryPokemonData, StarryPokemonEncounterInfo,
-        StarryPokemonGeneration, StarryPokemonSpecie,
+        PokemonInfo, StarryEvolutionData, StarryPokemon, StarryPokemonData,
+        StarryPokemonEncounterInfo, StarryPokemonGeneration, StarryPokemonSpecie,
     },
     utils::{capitalize_string, parse_pokemon_stats},
 };
@@ -426,6 +426,36 @@ impl StarryApi {
 
         let specie_info = rustemon::pokemon::pokemon_species::get_by_name(name, client).await;
 
+        let evolution_info = if let Ok(specie_info) = &specie_info {
+            async {
+                let url = specie_info
+                    .evolution_chain
+                    .as_ref()
+                    .ok_or_else(|| anywho!("No evolution chain data"))?
+                    .url
+                    .clone();
+
+                let id: i64 = url
+                    .trim_end_matches('/')
+                    .split('/')
+                    .next_back()
+                    .ok_or_else(|| anywho!("Invalid URL format"))?
+                    .parse()
+                    .map_err(|_| anywho!("Could not parse evolution chain ID"))?;
+
+                if id == 0 {
+                    return Err(anywho!("Invalid evolution chain ID"));
+                }
+
+                rustemon::evolution::evolution_chain::get_by_id(id, client)
+                    .await
+                    .map_err(|err| anywho!("{err}"))
+            }
+            .await
+        } else {
+            Err(anywho!("Species info not available"))
+        };
+
         let resources_path = dirs::data_dir()
             .unwrap()
             .join(APP_ID)
@@ -512,6 +542,11 @@ impl StarryApi {
                             .join(" ")
                     }),
                 generation: StarryPokemonGeneration::from_name(&specie_info.generation.name),
+                evolution_data: if let Ok(evolution_info) = evolution_info {
+                    extract_evolution_data_from_chain_link(&evolution_info.chain, &resources_path)
+                } else {
+                    Vec::new()
+                },
             })
         } else {
             None
@@ -604,4 +639,108 @@ async fn download_image(
             response.status()
         ))
     }
+}
+
+// Extracts the evolution data from ChainLink
+fn extract_evolution_data_from_chain_link(
+    chain_link: &rustemon::model::evolution::ChainLink,
+    resources_path: &std::path::Path,
+) -> Vec<StarryEvolutionData> {
+    let mut evolution_data = Vec::new();
+
+    let sprite_path = resources_path
+        .join(&chain_link.species.name)
+        .join(format!("{}_front.png", chain_link.species.name))
+        .to_str()
+        .map(String::from);
+
+    evolution_data.push(StarryEvolutionData {
+        id: chain_link
+            .species
+            .url
+            .trim_end_matches('/')
+            .split('/')
+            .next_back()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0),
+        name: capitalize_string(&chain_link.species.name),
+        sprite_path: sprite_path.clone(),
+        needs_to_evolve: None, // base form doesn't need requirements
+    });
+
+    // add evolved forms
+    for evolution in &chain_link.evolves_to {
+        let mut evolved_data = extract_evolution_data_from_chain_link(evolution, resources_path);
+
+        // set the evolution requirement for the first Pokémon in this evolution line
+        if let Some(first_evolution) = evolved_data.first_mut() {
+            first_evolution.needs_to_evolve =
+                extract_evolution_requirement(&evolution.evolution_details);
+        }
+
+        evolution_data.extend(evolved_data);
+    }
+
+    evolution_data
+}
+
+// Extracts evolution requirements from evolution details
+fn extract_evolution_requirement(
+    evolution_details: &[rustemon::model::evolution::EvolutionDetail],
+) -> Option<String> {
+    if evolution_details.is_empty() {
+        return None;
+    }
+
+    let detail = &evolution_details[0];
+
+    // level requirement
+    if let Some(min_level) = detail.min_level {
+        return Some(format!("Level {min_level}"));
+    }
+
+    // item requirement
+    if let Some(ref item) = detail.item {
+        return Some(capitalize_string(&item.name));
+    }
+
+    // held item requirement
+    if let Some(ref held_item) = detail.held_item {
+        return Some(format!("Holding {}", capitalize_string(&held_item.name)));
+    }
+
+    // happiness requirement
+    if let Some(min_happiness) = detail.min_happiness {
+        return Some(format!("Happiness {min_happiness}"));
+    }
+
+    // time of day requirement
+    if !detail.time_of_day.is_empty() {
+        return Some(format!(
+            "During {}",
+            capitalize_string(detail.time_of_day.as_str())
+        ));
+    }
+
+    // location requirement
+    if let Some(ref location) = detail.location {
+        return Some(format!("At {}", capitalize_string(&location.name)));
+    }
+
+    // known move requirement
+    if let Some(ref known_move) = detail.known_move {
+        return Some(format!("Knowing {}", capitalize_string(&known_move.name)));
+    }
+
+    // relative physical stats
+    if let Some(relative_physical_stats) = detail.relative_physical_stats {
+        match relative_physical_stats {
+            1 => return Some("Attack > Defense".to_string()),
+            -1 => return Some("Defense > Attack".to_string()),
+            0 => return Some("Attack = Defense".to_string()),
+            _ => {}
+        }
+    }
+
+    None
 }

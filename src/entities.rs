@@ -196,6 +196,7 @@ pub struct StarryPokemonSpecie {
     pub evolution_chain_url: Option<String>,
     pub flavor_text: Option<String>,
     pub generation: StarryPokemonGeneration,
+    pub evolution_data: Vec<StarryEvolutionData>,
 }
 
 #[derive(Archive, Serialize, Deserialize, Default)]
@@ -247,4 +248,14 @@ impl StarryPokemonGeneration {
             _ => StarryPokemonGeneration::Unknown,
         }
     }
+}
+
+/// Pokémon evolution data
+#[derive(Archive, CheckBytes, Serialize, Deserialize, Debug)]
+#[rkyv(derive(Debug))]
+pub struct StarryEvolutionData {
+    pub id: i64,
+    pub name: String,
+    pub sprite_path: Option<String>,
+    pub needs_to_evolve: Option<String>,
 }
