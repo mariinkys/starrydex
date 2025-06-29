@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 const CONFIG_VERSION: u64 = 1;
 
+/// Contains the configurations fields of the application
 #[derive(Debug, Clone, CosmicConfigEntry, Eq, PartialEq)]
 pub struct StarryConfig {
     pub app_theme: AppTheme,

@@ -2,7 +2,9 @@
 
 use crate::config::{AppTheme, StarryConfig, TypeFilteringMode};
 use crate::core::StarryCore;
-use crate::entities::{PokemonInfo, PokemonType, StarryPokemon};
+use crate::entities::{
+    pokemon_info::PokemonInfo, pokemon_type::PokemonType, starry_pokemon::StarryPokemon,
+};
 use crate::image_cache::ImageCache;
 use crate::utils::{capitalize_string, remove_dir_contents, scale_numbers};
 use crate::widgets::barchart::BarChart;

@@ -2,6 +2,7 @@ use cosmic::cosmic_config;
 
 use crate::config::StarryConfig;
 
+/// Flags given to our COSMIC application to use in it's "init" function.
 #[derive(Clone, Debug)]
 pub struct Flags {
     pub config_handler: Option<cosmic_config::Config>,

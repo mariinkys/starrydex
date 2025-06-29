@@ -12,8 +12,11 @@ use tokio::sync::Semaphore;
 
 use crate::{
     entities::{
-        PokemonInfo, StarryEvolutionData, StarryPokemon, StarryPokemonData,
-        StarryPokemonEncounterInfo, StarryPokemonGeneration, StarryPokemonSpecie,
+        pokemon_info::PokemonInfo,
+        starry_pokemon::{
+            StarryEvolutionData, StarryPokemon, StarryPokemonData, StarryPokemonEncounterInfo,
+            StarryPokemonGeneration, StarryPokemonSpecie,
+        },
     },
     utils::{capitalize_string, parse_pokemon_stats},
 };
@@ -322,6 +325,7 @@ impl StarryCore {
         }
     }
 
+    /// Attempts to serialize the given data and save it to our cache replacing the old file if exists
     fn save_to_file(pokemons: BTreeMap<i64, StarryPokemon>) -> Result<(), Error> {
         let cache_dir = dirs::data_dir().unwrap().join(APP_ID);
 
@@ -344,6 +348,7 @@ impl StarryCore {
         Ok(())
     }
 
+    /// Attempts to load the application cache from it's preconfigured location and creates a MMap out of it
     fn load_from_file() -> Result<Mmap, Error> {
         let cache_path = dirs::data_dir()
             .unwrap()
@@ -361,6 +366,7 @@ impl StarryCore {
     }
 }
 
+/// Allows us to interact with PokeApi within the app
 #[derive(Debug, Clone)]
 struct StarryApi {
     client: Arc<RustemonClient>,
@@ -387,6 +393,7 @@ impl Default for StarryApi {
 }
 
 impl StarryApi {
+    /// Fetches the details of all Pokémon in PokéApi and parses it to our own data structure.
     async fn fetch_all_pokemon(&self) -> BTreeMap<i64, StarryPokemon> {
         let all_entries = rustemon::pokemon::pokemon::get_all_entries(&self.client)
             .await
@@ -414,7 +421,7 @@ impl StarryApi {
             .collect()
     }
 
-    /// Retrieve a single Pokémon Data from PokéApi
+    /// Retrieve a single Pokémon Data from PokéApi and parse it to our own data structure
     async fn fetch_pokemon_details(
         name: &str,
         client: &rustemon::client::RustemonClient,
@@ -601,6 +608,7 @@ impl StarryApi {
     }
 }
 
+/// Attempts to download a pokemon sprite (image_url) to the preconfigured location following the naming scheme of the app
 async fn download_image(
     client: &reqwest::Client,
     image_url: String,
@@ -641,7 +649,7 @@ async fn download_image(
     }
 }
 
-// Extracts the evolution data from ChainLink
+/// Extracts the evolution data from a Rustemon ChainLink
 fn extract_evolution_data_from_chain_link(
     chain_link: &rustemon::model::evolution::ChainLink,
     resources_path: &std::path::Path,
@@ -684,7 +692,7 @@ fn extract_evolution_data_from_chain_link(
     evolution_data
 }
 
-// Extracts evolution requirements from evolution details
+/// Extracts evolution requirements from evolution details
 fn extract_evolution_requirement(
     evolution_details: &[rustemon::model::evolution::EvolutionDetail],
 ) -> Option<String> {

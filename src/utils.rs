@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-use crate::entities::StarryPokemonStats;
+use crate::entities::starry_pokemon::StarryPokemonStats;
 
+/// Transforms a kebab-case string into a space-separated string where each word starts with an uppercase letter.
 pub fn capitalize_string(input: &str) -> String {
     let words: Vec<&str> = input.split('-').collect();
 
@@ -20,6 +21,7 @@ pub fn capitalize_string(input: &str) -> String {
     capitalized_words.join(" ")
 }
 
+/// Parses the rustemon pokemon stats to the StarryDex ones
 pub fn parse_pokemon_stats(stats: &[rustemon::model::pokemon::PokemonStat]) -> StarryPokemonStats {
     let mut starry_stats = StarryPokemonStats {
         hp: 0,
@@ -45,10 +47,13 @@ pub fn parse_pokemon_stats(stats: &[rustemon::model::pokemon::PokemonStat]) -> S
     starry_stats
 }
 
+/// Helper to scale some data from PokeApi such as weight...
+/// scales a number down by dividing it by 10, converting it to a floating-point
 pub fn scale_numbers(num: i64) -> f64 {
     (num as f64) / 10.0
 }
 
+/// Attempts to remove the contents of the provided directory path
 pub fn remove_dir_contents<P: AsRef<std::path::Path>>(path: P) -> std::io::Result<()> {
     for entry in std::fs::read_dir(path)? {
         let entry = entry?;
