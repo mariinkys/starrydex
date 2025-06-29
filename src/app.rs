@@ -941,15 +941,25 @@ impl StarryDex {
                     for data in &specie.evolution_data {
                         let pokemon_image = if let Some(path) = &data.sprite_path {
                             widget::tooltip(
-                                widget::Image::new(path)
-                                    .content_fit(cosmic::iced::ContentFit::Fill),
+                                widget::mouse_area(
+                                    widget::Image::new(path)
+                                        .content_fit(cosmic::iced::ContentFit::Fill),
+                                )
+                                // Right now if we search for example for Gardevoir we open it (Kirlia is not in the results page)
+                                // and we click on Kirlia the arrows to switch from one mon to another (the ones next to the name)
+                                // do nothing because the kirlia id is not in the page that we are searching on, with all of that
+                                // it's still worth it too keep this as-is, in my opinion.
+                                .on_press(Message::LoadPokemon(data.id)),
                                 widget::text(data.name.to_owned()),
                                 widget::tooltip::Position::Top,
                             )
                         } else {
                             widget::tooltip(
-                                widget::Image::new(ImageCache::get("fallback"))
-                                    .content_fit(cosmic::iced::ContentFit::Fill),
+                                widget::mouse_area(
+                                    widget::Image::new(ImageCache::get("fallback"))
+                                        .content_fit(cosmic::iced::ContentFit::Fill),
+                                )
+                                .on_press(Message::LoadPokemon(data.id)),
                                 widget::text(data.name.to_owned()),
                                 widget::tooltip::Position::Top,
                             )
