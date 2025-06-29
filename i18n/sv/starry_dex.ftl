@@ -35,10 +35,8 @@ renew-cache = Förnya Cache
 renew-cache-button = Förnya
 
 <#-- Landningssida (huvudsida). -->
-landing-page-title = Alla Pokémon
 search = Sök
 filter = Filtrera
-clear-filters = Rensa
 
 <#-- Pokémon detaljsida-->
 pokemon-page = Pokémon

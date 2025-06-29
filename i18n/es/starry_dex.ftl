@@ -35,10 +35,9 @@ renew-cache = Renovar Cache
 renew-cache-button = Renovar
 
 <#-- Landing (Main) Page -->
-landing-page-title = Todos los Pokémon
 search = Buscar
 filter = Filtrar
-clear-filters = Limpiar
+page = Página
 
 <#-- Pokemon Details Page -->
 pokemon-page = Pokémon
