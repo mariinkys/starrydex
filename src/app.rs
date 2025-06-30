@@ -2,6 +2,7 @@
 
 use crate::config::{AppTheme, StarryConfig, TypeFilteringMode};
 use crate::core::StarryCore;
+use crate::entities::starry_pokemon::StarryPokemonGeneration;
 use crate::entities::{
     pokemon_info::PokemonInfo, pokemon_type::PokemonType, starry_pokemon::StarryPokemon,
 };
@@ -82,6 +83,7 @@ pub enum Message {
 
     InitializedCore(Result<StarryCore, Error>),
     TypeFilterToggled(bool, PokemonType),
+    GenerationFilterToggled(bool, StarryPokemonGeneration),
     StatsFilterToggled(bool),
     StatsFilterUpdated(i64),
 }
@@ -97,6 +99,30 @@ pub enum PaginationAction {
 pub struct Filters {
     pub selected_types: HashSet<PokemonType>,
     pub total_stats: (bool, i64),
+    pub selected_generations: HashSet<StarryPokemonGeneration>,
+}
+
+impl Default for Filters {
+    fn default() -> Self {
+        Self {
+            selected_types: HashSet::new(),
+            total_stats: (false, 50),
+            selected_generations: HashSet::new(),
+        }
+    }
+}
+
+impl Filters {
+    pub fn any_applied(&self) -> bool {
+        if !self.selected_types.is_empty()
+            || !self.selected_generations.is_empty()
+            || self.total_stats.0
+        {
+            return true;
+        }
+
+        false
+    }
 }
 
 /// Identifies the status of a page in the application.
@@ -171,10 +197,7 @@ impl cosmic::Application for StarryDex {
             current_page_status: PageStatus::Loading,
             wants_pokemon_details: false,
             search: String::new(),
-            filters: Filters {
-                selected_types: HashSet::new(),
-                total_stats: (false, 50),
-            },
+            filters: Filters::default(),
             type_filter_mode: vec![fl!("exclusive"), fl!("inclusive")],
             current_page: 0,
         };
@@ -404,44 +427,68 @@ impl cosmic::Application for StarryDex {
                     self.filters.selected_types.remove(&type_name);
                 }
             }
+            Message::GenerationFilterToggled(value, generation_name) => {
+                if value {
+                    // Add the selected generation to the filter
+                    self.filters.selected_generations.insert(generation_name);
+                } else {
+                    // Remove the deselected generation from the filter
+                    self.filters.selected_generations.remove(&generation_name);
+                }
+            }
             Message::ApplyCurrentFilters => {
                 if let Some(core) = &self.starry_core {
-                    if !self.filters.selected_types.is_empty() {
+                    if self.filters.any_applied() {
                         self.search = String::new();
                         self.current_page = 0;
 
-                        let selected_types_lowercase: HashSet<String> = self
-                            .filters
-                            .selected_types
-                            .iter()
-                            .map(|t| t.name.to_lowercase())
-                            .collect();
+                        let mut all_pokemon = core.get_pokemon_list();
 
-                        match self.config.type_filtering_mode {
-                            TypeFilteringMode::Inclusive => {
-                                // Ej: If fire and ice are selected it will show fire pokemons and ice pokemons
-                                self.pokemon_list =
-                                    core.filter_pokemon_inclusive(&selected_types_lowercase);
-                            }
-                            TypeFilteringMode::Exclusive => {
-                                // Ej: If fire and ice are selected it will show pokemons that are both fire and ice types
-                                self.pokemon_list =
-                                    core.filter_pokemon_exclusive(&selected_types_lowercase);
+                        // Try to apply types filter if needed
+                        if !self.filters.selected_types.is_empty() {
+                            let selected_types_lowercase: HashSet<String> = self
+                                .filters
+                                .selected_types
+                                .iter()
+                                .map(|t| t.name.to_lowercase())
+                                .collect();
+
+                            match self.config.type_filtering_mode {
+                                TypeFilteringMode::Inclusive => {
+                                    // Ej: If fire and ice are selected it will show fire pokemons and ice pokemons
+                                    all_pokemon =
+                                        core.filter_pokemon_inclusive(&selected_types_lowercase);
+                                }
+                                TypeFilteringMode::Exclusive => {
+                                    // Ej: If fire and ice are selected it will show pokemons that are both fire and ice types
+                                    all_pokemon =
+                                        core.filter_pokemon_exclusive(&selected_types_lowercase);
+                                }
                             }
                         }
-                    }
 
-                    // Apply total stats filter
-                    if self.filters.total_stats.0 && self.filters.total_stats.1 > 0 {
-                        if self.filters.selected_types.is_empty() {
-                            self.pokemon_list =
-                                core.filter_pokemon_stats(self.filters.total_stats.1);
-                        } else {
-                            self.pokemon_list = core.filter_pokemon_stats_with_list(
-                                &self.pokemon_list,
+                        // Try to apply stats filter if needed
+                        if self.filters.total_stats.0 && self.filters.total_stats.1 > 0 {
+                            all_pokemon = core.filter_pokemon_stats_with_list(
+                                &all_pokemon,
                                 self.filters.total_stats.1,
                             );
                         }
+
+                        // Try to apply generations filter if needed
+                        if !self.filters.selected_generations.is_empty() {
+                            let selected_generations: HashSet<String> = self
+                                .filters
+                                .selected_generations
+                                .iter()
+                                .map(|t| t.to_string())
+                                .collect();
+
+                            all_pokemon = core
+                                .filter_pokemon_by_generation(&all_pokemon, &selected_generations);
+                        }
+
+                        self.pokemon_list = all_pokemon;
                     }
 
                     self.core.window.show_context = false;
@@ -452,10 +499,7 @@ impl cosmic::Application for StarryDex {
                     self.search = String::new();
                     self.current_page = 0;
                     self.pokemon_list = core.get_pokemon_page(0, self.config.items_per_page);
-                    self.filters = Filters {
-                        selected_types: HashSet::new(),
-                        total_stats: (false, 50),
-                    };
+                    self.filters = Filters::default();
                     self.current_page_status = PageStatus::Loaded;
                 }
             }
@@ -494,10 +538,7 @@ impl cosmic::Application for StarryDex {
             Message::PaginationActionRequested(action) => match &action {
                 PaginationAction::Next => {
                     if let Some(core) = &self.starry_core {
-                        if self.search.is_empty()
-                            && self.filters.selected_types.is_empty()
-                            && !self.filters.total_stats.0
-                        {
+                        if !self.filters.any_applied() {
                             let new_list = core.get_pokemon_page(
                                 (self.current_page + 1) * self.config.items_per_page,
                                 self.config.items_per_page,
@@ -512,10 +553,7 @@ impl cosmic::Application for StarryDex {
                 PaginationAction::Back => {
                     if self.current_page >= 1 {
                         if let Some(core) = &self.starry_core {
-                            if self.search.is_empty()
-                                && self.filters.selected_types.is_empty()
-                                && !self.filters.total_stats.0
-                            {
+                            if !self.filters.any_applied() {
                                 let new_list = core.get_pokemon_page(
                                     (self.current_page - 1) * self.config.items_per_page,
                                     self.config.items_per_page,
@@ -1085,8 +1123,8 @@ impl StarryDex {
 
     /// The filters context page for this app.
     pub fn filters_page(&self) -> Element<Message> {
+        // TYPE FILTERS
         let all_pokemon_types = PokemonType::get_all();
-
         let type_checkboxes: Vec<Element<Message>> = all_pokemon_types
             .into_iter()
             .map(|pokemon_type| {
@@ -1124,6 +1162,7 @@ impl StarryDex {
             types_column = types_column.push(current_row);
         }
 
+        // STATS FILTERING
         let poke_stats_column = column![
             widget::text::title3(fl!("stats-filter")),
             widget::Row::new()
@@ -1152,10 +1191,52 @@ impl StarryDex {
                 .width(Length::Fill)
         ];
 
+        // GENERATION FILTERS
+        let generation_checkboxes: Vec<Element<Message>> = StarryPokemonGeneration::ALL
+            .iter()
+            .map(|pokemon_generation| {
+                let is_checked = self
+                    .filters
+                    .selected_generations
+                    .contains(pokemon_generation);
+                let checkbox: Element<Message> =
+                    widget::checkbox::Checkbox::new(pokemon_generation.to_string(), is_checked)
+                        .on_toggle(move |value| {
+                            Message::GenerationFilterToggled(value, pokemon_generation.clone())
+                        })
+                        .into();
+
+                widget::container(checkbox).width(Length::Fill).into()
+            })
+            .collect();
+
+        let mut generations_column = widget::Column::new()
+            .push(widget::text::title3(fl!("generation-filters")))
+            .spacing(5)
+            .width(Length::Fill);
+        let mut current_row = widget::Row::new();
+        let mut count = 0;
+
+        for g_checkbox in generation_checkboxes {
+            current_row = current_row.push(g_checkbox);
+            count += 1;
+
+            if count % 2 == 0 {
+                generations_column = generations_column.push(current_row);
+                current_row = widget::Row::new();
+            }
+        }
+
+        // If there's an odd number of checkboxes, add the last row
+        if count % 2 != 0 {
+            generations_column = generations_column.push(current_row);
+        }
+
         let result_column = widget::Column::new()
             .width(Length::Fill)
             .push(types_column)
             .push(poke_stats_column)
+            .push(generations_column)
             .push(
                 widget::container(
                     widget::button::suggested(fl!("apply-filters"))

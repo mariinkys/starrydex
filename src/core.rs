@@ -145,7 +145,6 @@ impl StarryCore {
     }
 
     /// Get a list of all Pokémon (converts to owned data)
-    #[allow(dead_code)]
     pub fn get_pokemon_list(&self) -> Vec<PokemonInfo> {
         if let Some(data) = self.inner.pokemon_data {
             data.iter()
@@ -266,6 +265,40 @@ impl StarryCore {
         }
     }
 
+    /// Filter pokémon by generation
+    pub fn filter_pokemon_by_generation(
+        &self,
+        pokemon_list: &[PokemonInfo],
+        selected_generations: &std::collections::HashSet<String>,
+    ) -> Vec<PokemonInfo> {
+        pokemon_list
+            .iter()
+            .filter(|pokemon_info| {
+                if let Some(data) = &self.inner.pokemon_data {
+                    if let Some(archived_pokemon) = data.get(&pokemon_info.id.into()) {
+                        if let Ok(pokemon) =
+                            rkyv::deserialize::<StarryPokemon, rancor::Error>(archived_pokemon)
+                        {
+                            if let Some(pokemon_specie) = pokemon.specie {
+                                selected_generations
+                                    .contains(&pokemon_specie.generation.to_string())
+                            } else {
+                                false
+                            }
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            })
+            .cloned()
+            .collect()
+    }
+
     /// Filter the provided Pokémon list by pokémon that have at least X total_power
     pub fn filter_pokemon_stats_with_list(
         &self,
@@ -296,6 +329,7 @@ impl StarryCore {
     }
 
     /// Filter by pokémon that have at least X total_power
+    #[allow(dead_code)]
     pub fn filter_pokemon_stats(&self, total_power: i64) -> Vec<PokemonInfo> {
         if let Some(data) = &self.inner.pokemon_data {
             data.iter()

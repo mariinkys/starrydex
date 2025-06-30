@@ -54,6 +54,7 @@ no-flavor-text = No flavor text available...
 filters-page = Filters
 apply-filters = Apply Filters
 type-filters = Filter by Type
+generation-filters = Filter by Generation
 stats-filter = Filter by Pokémon Stats
 minimum-poke-stats = Minimum Pokémon Stats
 enabled = Enabled

@@ -53,6 +53,7 @@ no-flavor-text = Sin descripción...
 filters-page = Filtros
 apply-filters = Aplicar Filtros
 type-filters = Fitrar por Tipo
+generation-filters = Filtrar por Generación
 stats-filter = Filterar por Estadísticas
 minimum-poke-stats = Estadísticas Mínimas
 enabled = Enabled

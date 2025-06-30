@@ -100,9 +100,8 @@ pub struct StarryPokemonSpecie {
     pub evolution_data: Vec<StarryEvolutionData>,
 }
 
-
 /// Pokémon generation
-#[derive(Archive, Serialize, Deserialize, Default)]
+#[derive(Archive, Serialize, Deserialize, Default, PartialEq, Eq, Hash, Debug, Clone)]
 #[rkyv(derive(Debug))]
 pub enum StarryPokemonGeneration {
     #[default]
@@ -136,6 +135,20 @@ impl std::fmt::Display for StarryPokemonGeneration {
 }
 
 impl StarryPokemonGeneration {
+    /// List of all Pokémon Generations
+    pub const ALL: &'static [Self] = &[
+        Self::One,
+        Self::Two,
+        Self::Three,
+        Self::Four,
+        Self::Five,
+        Self::Six,
+        Self::Seven,
+        Self::Eight,
+        Self::Nine,
+        Self::Unknown,
+    ];
+
     /// Parses a generation name to the StarryPokemonGeneration enum
     pub fn from_name(name: &str) -> Self {
         match name.to_lowercase().as_str() {
