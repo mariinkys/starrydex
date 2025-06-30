@@ -794,28 +794,33 @@ impl StarryDex {
             .spacing(Pixels::from(spacing.space_xxxs))
             .width(Length::Fill);
 
-        let pagination_row = widget::container(
-            widget::Row::new()
-                .push(
-                    widget::button::icon(icon_cache::get_handle("go-previous-symbolic", 18))
-                        .on_press(Message::PaginationActionRequested(PaginationAction::Back)),
-                )
-                .push(text(format!(
-                    "{} - {}",
-                    fl!("page"),
-                    (&self.current_page + 1)
-                )))
-                .push(
-                    widget::button::icon(icon_cache::get_handle("go-next-symbolic", 18))
-                        .on_press(Message::PaginationActionRequested(PaginationAction::Next)),
-                )
-                .spacing(Pixels::from(spacing.space_xxl))
-                .width(Length::Shrink)
-                .align_y(Alignment::Center),
-        )
-        .width(Length::Fill)
-        .align_x(Alignment::Center)
-        .align_y(Alignment::Center);
+        let pagination_row =
+            widget::container(
+                widget::Row::new()
+                    .push(
+                        widget::button::icon(icon_cache::get_handle("go-previous-symbolic", 18))
+                            .on_press_maybe((!self.filters.any_applied()).then_some(
+                                Message::PaginationActionRequested(PaginationAction::Back),
+                            )),
+                    )
+                    .push(text(format!(
+                        "{} - {}",
+                        fl!("page"),
+                        (&self.current_page + 1)
+                    )))
+                    .push(
+                        widget::button::icon(icon_cache::get_handle("go-next-symbolic", 18))
+                            .on_press_maybe((!self.filters.any_applied()).then_some(
+                                Message::PaginationActionRequested(PaginationAction::Next),
+                            )),
+                    )
+                    .spacing(Pixels::from(spacing.space_xxl))
+                    .width(Length::Shrink)
+                    .align_y(Alignment::Center),
+            )
+            .width(Length::Fill)
+            .align_x(Alignment::Center)
+            .align_y(Alignment::Center);
 
         widget::Column::new()
             .push(search_row)
