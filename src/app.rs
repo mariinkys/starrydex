@@ -66,6 +66,7 @@ pub struct StarryDex {
 /// Messages emitted by the application and its widgets.
 #[derive(Debug, Clone)]
 pub enum Message {
+    Hotkey(Hotkey),
     LaunchUrl(String),
     ToggleContextPage(ContextPage),
     UpdateConfig(StarryConfig),
@@ -327,6 +328,8 @@ impl cosmic::Application for StarryDex {
 
                     Message::UpdateConfig(update.config)
                 }),
+            // Application HoyKeys
+            cosmic::iced::event::listen_with(handle_event),
         ])
     }
 
@@ -336,6 +339,29 @@ impl cosmic::Application for StarryDex {
     /// on the application's async runtime.
     fn update(&mut self, message: Self::Message) -> Task<cosmic::Action<Self::Message>> {
         match message {
+            Message::Hotkey(hotkey) => {
+                if self.current_page_status == PageStatus::Loaded {
+                    if self.context_page == ContextPage::PokemonPage
+                        && self.core.window.show_context
+                    {
+                        // We're on the Pokémon details page
+                        return match hotkey {
+                            Hotkey::ArrowLeft => self
+                                .update(Message::SinglePokemonPagination(PaginationAction::Back)),
+                            Hotkey::ArrowRight => self
+                                .update(Message::SinglePokemonPagination(PaginationAction::Next)),
+                        };
+                    } else if !self.core.window.show_context {
+                        // We're on the main page
+                        return match hotkey {
+                            Hotkey::ArrowLeft => self
+                                .update(Message::PaginationActionRequested(PaginationAction::Back)),
+                            Hotkey::ArrowRight => self
+                                .update(Message::PaginationActionRequested(PaginationAction::Next)),
+                        };
+                    }
+                }
+            }
             Message::LaunchUrl(url) => {
                 _ = open::that_detached(url);
             }
@@ -1334,5 +1360,38 @@ impl menu::action::MenuAction for MenuAction {
             MenuAction::About => Message::ToggleContextPage(ContextPage::About),
             MenuAction::Settings => Message::ToggleContextPage(ContextPage::Settings),
         }
+    }
+}
+
+//
+// SUBSCRIPTION HANDLING
+//
+
+#[derive(Debug, Clone)]
+pub enum Hotkey {
+    ArrowLeft,
+    ArrowRight,
+}
+
+fn handle_event(
+    event: cosmic::iced::event::Event,
+    _: cosmic::iced::event::Status,
+    _: cosmic::iced::window::Id,
+) -> Option<Message> {
+    match event {
+        #[allow(clippy::collapsible_match)]
+        cosmic::iced::event::Event::Keyboard(cosmic::iced::keyboard::Event::KeyPressed {
+            key,
+            ..
+        }) => match key {
+            cosmic::iced::keyboard::Key::Named(cosmic::iced::keyboard::key::Named::ArrowRight) => {
+                Some(Message::Hotkey(Hotkey::ArrowRight))
+            }
+            cosmic::iced::keyboard::Key::Named(cosmic::iced::keyboard::key::Named::ArrowLeft) => {
+                Some(Message::Hotkey(Hotkey::ArrowLeft))
+            }
+            _ => None,
+        },
+        _ => None,
     }
 }
