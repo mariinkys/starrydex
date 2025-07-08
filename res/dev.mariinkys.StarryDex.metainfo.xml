@@ -65,6 +65,19 @@
     </keywords>
 
     <releases>
+        <release version="0.2.7" date="2025-07-08">
+            <description>
+                <p>Settings now persist between runs</p>
+                <p>Added the Pokémon ID to the details page</p>
+                <p>Added Pokémon generation information to the details page</p>
+                <p>Added Pokémon evolution data to the details page</p>
+                <p>Allow the user to switch Pokémon by clicking on evolution data</p>
+                <p>Added filtering by Pokémon generation</p>
+                <p>Added keyboard navigation via arrow keys in both details and main page</p>
+                <p>General bug fixes and improvements</p>
+                <p>Updated dependencies</p>
+            </description>
+        </release>
         <release version="0.2.6" date="2025-06-27">
             <description>
                 <p>Allow filtering by Pokémon total stats</p>
