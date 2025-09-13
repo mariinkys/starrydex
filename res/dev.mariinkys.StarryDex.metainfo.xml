@@ -15,19 +15,21 @@
     <project_license>GPL-3.0-only</project_license>
 
     <description>
-      <p>
-        Embark on your Pokémon journey with StarryDex, a simple Pokédex application.
-      </p>
-      <ul>
-        <li>Browse detailed info on all Pokémon species, including stats, evolution requirements, and more.</li>
-        <li>Quickly search Pokémon by name, type, stats, and other filters.</li>
-        <li>Works offline after the initial setup is complete.</li>
-      </ul>
+        <p>
+            Embark on your Pokémon journey with StarryDex, a simple Pokédex application.
+        </p>
+        <ul>
+            <li>Browse detailed info on all Pokémon species, including stats, evolution
+                requirements, and more.</li>
+            <li>Quickly search Pokémon by name, type, stats, and other filters.</li>
+            <li>Works offline after the initial setup is complete.</li>
+        </ul>
     </description>
 
-    <icon type="remote" height="256" width="256">https://raw.githubusercontent.com/mariinkys/starrydex/main/res/icons/hicolor/256x256/apps/dev.mariinkys.StarryDex.svg</icon>
+    <icon type="remote" height="256" width="256">
+        https://raw.githubusercontent.com/mariinkys/starrydex/main/res/icons/hicolor/256x256/apps/dev.mariinkys.StarryDex.svg</icon>
     <launchable type="desktop-id">dev.mariinkys.StarryDex.desktop</launchable>
-    <content_rating type="oars-1.1"/>
+    <content_rating type="oars-1.1" />
 
     <provides>
         <id>com.system76.CosmicApplication</id>
@@ -40,14 +42,15 @@
             <caption>Pokémon List Page</caption>
         </screenshot>
         <screenshot xml:lang="en">
-            <image>https://raw.githubusercontent.com/mariinkys/starrydex/main/screenshots/pokemon.png</image>
+            <image>
+                https://raw.githubusercontent.com/mariinkys/starrydex/main/screenshots/pokemon.png</image>
             <caption>Pokémon Details Page</caption>
         </screenshot>
     </screenshots>
 
     <branding>
-      <color type="primary" scheme_preference="light">#E63946</color>
-      <color type="primary" scheme_preference="dark">#F1C6F5</color>
+        <color type="primary" scheme_preference="light">#E63946</color>
+        <color type="primary" scheme_preference="dark">#F1C6F5</color>
     </branding>
 
     <categories>
@@ -65,6 +68,11 @@
     </keywords>
 
     <releases>
+        <release version="0.2.8" date="2025-09-25">
+            <description>
+                <p>Updated dependencies</p>
+            </description>
+        </release>
         <release version="0.2.7" date="2025-07-08">
             <description>
                 <p>Settings now persist between runs</p>
@@ -128,7 +136,8 @@
         <release version="0.2.0" date="2024-09-30">
             <description>
                 <p>Complete code rewrite</p>
-                <p>Implemented custom cache that improves performance and drastically reduces disk usage</p>
+                <p>Implemented custom cache that improves performance and drastically reduces disk
+                    usage</p>
                 <p>Basic Pokémon filtering implementation</p>
                 <p>Now you can customize how many Pokémon are shown per each row</p>
             </description>
@@ -151,7 +160,8 @@
             <description>
                 <p>First Stable Release</p>
                 <p>Search for Pokémon by Name</p>
-                <p>Look at a specific Pokémon Types, Weight, Height, Stats, Abilities as well as Encounter Details for that Pokémon on each game.</p>
+                <p>Look at a specific Pokémon Types, Weight, Height, Stats, Abilities as well as
+                    Encounter Details for that Pokémon on each game.</p>
                 <p>Ability to work offline after initial setup</p>
             </description>
         </release>
