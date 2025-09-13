@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
-
+#![allow(clippy::collapsible_if)]
+#![allow(mismatched_lifetime_syntaxes)]
 use icon_cache::{ICON_CACHE, IconCache};
 use image_cache::{IMAGE_CACHE, ImageCache};
 

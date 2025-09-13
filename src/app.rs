@@ -164,7 +164,7 @@ impl cosmic::Application for StarryDex {
         // Application about page
         let about = About::default()
             .name(fl!("app-title"))
-            .icon(Self::APP_ID)
+            .icon(widget::icon::from_name(Self::APP_ID))
             .version(env!("CARGO_PKG_VERSION"))
             .author("mariinkys")
             .license("GPL-3.0-only")
