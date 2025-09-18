@@ -504,7 +504,12 @@ async fn download_pokemon_data(api_client: &StarryApi) {
     let ron_string = to_string(&data);
 
     if let Ok(ron_data) = ron_string {
-        let data_write_res = tokio::fs::write("pokemon_data.ron", ron_data).await;
+        if let Err(e) = tokio::fs::create_dir_all("assets").await {
+            println!("Failed to create assets directory: {}", e);
+            return;
+        }
+
+        let data_write_res = tokio::fs::write("assets/pokemon_data.ron", ron_data).await;
         if let Ok(_res) = data_write_res {
             println!("Data written successfully");
         } else {
@@ -529,7 +534,12 @@ async fn download_sprites(api_client: &StarryApi) {
             &temp_sprites_dir
         );
 
-        let assets_path = Path::new("sprites.tar.gz");
+        if let Err(e) = tokio::fs::create_dir_all("assets").await {
+            println!("Failed to create assets directory: {}", e);
+            return;
+        }
+
+        let assets_path = Path::new("assets").join("sprites.tar.gz");
         let tar_gz = std::fs::File::create(assets_path).unwrap();
         let enc = GzEncoder::new(tar_gz, Compression::default());
         let mut tar = tar::Builder::new(enc);

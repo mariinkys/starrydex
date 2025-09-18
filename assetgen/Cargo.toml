@@ -3,13 +3,17 @@ name = "assetgen"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "assetgen"
+path = "src/main.rs"
+
 [dependencies]
-tar = "0.4.44"
-flate2 = "1.1.2"
-serde = { version = "1.0.225", features = ["serde_derive"] }
-ron = "0.11.0"
-rustemon = { version = "4.3.0" }
-reqwest = "0.12.23"
-futures = "0.3.31"
-tokio = { version = "1.47.1", features = ["full"] }
-anywho = "0.1.2"
+tar.workspace = true
+flate2.workspace = true
+serde.workspace = true
+ron.workspace = true
+rustemon.workspace = true
+reqwest.workspace = true
+futures.workspace = true
+tokio.workspace = true
+anywho.workspace = true

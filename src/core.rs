@@ -98,7 +98,7 @@ impl StarryCore {
     /// Deserialize Pokémon data in .ron format to a BTreeMap<i64, StarryPokemon>
     async fn extract_pokemon_data() -> Result<BTreeMap<i64, StarryPokemon>, Error> {
         // Bundle sprites as tar.gz and extract
-        const BUNDLED_SPRITES: &[u8] = include_bytes!("../assetgen/pokemon_data.ron");
+        const BUNDLED_SPRITES: &[u8] = include_bytes!("../assets/pokemon_data.ron");
 
         let ron_str = std::str::from_utf8(BUNDLED_SPRITES)?;
         let mut pokemon_data: BTreeMap<i64, StarryPokemon> = ron::from_str(ron_str)?;
@@ -138,7 +138,7 @@ impl StarryCore {
     /// Extract sprites archive
     async fn extract_sprite_archive(target_dir: &std::path::Path) -> Result<(), Error> {
         // Bundle sprites as tar.gz and extract
-        const BUNDLED_SPRITES: &[u8] = include_bytes!("../assetgen/sprites.tar.gz");
+        const BUNDLED_SPRITES: &[u8] = include_bytes!("../assets/sprites.tar.gz");
 
         // Extract using tar crate
         let mut archive = tar::Archive::new(flate2::read::GzDecoder::new(BUNDLED_SPRITES));

@@ -20,10 +20,6 @@
  </a>
  </div>
 
-## Information
-> [!TIP]
-> The application can work offline after initial setup is completed.
-
 ## Install
 
 To install your COSMIC application, you will need [just](https://github.com/casey/just), if you're on Pop!\_OS, you can install it with the following command:
@@ -39,7 +35,7 @@ just build-release
 sudo just install
 ```
 
-# Attribution
+## Attribution
 
 > "[Pop Icons](http://github.com/pop-os/icon-theme)" by [System76](http://system76.com/) is licensed under [CC-SA-4.0](http://creativecommons.org/licenses/by-sa/4.0/)
 
@@ -49,7 +45,16 @@ Pokémon and Pokémon character names are trademarks of Nintendo.
 
 This application uses [PokeApi](https://github.com/PokeAPI/) and its resources.
 
-# Copyright and Licensing
+## Development
+
+To update/generate your assets you have to execute: `cargo run -p assetgen -- -a`
+```
+-a = All Assets
+-p = Only Pokémon Data
+-s = Only Sprites
+```
+
+## Copyright and Licensing
 
 Copyright 2024 © Alex Marín
 
