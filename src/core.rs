@@ -101,7 +101,36 @@ impl StarryCore {
         const BUNDLED_SPRITES: &[u8] = include_bytes!("../assetgen/pokemon_data.ron");
 
         let ron_str = std::str::from_utf8(BUNDLED_SPRITES)?;
-        let pokemon_data: BTreeMap<i64, StarryPokemon> = ron::from_str(ron_str)?;
+        let mut pokemon_data: BTreeMap<i64, StarryPokemon> = ron::from_str(ron_str)?;
+
+        let base_sprite_path = dirs::data_dir().unwrap().join(APP_ID);
+
+        // Modify sprite_path for all pokémon
+        pokemon_data = pokemon_data
+            .into_iter()
+            .map(|(id, mut pokemon)| {
+                if let Some(sprite_path) = pokemon.sprite_path {
+                    pokemon.sprite_path = std::path::Path::new(&base_sprite_path)
+                        .join(sprite_path)
+                        .to_str()
+                        .map(String::from);
+                }
+
+                if let Some(mut specie) = pokemon.specie {
+                    specie.evolution_data.iter_mut().for_each(|evo_data| {
+                        if let Some(evo_data_sprite_path) = &evo_data.sprite_path {
+                            evo_data.sprite_path = std::path::Path::new(&base_sprite_path)
+                                .join(evo_data_sprite_path)
+                                .to_str()
+                                .map(String::from);
+                        }
+                    });
+                    pokemon.specie = Some(specie);
+                }
+
+                (id, pokemon)
+            })
+            .collect();
 
         Ok(pokemon_data)
     }
