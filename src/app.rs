@@ -128,7 +128,6 @@ impl Filters {
 /// Identifies the status of a page in the application.
 #[derive(PartialEq)]
 pub enum PageStatus {
-    FirstRun,
     Loaded,
     Loading,
 }
@@ -216,16 +215,7 @@ impl cosmic::Application for StarryDex {
             |starry_core| cosmic::action::app(Message::InitializedCore(starry_core)),
         ));
 
-        if !app.config.first_run_completed {
-            app.current_page_status = PageStatus::FirstRun;
-            if let Some(handler) = &app.config_handler {
-                if let Err(err) = app.config.set_first_run_completed(handler, true) {
-                    eprintln!("{err}")
-                }
-            }
-        } else {
-            app.current_page_status = PageStatus::Loading;
-        }
+        app.current_page_status = PageStatus::Loading;
 
         (app, Task::batch(tasks))
     }
@@ -285,14 +275,6 @@ impl cosmic::Application for StarryDex {
         let space_s = theme::active().cosmic().spacing.space_s;
 
         let content = match self.current_page_status {
-            PageStatus::FirstRun => Column::new()
-                .push(text(fl!("downloading-sprites")))
-                .push(text(fl!("estimate")))
-                .push(text(fl!("once-message")))
-                .align_x(Alignment::Center)
-                .width(Length::Fill)
-                .spacing(space_s)
-                .into(),
             PageStatus::Loaded => self.landing(),
             PageStatus::Loading => Column::new()
                 .push(text(fl!("loading")))
@@ -683,7 +665,6 @@ impl StarryDex {
                                 move |new_value| {
                                     Message::UpdateConfig(StarryConfig {
                                         app_theme: old_config.app_theme,
-                                        first_run_completed: old_config.first_run_completed,
                                         pokemon_per_row: new_value as usize,
                                         items_per_page: old_config.items_per_page,
                                         type_filtering_mode: old_config.type_filtering_mode,
@@ -703,7 +684,6 @@ impl StarryDex {
                                 move |new_value| {
                                     Message::UpdateConfig(StarryConfig {
                                         app_theme: old_config.app_theme,
-                                        first_run_completed: old_config.first_run_completed,
                                         pokemon_per_row: old_config.pokemon_per_row,
                                         items_per_page: new_value as usize,
                                         type_filtering_mode: old_config.type_filtering_mode,
@@ -1273,14 +1253,6 @@ impl StarryDex {
     fn update_all_config_fields(&mut self, new_config: &StarryConfig) {
         if let Some(handler) = &self.config_handler {
             if let Err(err) = self.config.set_app_theme(handler, new_config.app_theme) {
-                eprintln!("{err}");
-                // If for some reason the handler fails we update the config anyways, even if it won't save after restart.
-                self.config = new_config.clone();
-            }
-            if let Err(err) = self
-                .config
-                .set_first_run_completed(handler, new_config.first_run_completed)
-            {
                 eprintln!("{err}");
                 // If for some reason the handler fails we update the config anyways, even if it won't save after restart.
                 self.config = new_config.clone();

@@ -6,13 +6,12 @@ use cosmic::{
 };
 use serde::{Deserialize, Serialize};
 
-const CONFIG_VERSION: u64 = 1;
+const CONFIG_VERSION: u64 = 2;
 
 /// Contains the configurations fields of the application
 #[derive(Debug, Clone, CosmicConfigEntry, Eq, PartialEq)]
 pub struct StarryConfig {
     pub app_theme: AppTheme,
-    pub first_run_completed: bool,
     pub pokemon_per_row: usize,
     pub items_per_page: usize,
     pub type_filtering_mode: TypeFilteringMode,
@@ -22,7 +21,6 @@ impl Default for StarryConfig {
     fn default() -> Self {
         Self {
             app_theme: Default::default(),
-            first_run_completed: false,
             pokemon_per_row: 3,
             type_filtering_mode: Default::default(),
             items_per_page: 30,
