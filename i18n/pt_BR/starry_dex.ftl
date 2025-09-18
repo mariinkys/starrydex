@@ -16,11 +16,6 @@ match-desktop = Correspondência de desktop
 dark = Escuro
 light = Claro
 
-<#-- First Run -->
-downloading-sprites = Baixando Sprites e Construindo Cache...
-estimate = Pode demorar um minuto
-once-message = Isso só vai acontecer uma vez
-
 <#-- About Page -->
 app-info = Este aplicativo foi criado para fins de aprendizado.
 pokeapi-text = Este aplicativo usa PokéApi e seus recursos.

@@ -1,8 +1,10 @@
 use crate::fl;
 
+use serde::{Deserialize, Serialize};
+
 /// Allows us to show translated names for pokemon types while keeping the app working (we depend on concats with the original english name)
 /// Represents a Pokemon type
-#[derive(Debug, Clone, Eq, Hash, PartialEq)]
+#[derive(Debug, Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct PokemonType {
     pub display_name: String,
     pub name: String,

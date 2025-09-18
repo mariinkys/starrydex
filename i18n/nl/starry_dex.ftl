@@ -16,11 +16,6 @@ match-desktop = Systeemstandaard
 dark = Donker
 light = Licht
 
-<#-- First Run -->
-downloading-sprites = Sprites downloaden en cache opbouwen...
-estimate = Dit kan even duren
-once-message = Dit gebeurt maar één keer
-
 <#-- About Page -->
 app-info = Deze toepassing is gemaakt voor leerdoeleinden.
 pokeapi-text = Deze toepassing maakt gebruik van PokéApi met de bijbehorende softwarebronnen.

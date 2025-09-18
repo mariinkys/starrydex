@@ -9,7 +9,6 @@ target/
 # MSVC Windows builds of rustc generate these, which store debugging information
 *.pdb
 
-# Flatpak Support
-.flatpak-builder
-flatpak-cargo-generator.py
-repo
+# Pokémon Data
+pokemon_data.ron
+sprites.tar.gz

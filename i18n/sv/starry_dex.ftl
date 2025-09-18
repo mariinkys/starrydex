@@ -16,11 +16,6 @@ match-desktop = Matcha skrivbordet
 dark = Mörkt
 light = Ljust
 
-<#-- Första körningen -->
-downloading-sprites = Laddar ner sprites och bygger cache...
-estimate = Det kan ta en minut
-once-message = Detta kommer bara att hända en gång
-
 <#-- Om sida -->
 app-info = Det här programmet har gjorts i läroändamål.
 pokeapi-text = Detta program använder PokéApi och dess resurser.

@@ -1,0 +1,19 @@
+[package]
+name = "assetgen"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "assetgen"
+path = "src/main.rs"
+
+[dependencies]
+tar.workspace = true
+flate2.workspace = true
+serde.workspace = true
+ron.workspace = true
+rustemon.workspace = true
+reqwest.workspace = true
+futures.workspace = true
+tokio.workspace = true
+anywho.workspace = true
