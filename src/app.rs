@@ -7,7 +7,7 @@ use crate::entities::{
     pokemon_info::PokemonInfo, pokemon_type::PokemonType, starry_pokemon::StarryPokemon,
 };
 use crate::image_cache::ImageCache;
-use crate::utils::{capitalize_string, scale_numbers};
+use crate::utils::{capitalize_string, remove_dir_contents, scale_numbers};
 use crate::widgets::barchart::BarChart;
 use crate::{fl, icon_cache};
 use anywho::Error;
@@ -78,6 +78,7 @@ pub enum Message {
     SearchInput(String),
     ApplyCurrentFilters,
     ClearFilters,
+    DeleteCache,
     PaginationActionRequested(PaginationAction),
     SinglePokemonPagination(PaginationAction),
 
@@ -510,6 +511,24 @@ impl cosmic::Application for StarryDex {
                     self.current_page_status = PageStatus::Loaded;
                 }
             }
+            Message::DeleteCache => {
+                if self.current_page_status == PageStatus::Loaded {
+                    self.current_page_status = PageStatus::Loading;
+
+                    self.set_show_context(false);
+
+                    let data_dir = dirs::data_dir().unwrap().join(Self::APP_ID);
+
+                    if let Err(e) = remove_dir_contents(&data_dir) {
+                        eprintln!("Error deleting cache: {e}");
+                    }
+
+                    return cosmic::app::Task::perform(
+                        async move { StarryCore::initialize().await },
+                        |starry_core| cosmic::action::app(Message::InitializedCore(starry_core)),
+                    );
+                }
+            }
             Message::UpdateTypeFilterMode(index) => {
                 let filter_mode = match index {
                     1 => TypeFilteringMode::Inclusive,
@@ -703,6 +722,12 @@ impl StarryDex {
                             Some(type_filter_mode_selected),
                             Message::UpdateTypeFilterMode,
                         ),
+                    ),
+                )
+                .add(
+                    widget::settings::item::builder(fl!("renew-cache")).control(
+                        widget::button::destructive(fl!("renew-cache-button"))
+                            .on_press(Message::DeleteCache),
                     ),
                 )
                 .into(),
