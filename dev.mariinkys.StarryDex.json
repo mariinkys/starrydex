@@ -1,7 +1,7 @@
 {
   "app-id": "dev.mariinkys.StarryDex",
   "runtime": "org.freedesktop.Platform",
-  "runtime-version": "24.08",
+  "runtime-version": "25.08",
   "sdk": "org.freedesktop.Sdk",
   "sdk-extensions": [
     "org.freedesktop.Sdk.Extension.rust-stable"
@@ -12,7 +12,6 @@
     "--socket=fallback-x11",
     "--socket=wayland",
     "--device=dri",
-    "--share=network",
     "--filesystem=xdg-config/cosmic:rw",
     "--talk-name=com.system76.CosmicSettingsDaemon"
   ],
