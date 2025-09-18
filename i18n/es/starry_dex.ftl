@@ -16,11 +16,6 @@ match-desktop = Seguir sistema
 dark = Oscuro
 light = Claro
 
-<#-- First Run -->
-downloading-sprites = Descargando Sprites y Construyendo Cache...
-estimate = Tardará un minutito
-once-message = Esto solo pasará una vez
-
 <#-- About Page -->
 app-info = Esta aplicación ha sido desarrollada con el fin de aprender.
 pokeapi-text = Esta aplicación hace uso de PokéApi y sus recursos.
