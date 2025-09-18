@@ -68,7 +68,16 @@
     </keywords>
 
     <releases>
-        <release version="0.2.8" date="2025-09-25">
+        <release version="0.3.0" date="2025-09-18">
+            <description>
+                <p>Pokémon data is now bundled with the application</p>
+                <p>Updated application runtime to 25.08</p>
+                <p>The application no longer needs network access, so the permission has been
+                    removed</p>
+                <p>Updated dependencies</p>
+            </description>
+        </release>
+        <release version="0.2.8" date="2025-09-13">
             <description>
                 <p>Updated dependencies</p>
             </description>
