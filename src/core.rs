@@ -10,6 +10,7 @@ use crate::entities::{pokemon_info::PokemonInfo, starry_pokemon::StarryPokemon};
 
 /// Unique identifier in RDNN (reverse domain name notation) format.
 pub const APP_ID: &str = "dev.mariinkys.StarryDex";
+pub const CACHE_VERSION: i32 = 1;
 
 type ArchivedStarryPokemonMap = rkyv::Archived<BTreeMap<i64, StarryPokemon>>;
 
@@ -393,7 +394,11 @@ impl StarryCore {
 
     /// Attempts to serialize the given data and save it to our cache replacing the old file if exists
     fn save_to_file(pokemons: BTreeMap<i64, StarryPokemon>) -> Result<(), Error> {
-        let cache_dir = dirs::data_dir().unwrap().join(APP_ID);
+        let cache_dir = dirs::data_dir()
+            .unwrap()
+            .join(APP_ID)
+            .join("cache")
+            .join(format!("v{}", CACHE_VERSION));
 
         std::fs::create_dir_all(&cache_dir)?;
 
@@ -419,6 +424,8 @@ impl StarryCore {
         let cache_path = dirs::data_dir()
             .unwrap()
             .join(APP_ID)
+            .join("cache")
+            .join(format!("v{}", CACHE_VERSION))
             .join("pokemon_cache.bin");
 
         let file = std::fs::File::open(cache_path).map_err(|_| anywho!("Cache file not found"))?;
