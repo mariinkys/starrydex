@@ -8,7 +8,7 @@ use rkyv::{Archive, Deserialize, Serialize};
 use crate::fl;
 
 /// Main Pokemon structure with all the info we want to display about it
-#[derive(Archive, CheckBytes, Serialize, Deserialize)]
+#[derive(Archive, CheckBytes, Serialize, Deserialize, serde::Serialize, serde::Deserialize)]
 #[rkyv(derive(Debug))]
 pub struct StarryPokemon {
     pub pokemon: StarryPokemonData,
@@ -38,7 +38,7 @@ impl StarryPokemon {
 }
 
 /// Core Pokémon data
-#[derive(Archive, CheckBytes, Serialize, Deserialize)]
+#[derive(Archive, CheckBytes, Serialize, Deserialize, serde::Serialize, serde::Deserialize)]
 #[rkyv(derive(Debug))]
 pub struct StarryPokemonData {
     pub id: i64,
@@ -59,7 +59,7 @@ impl Debug for StarryPokemonData {
 }
 
 /// Pokémon statistics
-#[derive(Archive, CheckBytes, Serialize, Deserialize)]
+#[derive(Archive, CheckBytes, Serialize, Deserialize, serde::Serialize, serde::Deserialize)]
 #[rkyv(derive(Debug))]
 pub struct StarryPokemonStats {
     pub hp: i64,
@@ -77,7 +77,9 @@ impl Debug for StarryPokemonStats {
 }
 
 /// Pokémon encounter information
-#[derive(Archive, CheckBytes, Serialize, Deserialize, Clone)]
+#[derive(
+    Archive, CheckBytes, Serialize, Deserialize, Clone, serde::Serialize, serde::Deserialize,
+)]
 #[rkyv(derive(Debug))]
 pub struct StarryPokemonEncounterInfo {
     pub city: String,
@@ -91,7 +93,7 @@ impl Debug for StarryPokemonEncounterInfo {
 }
 
 /// Pokémon specie
-#[derive(Archive, CheckBytes, Serialize, Deserialize)]
+#[derive(Archive, CheckBytes, Serialize, Deserialize, serde::Serialize, serde::Deserialize)]
 #[rkyv(derive(Debug))]
 pub struct StarryPokemonSpecie {
     pub evolution_chain_url: Option<String>,
@@ -101,7 +103,19 @@ pub struct StarryPokemonSpecie {
 }
 
 /// Pokémon generation
-#[derive(Archive, Serialize, Deserialize, Default, PartialEq, Eq, Hash, Debug, Clone)]
+#[derive(
+    Archive,
+    Serialize,
+    Deserialize,
+    Default,
+    PartialEq,
+    Eq,
+    Hash,
+    Debug,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 #[rkyv(derive(Debug))]
 pub enum StarryPokemonGeneration {
     #[default]
@@ -167,7 +181,9 @@ impl StarryPokemonGeneration {
 }
 
 /// Pokémon evolution data
-#[derive(Archive, CheckBytes, Serialize, Deserialize, Debug)]
+#[derive(
+    Archive, CheckBytes, Serialize, Deserialize, Debug, serde::Serialize, serde::Deserialize,
+)]
 #[rkyv(derive(Debug))]
 pub struct StarryEvolutionData {
     pub id: i64,

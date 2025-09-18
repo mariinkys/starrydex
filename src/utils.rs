@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-use crate::entities::starry_pokemon::StarryPokemonStats;
-
 /// Transforms a kebab-case string into a space-separated string where each word starts with an uppercase letter.
 pub fn capitalize_string(input: &str) -> String {
     let words: Vec<&str> = input.split('-').collect();
@@ -19,32 +17,6 @@ pub fn capitalize_string(input: &str) -> String {
         .collect();
 
     capitalized_words.join(" ")
-}
-
-/// Parses the rustemon pokemon stats to the StarryDex ones
-pub fn parse_pokemon_stats(stats: &[rustemon::model::pokemon::PokemonStat]) -> StarryPokemonStats {
-    let mut starry_stats = StarryPokemonStats {
-        hp: 0,
-        attack: 0,
-        defense: 0,
-        sp_attack: 0,
-        sp_defense: 0,
-        speed: 0,
-    };
-
-    for stat in stats {
-        match stat.stat.name.as_str() {
-            "hp" => starry_stats.hp = stat.base_stat,
-            "attack" => starry_stats.attack = stat.base_stat,
-            "defense" => starry_stats.defense = stat.base_stat,
-            "special-attack" => starry_stats.sp_attack = stat.base_stat,
-            "special-defense" => starry_stats.sp_defense = stat.base_stat,
-            "speed" => starry_stats.speed = stat.base_stat,
-            _ => {} // Ignore any unknown stats
-        }
-    }
-
-    starry_stats
 }
 
 /// Helper to scale some data from PokeApi such as weight...

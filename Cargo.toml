@@ -14,12 +14,12 @@ i18n-embed-fl = "0.10.0"
 open = "5.3.2"
 rust-embed = "8.7.2"
 tokio = { version = "1.47.1", features = ["full"] }
-serde = { version = "1.0.219", features = ["serde_derive"] }
+serde = { version = "1.0.225", features = ["serde_derive"] }
 
-rustemon = { version = "4.3.0" }
 dirs = "6.0.0"
-futures = "0.3.31"
-reqwest = { version = "0.12.23", features = ["json"] }
+ron = "0.11.0"
+tar = "0.4.44"
+flate2 = "1.1.2"
 memmap2 = "0.9.8"
 anywho = "0.1.2"
 rkyv = { version = "0.8.11", features = ["bytecheck"] }
