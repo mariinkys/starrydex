@@ -118,7 +118,7 @@ impl StarryApi {
             Err(anywho!("Species info not available"))
         };
 
-        let resources_path = Path::new("resources").join("sprites");
+        let resources_path = Path::new("sprites");
 
         let image_path = if let Some(_front_default_sprite) = &pokemon.sprites.front_default {
             let image_filename = format!("{}_front.png", pokemon.name);
@@ -201,7 +201,7 @@ impl StarryApi {
                     }),
                 generation: StarryPokemonGeneration::from_name(&specie_info.generation.name),
                 evolution_data: if let Ok(evolution_info) = evolution_info {
-                    extract_evolution_data_from_chain_link(&evolution_info.chain, &resources_path)
+                    extract_evolution_data_from_chain_link(&evolution_info.chain, resources_path)
                 } else {
                     Vec::new()
                 },

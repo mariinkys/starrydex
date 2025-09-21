@@ -10,7 +10,7 @@ use crate::entities::{pokemon_info::PokemonInfo, starry_pokemon::StarryPokemon};
 
 /// Unique identifier in RDNN (reverse domain name notation) format.
 pub const APP_ID: &str = "dev.mariinkys.StarryDex";
-pub const CACHE_VERSION: i32 = 1;
+pub const CACHE_VERSION: i32 = 2;
 
 type ArchivedStarryPokemonMap = rkyv::Archived<BTreeMap<i64, StarryPokemon>>;
 
@@ -88,7 +88,10 @@ impl StarryCore {
 
         println!("Extracting Sprites");
         // we don't join sprites because the archive already has a /sprites folder
-        let sprites_directory = dirs::data_dir().unwrap().join(APP_ID).join("resources");
+        let sprites_directory = dirs::data_dir()
+            .unwrap()
+            .join(APP_ID)
+            .join(format!("resources_v{}", CACHE_VERSION));
         if let Err(e) = Self::extract_sprite_archive(&sprites_directory).await {
             eprintln!("Error downloading sprites: {e}");
         }
@@ -99,12 +102,15 @@ impl StarryCore {
     /// Deserialize Pokémon data in .ron format to a BTreeMap<i64, StarryPokemon>
     async fn extract_pokemon_data() -> Result<BTreeMap<i64, StarryPokemon>, Error> {
         // Bundle sprites as tar.gz and extract
-        const BUNDLED_SPRITES: &[u8] = include_bytes!("../assets/pokemon_data.ron");
+        const POKEMON_DATA: &[u8] = include_bytes!("../assets/pokemon_data.ron");
 
-        let ron_str = std::str::from_utf8(BUNDLED_SPRITES)?;
+        let ron_str = std::str::from_utf8(POKEMON_DATA)?;
         let mut pokemon_data: BTreeMap<i64, StarryPokemon> = ron::from_str(ron_str)?;
 
-        let base_sprite_path = dirs::data_dir().unwrap().join(APP_ID);
+        let base_sprite_path = dirs::data_dir()
+            .unwrap()
+            .join(APP_ID)
+            .join(format!("resources_v{}", CACHE_VERSION));
 
         // Modify sprite_path for all pokémon
         pokemon_data = pokemon_data
