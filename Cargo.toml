@@ -33,17 +33,17 @@ i18n-embed-fl = "0.10.0"
 open = "5.3.2"
 rust-embed = "8.7.2"
 tokio = { version = "1.47.1", features = ["full"] }
-serde = { version = "1.0.225", features = ["serde_derive"] }
+serde = { version = "1.0.228", features = ["serde_derive"] }
 
 # Added by me
 dirs = "6.0.0"
 ron = "0.11.0"
 tar = "0.4.44"
-flate2 = "1.1.2"
+flate2 = "1.1.4"
 memmap2 = "0.9.8"
 anywho = "0.1.2"
-rkyv = { version = "0.8.11", features = ["bytecheck"] }
-bytecheck = "0.8.1"
+rkyv = { version = "0.8.12", features = ["bytecheck"] }
+bytecheck = "0.8.2"
 
 futures = "0.3.31"
 rustemon = { version = "4.3.0" }

@@ -246,7 +246,7 @@ impl cosmic::Application for StarryDex {
         Some(match self.context_page {
             ContextPage::About => context_drawer::about(
                 &self.about,
-                Message::LaunchUrl,
+                |s| Message::LaunchUrl(s.to_string()),
                 Message::ToggleContextPage(ContextPage::About),
             )
             .title(fl!("about")),
