@@ -62,7 +62,14 @@ impl StarryApi {
                 let sem = Arc::clone(&semaphore);
                 async move {
                     let _permit = sem.acquire().await.unwrap();
-                    Self::fetch_pokemon_details(&entry.name, &client).await
+                    let details_res = Self::fetch_pokemon_details(&entry.name, &client).await;
+                    if let Err(details_err) = &details_res {
+                        eprintln!(
+                            "Error downlading details for {}, Error: {}",
+                            &entry.name, &details_err
+                        );
+                    }
+                    details_res
                 }
             })
             .buffer_unordered(30);
@@ -291,6 +298,7 @@ async fn download_image(
         tokio::fs::write(&image_path, &bytes).await?;
         Ok(())
     } else {
+        eprintln!("Error downloading image for Pokémon: {}", &pokemon_name);
         Err(anywho!(
             "Failed to download image. Status: {}",
             response.status()
