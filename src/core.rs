@@ -10,7 +10,7 @@ use crate::entities::{pokemon_info::PokemonInfo, starry_pokemon::StarryPokemon};
 
 /// Unique identifier in RDNN (reverse domain name notation) format.
 pub const APP_ID: &str = "dev.mariinkys.StarryDex";
-pub const CACHE_VERSION: i32 = 2;
+pub const CACHE_VERSION: i32 = 3;
 
 type ArchivedStarryPokemonMap = rkyv::Archived<BTreeMap<i64, StarryPokemon>>;
 

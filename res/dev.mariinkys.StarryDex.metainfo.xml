@@ -22,7 +22,7 @@
             <li>Browse detailed info on all Pokémon species, including stats, evolution
                 requirements, and more.</li>
             <li>Quickly search Pokémon by name, type, stats, and other filters.</li>
-            <li>Works offline after the initial setup is complete.</li>
+            <li>Works completely offline.</li>
         </ul>
     </description>
 
@@ -68,6 +68,12 @@
     </keywords>
 
     <releases>
+        <release version="0.3.1" date="2025-11-25">
+            <description>
+                <p>Updated bundled application data to include last PokeApi updates</p>
+                <p>Updated dependencies</p>
+            </description>
+        </release>
         <release version="0.3.0" date="2025-09-18">
             <description>
                 <p>Pokémon data is now bundled with the application</p>
