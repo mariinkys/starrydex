@@ -22,7 +22,8 @@ use cosmic::iced_widget::{center, column, row, scrollable};
 use cosmic::widget::menu::Action;
 use cosmic::widget::{self, about::About, menu};
 use cosmic::widget::{
-    Column, Grid, Image, Row, button, checkbox, container, flex_row, search_input, text,
+    Column, Grid, Image, JustifyContent, Row, button, checkbox, container, flex_row, search_input,
+    text,
 };
 use cosmic::{prelude::*, theme};
 use rkyv::rancor;
@@ -1394,37 +1395,49 @@ fn evolution_data_view<'a>(starry_pokemon: &'a StarryPokemon) -> Element<'a, Mes
     if let Some(specie) = &starry_pokemon.specie
         && !specie.evolution_data.is_empty()
     {
-        let evo_data_row = specie.evolution_data.iter().fold(
-            widget::Row::new().align_y(Alignment::Center).spacing(5.),
-            |row, data| {
-                let pokemon_image = {
-                    let image = if let Some(path) = &data.sprite_path {
-                        widget::Image::new(path).content_fit(cosmic::iced::ContentFit::Fill)
-                    } else {
-                        widget::Image::new(images::get("fallback"))
-                            .content_fit(cosmic::iced::ContentFit::Fill)
-                    };
+        let mut evo_items = Vec::new();
 
-                    widget::tooltip(
-                        widget::mouse_area(image).on_press(Message::LoadPokemon(data.id)),
-                        widget::text(data.name.to_owned()),
-                        widget::tooltip::Position::Top,
-                    )
+        for data in &specie.evolution_data {
+            let pokemon_image = {
+                let image = if let Some(path) = &data.sprite_path {
+                    widget::Image::new(path).content_fit(cosmic::iced::ContentFit::Fill)
+                } else {
+                    widget::Image::new(images::get("fallback"))
+                        .content_fit(cosmic::iced::ContentFit::Fill)
                 };
+                widget::tooltip(
+                    widget::mouse_area(image).on_press(Message::LoadPokemon(data.id)),
+                    widget::text(data.name.to_owned()),
+                    widget::tooltip::Position::Top,
+                )
+            };
 
-                let row = if let Some(n) = &data.needs_to_evolve {
-                    row.push(widget::tooltip(
+            // Group arrow and image together in a row
+            let item = if let Some(n) = &data.needs_to_evolve {
+                row![
+                    container(widget::tooltip(
                         widget::icon(icons::get_handle("go-next-symbolic", 18)),
                         widget::text(n.to_owned()),
                         widget::tooltip::Position::Top,
                     ))
-                } else {
-                    row
-                };
+                    .align_x(Alignment::Center)
+                    .align_y(Alignment::Center)
+                    .height(Length::Fixed(96.0)),
+                    pokemon_image
+                ]
+                .align_y(Alignment::Center)
+                .spacing(5.)
+                .into()
+            } else {
+                pokemon_image.into()
+            };
 
-                row.push(pokemon_image)
-            },
-        );
+            evo_items.push(item);
+        }
+
+        let evo_data_row = widget::flex_row(evo_items)
+            .align_items(Alignment::Center)
+            .justify_content(JustifyContent::SpaceEvenly);
 
         column![
             widget::text::title3(fl!("poke-evo-data"))
