@@ -31,10 +31,9 @@
         "cargo --offline fetch --manifest-path Cargo.toml --verbose",
         "cargo --offline build --release --verbose",
         "install -Dm0755 ./target/release/starry-dex /app/bin/starry-dex",
-        "install -Dm0644 ./res/dev.mariinkys.StarryDex.desktop /app/share/applications/dev.mariinkys.StarryDex.desktop",
-        "install -Dm0644 ./res/dev.mariinkys.StarryDex.metainfo.xml /app/share/metainfo/dev.mariinkys.StarryDex.metainfo.xml",
-        "install -Dm0644 ./res/icons/hicolor/256x256/apps/dev.mariinkys.StarryDex.png /app/share/icons/hicolor/256x256/apps/dev.mariinkys.StarryDex.png",
-        "install -Dm0644 ./res/icons/hicolor/256x256/apps/dev.mariinkys.StarryDex.svg /app/share/icons/hicolor/scalable/apps/dev.mariinkys.StarryDex.svg"
+        "install -Dm0644 ./resources/app.desktop /app/share/applications/dev.mariinkys.StarryDex.desktop",
+        "install -Dm0644 ./resources/app.metainfo.xml /app/share/metainfo/dev.mariinkys.StarryDex.metainfo.xml",
+        "install -Dm0644 ./resources/icons/hicolor/scalable/apps/icon.svg /app/share/icons/hicolor/scalable/apps/dev.mariinkys.StarryDex.svg"
       ],
       "sources": [
         {

@@ -1,4 +1,3 @@
-app-title = StarryDex
 about = About
 settings = Settings
 view = View
@@ -13,6 +12,9 @@ appearance = Appearance
 theme = Theme
 pokemon-per-row = Pokémon per row
 pokemon-per-page = Pokémon per page
+view-mode = View Mode
+view-mode-manual = Manual
+view-mode-responsive = Responsive
 match-desktop = Match desktop
 dark = Dark
 light = Light

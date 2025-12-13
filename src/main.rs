@@ -1,21 +1,19 @@
-// SPDX-License-Identifier: GPL-3.0-only
-#![allow(clippy::collapsible_if)]
+// SPDX-License-Identifier: GPL-3.0
 #![allow(mismatched_lifetime_syntaxes)]
-use icon_cache::{ICON_CACHE, IconCache};
-use image_cache::{IMAGE_CACHE, ImageCache};
 
 use crate::flags::flags;
+use std::sync::Mutex;
 
 mod app;
 mod config;
-mod core;
-mod entities;
 mod flags;
 mod i18n;
-mod icon_cache;
-mod image_cache;
-mod utils;
-mod widgets;
+mod icons;
+mod images;
+mod key_binds;
+
+// TODO: Improve config + new option for view homepage
+// improve Ready state code...
 
 fn main() -> cosmic::iced::Result {
     // Get the system's preferred languages.
@@ -24,15 +22,21 @@ fn main() -> cosmic::iced::Result {
     // Enable localizations to be applied.
     i18n::init(&requested_languages);
 
+    // Settings for configuring the application window and iced runtime.
+    let settings = cosmic::app::Settings::default()
+        .size_limits(
+            cosmic::iced::Limits::NONE
+                .min_height(420.0)
+                .min_width(450.0),
+        )
+        .size(cosmic::iced::Size::new(1200.0, 800.0));
+
     // Init the image cache
-    IMAGE_CACHE.get_or_init(|| std::sync::Mutex::new(ImageCache::new()));
+    images::IMAGE_CACHE.get_or_init(|| std::sync::Mutex::new(images::ImageCache::new()));
 
     // Init the icon cache
-    ICON_CACHE.get_or_init(|| std::sync::Mutex::new(IconCache::new()));
-
-    // Settings for configuring the application window and iced runtime.
-    let settings = cosmic::app::Settings::default().size(cosmic::iced::Size::new(1200.0, 800.0));
+    icons::ICON_CACHE.get_or_init(|| Mutex::new(icons::IconCache::new()));
 
     // Starts the application's event loop with `()` as the application's flags.
-    cosmic::app::run::<app::StarryDex>(settings, flags())
+    cosmic::app::run::<app::AppModel>(settings, flags())
 }

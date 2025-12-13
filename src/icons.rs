@@ -20,10 +20,11 @@ pub struct IconCache {
 impl IconCache {
     pub fn new() -> Self {
         let mut cache = HashMap::new();
+
         macro_rules! bundle {
             ($name:expr, $size:expr) => {
                 let data: &'static [u8] =
-                    include_bytes!(concat!("../res/icons/bundled/", $name, ".svg"));
+                    include_bytes!(concat!("../resources/icons/bundled/", $name, ".svg"));
                 cache.insert(
                     IconCacheKey {
                         name: Cow::Borrowed($name),
@@ -33,6 +34,7 @@ impl IconCache {
                 );
             };
         }
+
         bundle!("edit-clear-all-symbolic", 18);
         bundle!("filter-symbolic", 18);
         bundle!("go-next-symbolic", 18);
@@ -55,27 +57,27 @@ impl IconCache {
         bundle!("type-rock", 18);
         bundle!("type-steel", 18);
         bundle!("type-water", 18);
+
         Self { cache }
     }
 
-    fn get_icon(&mut self, name: &'static str, size: u16) -> icon::Icon {
-        let handle = self
-            .cache
-            .entry(IconCacheKey {
-                name: Cow::Borrowed(name),
-                size,
-            })
-            .or_insert_with(|| icon::from_name(name).size(size).handle())
-            .clone();
-        icon::icon(handle).size(size)
-    }
+    // fn get_icon(&mut self, name: &'static str, size: u16) -> icon::Icon {
+    //     let handle = self
+    //         .cache
+    //         .entry(IconCacheKey {
+    //             name: Cow::Borrowed(name),
+    //             size,
+    //         })
+    //         .or_insert_with(|| icon::from_name(name).size(size).handle())
+    //         .clone();
+    //     icon::icon(handle).size(size)
+    // }
 }
 
-#[allow(dead_code)]
-pub fn get_icon(name: &'static str, size: u16) -> icon::Icon {
-    let mut icon_cache = ICON_CACHE.get().unwrap().lock().unwrap();
-    icon_cache.get_icon(name, size)
-}
+// pub fn get_icon(name: &'static str, size: u16) -> icon::Icon {
+//     let mut icon_cache = ICON_CACHE.get().unwrap().lock().unwrap();
+//     icon_cache.get_icon(name, size)
+// }
 
 pub fn get_handle(name: &'static str, size: u16) -> icon::Handle {
     let mut icon_cache = ICON_CACHE.get().unwrap().lock().unwrap();

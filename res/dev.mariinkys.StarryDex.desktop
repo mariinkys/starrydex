@@ -1,9 +1,0 @@
-[Desktop Entry]
-Name=StarryDex
-Exec=starry-dex %F
-Terminal=false
-Type=Application
-StartupNotify=true
-Icon=dev.mariinkys.StarryDex
-Categories=X-COSMIC;Utility;Game;Education;
-Keywords=Pokedex;Pokemon;Encyclopedia;Pocket Monsters;Game;

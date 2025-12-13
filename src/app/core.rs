@@ -1,12 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-use std::{collections::BTreeMap, io::Write, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashSet},
+    io::Write,
+    sync::Arc,
+};
 
 use anywho::{Error, anywho};
 use memmap2::{Mmap, MmapOptions};
 use rkyv::rancor;
 
-use crate::entities::{pokemon_info::PokemonInfo, starry_pokemon::StarryPokemon};
+use crate::app::entities::{
+    PokemonInfo, StarryPokemon, StarryPokemonGeneration, StarryPokemonType,
+};
 
 /// Unique identifier in RDNN (reverse domain name notation) format.
 pub const APP_ID: &str = "dev.mariinkys.StarryDex";
@@ -102,7 +108,7 @@ impl StarryCore {
     /// Deserialize Pokémon data in .ron format to a BTreeMap<i64, StarryPokemon>
     async fn extract_pokemon_data() -> Result<BTreeMap<i64, StarryPokemon>, Error> {
         // Bundle sprites as tar.gz and extract
-        const POKEMON_DATA: &[u8] = include_bytes!("../assets/pokemon_data.ron");
+        const POKEMON_DATA: &[u8] = include_bytes!("../../assets/pokemon_data.ron");
 
         let ron_str = std::str::from_utf8(POKEMON_DATA)?;
         let mut pokemon_data: BTreeMap<i64, StarryPokemon> = ron::from_str(ron_str)?;
@@ -145,7 +151,7 @@ impl StarryCore {
     /// Extract sprites archive
     async fn extract_sprite_archive(target_dir: &std::path::Path) -> Result<(), Error> {
         // Bundle sprites as tar.gz and extract
-        const BUNDLED_SPRITES: &[u8] = include_bytes!("../assets/sprites.tar.gz");
+        const BUNDLED_SPRITES: &[u8] = include_bytes!("../../assets/sprites.tar.gz");
 
         // Extract using tar crate
         let mut archive = tar::Archive::new(flate2::read::GzDecoder::new(BUNDLED_SPRITES));
@@ -253,22 +259,33 @@ impl StarryCore {
     /// Filter pokémon by type (inclusive)
     pub fn filter_pokemon_inclusive(
         &self,
-        selected_types: &std::collections::HashSet<String>,
+        selected_types: &HashSet<StarryPokemonType>,
     ) -> Vec<PokemonInfo> {
         if let Some(data) = &self.inner.pokemon_data {
             data.iter()
-                .filter(|(_, pokemon)| {
-                    selected_types.is_empty()
-                        || pokemon
-                            .pokemon
-                            .types
-                            .iter()
-                            .any(|t| selected_types.contains(&t.to_lowercase()))
-                })
-                .map(|(id, pokemon)| PokemonInfo {
-                    id: id.to_native(),
-                    name: pokemon.pokemon.name.as_str().to_string(),
-                    sprite_path: pokemon.sprite_path.as_ref().map(|s| s.as_str().to_string()),
+                .filter_map(|(id, archived_pokemon)| {
+                    if let Ok(pokemon) =
+                        rkyv::deserialize::<StarryPokemon, rancor::Error>(archived_pokemon)
+                    {
+                        let matches = selected_types.is_empty()
+                            || pokemon
+                                .pokemon
+                                .types
+                                .iter()
+                                .any(|t| selected_types.contains(t));
+
+                        if matches {
+                            Some(PokemonInfo {
+                                id: id.to_native(),
+                                name: pokemon.pokemon.name,
+                                sprite_path: pokemon.sprite_path,
+                            })
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
                 })
                 .collect()
         } else {
@@ -279,24 +296,31 @@ impl StarryCore {
     /// Filter pokémon by type (exclusive)
     pub fn filter_pokemon_exclusive(
         &self,
-        selected_types: &std::collections::HashSet<String>,
+        selected_types: &HashSet<StarryPokemonType>,
     ) -> Vec<PokemonInfo> {
         if let Some(data) = &self.inner.pokemon_data {
             data.iter()
-                .filter(|(_, pokemon)| {
-                    selected_types.is_empty()
-                        || selected_types.iter().all(|selected_type| {
-                            pokemon
-                                .pokemon
-                                .types
+                .filter_map(|(id, archived_pokemon)| {
+                    if let Ok(pokemon) =
+                        rkyv::deserialize::<StarryPokemon, rancor::Error>(archived_pokemon)
+                    {
+                        let matches = selected_types.is_empty()
+                            || selected_types
                                 .iter()
-                                .any(|t| t.to_lowercase() == *selected_type)
-                        })
-                })
-                .map(|(id, pokemon)| PokemonInfo {
-                    id: id.to_native(),
-                    name: pokemon.pokemon.name.as_str().to_string(),
-                    sprite_path: pokemon.sprite_path.as_ref().map(|s| s.as_str().to_string()),
+                                .all(|selected_type| pokemon.pokemon.types.contains(selected_type));
+
+                        if matches {
+                            Some(PokemonInfo {
+                                id: id.to_native(),
+                                name: pokemon.pokemon.name,
+                                sprite_path: pokemon.sprite_path,
+                            })
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
                 })
                 .collect()
         } else {
@@ -308,7 +332,7 @@ impl StarryCore {
     pub fn filter_pokemon_by_generation(
         &self,
         pokemon_list: &[PokemonInfo],
-        selected_generations: &std::collections::HashSet<String>,
+        selected_generations: &HashSet<StarryPokemonGeneration>,
     ) -> Vec<PokemonInfo> {
         pokemon_list
             .iter()
@@ -319,8 +343,7 @@ impl StarryCore {
                             rkyv::deserialize::<StarryPokemon, rancor::Error>(archived_pokemon)
                         {
                             if let Some(pokemon_specie) = pokemon.specie {
-                                selected_generations
-                                    .contains(&pokemon_specie.generation.to_string())
+                                selected_generations.contains(&pokemon_specie.generation)
                             } else {
                                 false
                             }

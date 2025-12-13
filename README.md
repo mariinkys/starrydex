@@ -1,6 +1,6 @@
 <div align="center">
 <br>
-<img src="https://raw.githubusercontent.com/mariinkys/starrydex/main/res/icons/hicolor/256x256/apps/dev.mariinkys.StarryDex.svg">
+<img src="./resources/icons/hicolor/scalable/apps/icon.svg" width="150" />
 <h1 align="center">StarryDex</h1>
 
 ![Flathub Version](https://img.shields.io/flathub/v/dev.mariinkys.StarryDex)
@@ -10,8 +10,8 @@
 
 <h3>A Pokédex application for the COSMIC™ desktop</h3>
 
-<img src="https://raw.githubusercontent.com/mariinkys/starrydex/main/screenshots/main.png" width=350>
-<img src="https://raw.githubusercontent.com/mariinkys/starrydex/main/screenshots/pokemon.png" width=350>
+<img src="./resources/screenshots/main-dark.png" width=350>
+<img src="./resources/screenshots/pokemon-dark.png" width=350>
 
 <br><br>
 
@@ -58,4 +58,4 @@ To update/generate your assets you have to execute: `cargo run -p assetgen -- -a
 
 Copyright 2024 © Alex Marín
 
-Released under the terms of the [GPL-3.0](https://github.com/mariinkys/oboete/blob/main/LICENSE)
+Released under the terms of the [GPL-3.0](./LICENSE)

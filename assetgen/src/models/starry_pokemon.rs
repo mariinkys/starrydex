@@ -14,9 +14,58 @@ pub struct StarryPokemonData {
     pub name: String,
     pub weight: i64,
     pub height: i64,
-    pub types: Vec<String>,
+    pub types: Vec<StarryPokemonType>,
     pub abilities: Vec<String>,
     pub stats: StarryPokemonStats,
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum StarryPokemonType {
+    Normal,
+    Fire,
+    Water,
+    Electric,
+    Grass,
+    Ice,
+    Fighting,
+    Poison,
+    Ground,
+    Flying,
+    Psychic,
+    Bug,
+    Rock,
+    Ghost,
+    Dragon,
+    Dark,
+    Steel,
+    Fairy,
+}
+
+impl StarryPokemonType {
+    /// Parses a generation name to the StarryPokemonGeneration enum
+    pub fn from_name(name: &str) -> Self {
+        match name.to_lowercase().as_str() {
+            "normal" => Self::Normal,
+            "fire" => Self::Fire,
+            "water" => Self::Water,
+            "electric" => Self::Electric,
+            "grass" => Self::Grass,
+            "ice" => Self::Ice,
+            "fighting" => Self::Fighting,
+            "poison" => Self::Poison,
+            "ground" => Self::Ground,
+            "flying" => Self::Flying,
+            "psychic" => Self::Psychic,
+            "bug" => Self::Bug,
+            "rock" => Self::Rock,
+            "ghost" => Self::Ghost,
+            "dragon" => Self::Dragon,
+            "dark" => Self::Dark,
+            "steel" => Self::Steel,
+            "fairy" => Self::Fairy,
+            _ => Self::Normal,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]

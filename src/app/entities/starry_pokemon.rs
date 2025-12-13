@@ -45,7 +45,7 @@ pub struct StarryPokemonData {
     pub name: String,
     pub weight: i64,
     pub height: i64,
-    pub types: Vec<String>,
+    pub types: Vec<StarryPokemonType>,
     pub abilities: Vec<String>,
     pub stats: StarryPokemonStats,
 }
@@ -55,6 +55,115 @@ impl Debug for StarryPokemonData {
         f.debug_struct("StarryPokemonData")
             .field("id", &self.id)
             .finish()
+    }
+}
+
+/// Possible Pokémon Types
+#[derive(
+    Archive,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Hash,
+    Debug,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[rkyv(derive(Debug))]
+pub enum StarryPokemonType {
+    Normal,
+    Fire,
+    Water,
+    Electric,
+    Grass,
+    Ice,
+    Fighting,
+    Poison,
+    Ground,
+    Flying,
+    Psychic,
+    Bug,
+    Rock,
+    Ghost,
+    Dragon,
+    Dark,
+    Steel,
+    Fairy,
+}
+
+impl std::fmt::Display for StarryPokemonType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            StarryPokemonType::Normal => write!(f, "{}", fl!("normal")),
+            StarryPokemonType::Fire => write!(f, "{}", fl!("fire")),
+            StarryPokemonType::Water => write!(f, "{}", fl!("water")),
+            StarryPokemonType::Electric => write!(f, "{}", fl!("electric")),
+            StarryPokemonType::Grass => write!(f, "{}", fl!("grass")),
+            StarryPokemonType::Ice => write!(f, "{}", fl!("ice")),
+            StarryPokemonType::Fighting => write!(f, "{}", fl!("fighting")),
+            StarryPokemonType::Poison => write!(f, "{}", fl!("poison")),
+            StarryPokemonType::Ground => write!(f, "{}", fl!("ground")),
+            StarryPokemonType::Flying => write!(f, "{}", fl!("flying")),
+            StarryPokemonType::Psychic => write!(f, "{}", fl!("psychic")),
+            StarryPokemonType::Bug => write!(f, "{}", fl!("bug")),
+            StarryPokemonType::Rock => write!(f, "{}", fl!("rock")),
+            StarryPokemonType::Ghost => write!(f, "{}", fl!("ghost")),
+            StarryPokemonType::Dragon => write!(f, "{}", fl!("dragon")),
+            StarryPokemonType::Dark => write!(f, "{}", fl!("dark")),
+            StarryPokemonType::Steel => write!(f, "{}", fl!("steel")),
+            StarryPokemonType::Fairy => write!(f, "{}", fl!("fairy")),
+        }
+    }
+}
+
+impl StarryPokemonType {
+    /// List of all Pokémon Types
+    pub const ALL: &'static [Self] = &[
+        Self::Normal,
+        Self::Fire,
+        Self::Water,
+        Self::Electric,
+        Self::Grass,
+        Self::Ice,
+        Self::Fighting,
+        Self::Poison,
+        Self::Ground,
+        Self::Flying,
+        Self::Psychic,
+        Self::Bug,
+        Self::Rock,
+        Self::Ghost,
+        Self::Dragon,
+        Self::Dark,
+        Self::Steel,
+        Self::Fairy,
+    ];
+
+    pub fn icon_name(&self) -> String {
+        let name = match &self {
+            StarryPokemonType::Normal => "type-normal",
+            StarryPokemonType::Fire => "type-fire",
+            StarryPokemonType::Water => "type-water",
+            StarryPokemonType::Electric => "type-electric",
+            StarryPokemonType::Grass => "type-grass",
+            StarryPokemonType::Ice => "type-ice",
+            StarryPokemonType::Fighting => "type-fighting",
+            StarryPokemonType::Poison => "type-poison",
+            StarryPokemonType::Ground => "type-ground",
+            StarryPokemonType::Flying => "type-flying",
+            StarryPokemonType::Psychic => "type-psychic",
+            StarryPokemonType::Bug => "type-bug",
+            StarryPokemonType::Rock => "type-rock",
+            StarryPokemonType::Ghost => "type-ghost",
+            StarryPokemonType::Dragon => "type-dragon",
+            StarryPokemonType::Dark => "type-dark",
+            StarryPokemonType::Steel => "type-steel",
+            StarryPokemonType::Fairy => "type-fairy",
+        };
+
+        String::from(name)
     }
 }
 
@@ -162,22 +271,6 @@ impl StarryPokemonGeneration {
         Self::Nine,
         Self::Unknown,
     ];
-
-    /// Parses a generation name to the StarryPokemonGeneration enum
-    pub fn from_name(name: &str) -> Self {
-        match name.to_lowercase().as_str() {
-            "generation-i" => StarryPokemonGeneration::One,
-            "generation-ii" => StarryPokemonGeneration::Two,
-            "generation-iii" => StarryPokemonGeneration::Three,
-            "generation-iv" => StarryPokemonGeneration::Four,
-            "generation-v" => StarryPokemonGeneration::Five,
-            "generation-vi" => StarryPokemonGeneration::Six,
-            "generation-vii" => StarryPokemonGeneration::Seven,
-            "generation-viii" => StarryPokemonGeneration::Eight,
-            "generation-ix" => StarryPokemonGeneration::Nine,
-            _ => StarryPokemonGeneration::Unknown,
-        }
-    }
 }
 
 /// Pokémon evolution data

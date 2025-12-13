@@ -20,7 +20,8 @@ impl ImageCache {
 
         macro_rules! bundle {
             ($name:expr) => {
-                let data: &'static [u8] = include_bytes!(concat!("../res/images/", $name, ".png"));
+                let data: &'static [u8] =
+                    include_bytes!(concat!("../resources/images/", $name, ".png"));
                 cache.insert(
                     ImageCacheKey { name: $name },
                     image::Handle::from_bytes(data.to_vec()),
@@ -40,8 +41,13 @@ impl ImageCache {
             .clone()
     }
 
-    pub fn get(name: &'static str) -> image::Handle {
-        let mut image_cache = IMAGE_CACHE.get().unwrap().lock().unwrap();
-        image_cache.get_image(name)
-    }
+    // pub fn get(name: &'static str) -> image::Handle {
+    //     let mut image_cache = IMAGE_CACHE.get().unwrap().lock().unwrap();
+    //     image_cache.get_image(name)
+    // }
+}
+
+pub fn get(name: &'static str) -> image::Handle {
+    let mut image_cache = IMAGE_CACHE.get().unwrap().lock().unwrap();
+    image_cache.get_image(name)
 }

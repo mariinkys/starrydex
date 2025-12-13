@@ -17,7 +17,7 @@ use tokio::sync::Semaphore;
 
 use crate::models::starry_pokemon::{
     StarryEvolutionData, StarryPokemon, StarryPokemonData, StarryPokemonEncounterInfo,
-    StarryPokemonGeneration, StarryPokemonSpecie, StarryPokemonStats,
+    StarryPokemonGeneration, StarryPokemonSpecie, StarryPokemonStats, StarryPokemonType,
 };
 
 mod models;
@@ -144,7 +144,7 @@ impl StarryApi {
             types: pokemon
                 .types
                 .iter()
-                .map(|types| types.type_.name.to_string())
+                .map(|types| StarryPokemonType::from_name(&types.type_.name.to_string()))
                 .collect(),
             abilities: pokemon
                 .abilities
