@@ -1397,12 +1397,17 @@ fn evolution_data_view<'a>(starry_pokemon: &'a StarryPokemon) -> Element<'a, Mes
     {
         let mut evo_items = Vec::new();
 
-        for data in &specie.evolution_data {
+        for (index, data) in specie.evolution_data.iter().enumerate() {
             let pokemon_image = {
                 let image = if let Some(path) = &data.sprite_path {
-                    widget::Image::new(path).content_fit(cosmic::iced::ContentFit::Fill)
+                    widget::Image::new(path)
+                        .width(Length::Fixed(96.))
+                        .height(Length::Fixed(96.))
+                        .content_fit(cosmic::iced::ContentFit::Fill)
                 } else {
                     widget::Image::new(images::get("fallback"))
+                        .width(Length::Fixed(96.))
+                        .height(Length::Fixed(96.))
                         .content_fit(cosmic::iced::ContentFit::Fill)
                 };
                 widget::tooltip(
@@ -1413,20 +1418,27 @@ fn evolution_data_view<'a>(starry_pokemon: &'a StarryPokemon) -> Element<'a, Mes
             };
 
             // Group arrow and image together in a row
-            let item = if let Some(n) = &data.needs_to_evolve {
-                row![
-                    container(widget::tooltip(
+            let item = if index > 0 {
+                let icon_element: Element<Message> = if let Some(n) = &data.needs_to_evolve {
+                    widget::tooltip(
                         widget::icon(icons::get_handle("go-next-symbolic", 18)),
                         widget::text(n.to_owned()),
                         widget::tooltip::Position::Top,
-                    ))
-                    .align_x(Alignment::Center)
-                    .align_y(Alignment::Center)
-                    .height(Length::Fixed(96.0)),
+                    )
+                    .into()
+                } else {
+                    widget::icon(icons::get_handle("go-next-symbolic", 18)).into()
+                };
+
+                row![
+                    container(icon_element)
+                        .align_x(Alignment::Center)
+                        .align_y(Alignment::Center)
+                        .height(Length::Fixed(96.0)),
                     pokemon_image
                 ]
                 .align_y(Alignment::Center)
-                .spacing(5.)
+                .spacing(15.)
                 .into()
             } else {
                 pokemon_image.into()
