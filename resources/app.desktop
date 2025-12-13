@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Starrydex
+Comment=A Pokédex application
+Type=Application
+Icon=dev.mariinkys.StarryDex
+Exec=starrydex %F
+Terminal=false
+StartupNotify=true
+Categories=X-COSMIC;Utility;Game;Education;
+Keywords=COSMIC;Pokedex;Pokemon;Encyclopedia;Pocket Monsters;Game;

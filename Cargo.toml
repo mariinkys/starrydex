@@ -1,12 +1,16 @@
 [package]
-name = "starry-dex"
-version = "0.3.1"
+name = "starrydex"
+version = "0.3.2"
 authors = ["mariinkys (kysdev.owjga@aleeas.com)"]
 edition = "2024"
-description = "A Pokédex application for the COSMIC™ desktop written in Rust"
-readme = "https://github.com/mariinkys/starrydex/blob/main/README.md"
-repository = "https://github.com/mariinkys/starrydex"
 license = "GPL-3.0"
+description = "A Pokédex application for the COSMIC™ desktop"
+repository = "https://github.com/mariinkys/starrydex"
+readme = "https://github.com/mariinkys/starrydex/blob/main/README.md"
+
+[[bin]]
+path = "src/main.rs"
+name = "starrydex"
 
 [dependencies]
 futures-util.workspace = true
@@ -47,11 +51,7 @@ bytecheck = "0.8.2"
 
 futures = "0.3.31"
 rustemon = { version = "4.3.0" }
-reqwest = { version = "0.12.24", features = ["json"] }
-
-[dependencies.i18n-embed]
-version = "0.16.0"
-features = ["fluent-system", "desktop-requester"]
+reqwest = { version = "0.12.25", features = ["json"] }
 
 [dependencies.libcosmic]
 git = "https://github.com/pop-os/libcosmic.git"
@@ -59,6 +59,8 @@ git = "https://github.com/pop-os/libcosmic.git"
 features = [
     # Accessibility support
     "a11y",
+    # About widget for the app
+    "about",
     # Uses cosmic-settings-daemon to watch for config file changes
     "dbus-config",
     # Support creating additional application windows.
@@ -73,12 +75,31 @@ features = [
     "wayland",
     # GPU-accelerated rendering
     "wgpu",
-    # About Page
-    "about",
 ]
+
+[dependencies.i18n-embed]
+version = "0.16.0"
+features = ["fluent-system", "desktop-requester"]
 
 # Uncomment to test a locally-cloned libcosmic
 # [patch.'https://github.com/pop-os/libcosmic']
 # libcosmic = { path = "../libcosmic" }
 # cosmic-config = { path = "../libcosmic/cosmic-config" }
 # cosmic-theme = { path = "../libcosmic/cosmic-theme" }
+
+# Enable a small amount of optimization in the dev profile.
+[profile.dev]
+opt-level = 1
+
+# Enable a large amount of optimization in the dev profile for dependencies.
+[profile.dev.package."*"]
+opt-level = 3
+
+# Enable more optimization in the release profile at the cost of compile time.
+[profile.release]
+# Compile the entire crate as one unit.
+# Slows compile times, marginal improvements.
+# codegen-units = 1
+# Do a second optimization pass over the entire program, including dependenc.
+# Slows compile times, marginal improvements.
+lto = "thin"

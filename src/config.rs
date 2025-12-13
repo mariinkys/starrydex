@@ -6,31 +6,38 @@ use cosmic::{
 };
 use serde::{Deserialize, Serialize};
 
-const CONFIG_VERSION: u64 = 2;
+const APP_ID: &str = "dev.mariinkys.StarryDex";
+const CONFIG_VERSION: u64 = 3;
 
 /// Contains the configurations fields of the application
 #[derive(Debug, Clone, CosmicConfigEntry, Eq, PartialEq)]
 pub struct StarryConfig {
     pub app_theme: AppTheme,
-    pub pokemon_per_row: usize,
-    pub items_per_page: usize,
+    pub view_mode: ViewMode,
+    pub pokemon_per_page: usize,
     pub type_filtering_mode: TypeFilteringMode,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Eq, PartialEq)]
+pub enum ViewMode {
+    Manual { pokemon_per_row: usize },
+    Responsive,
 }
 
 impl Default for StarryConfig {
     fn default() -> Self {
         Self {
             app_theme: Default::default(),
-            pokemon_per_row: 3,
+            view_mode: ViewMode::Responsive,
             type_filtering_mode: Default::default(),
-            items_per_page: 30,
+            pokemon_per_page: 30,
         }
     }
 }
 
 impl StarryConfig {
     pub fn config_handler() -> Option<Config> {
-        Config::new(crate::core::APP_ID, CONFIG_VERSION).ok()
+        Config::new(APP_ID, CONFIG_VERSION).ok()
     }
 
     pub fn config() -> StarryConfig {
@@ -69,4 +76,21 @@ pub enum TypeFilteringMode {
     Inclusive,
     #[default]
     Exclusive,
+}
+
+/// Represents the different inputs that can happen in the config [`ContextPage`]
+#[derive(Debug, Clone)]
+pub enum ConfigInput {
+    /// Update the application theme
+    UpdateTheme(usize),
+    /// Update the current view mode
+    UpdateViewMode(usize),
+    /// Update the pokemon per row setting
+    UpdatePokemonPerRow(u16),
+    /// Update the pokemon per page setting
+    UpdatePokemonPerPage(u16),
+    /// Update the type filtering mode setting
+    UpdateTypeFilterMode(usize),
+    /// Ask to delete and recreate the app cache
+    DeleteCache,
 }
