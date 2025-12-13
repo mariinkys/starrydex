@@ -1,8 +1,6 @@
 about = About
 settings = Settings
 view = View
-back = Back
-generic-error = Oops, something has gone wrong...
 loading = Loading...
 repository = Repository
 support = Support
@@ -34,7 +32,6 @@ renew-cache-button = Renew
 
 <#-- Landing (Main) Page -->
 search = Search
-filter = Filter
 page = Page
 
 <#-- Pokemon Details Page -->
