@@ -99,7 +99,7 @@
         <p>New responsive viewmode available for the homepage</p>
         <p>New homepage Design</p>
         <p>Improved evolution data row wrapping strategy</p>
-        <p>Fixed bug that caused weird behaviour when moving pages after searching</p>
+        <p>Fixed bug that caused weird behavior when moving pages after searching</p>
         <p>Updated bundled application data to include last PokeApi updates</p>
         <p>Updated dependencies</p>
       </description>
