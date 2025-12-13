@@ -706,7 +706,7 @@ impl cosmic::Application for AppModel {
                 match input {
                     PokemonListInput::PaginationAction(action) => match action {
                         PaginationAction::Next => {
-                            if !filters.any_applied() {
+                            if !filters.any_applied() && search.is_empty() {
                                 let new_list = core.get_pokemon_page(
                                     (*current_page + 1) * self.config.pokemon_per_page,
                                     self.config.pokemon_per_page,
@@ -721,7 +721,7 @@ impl cosmic::Application for AppModel {
                         {
                             #[allow(clippy::collapsible_if)]
                             if *current_page >= 1 {
-                                if !filters.any_applied() {
+                                if !filters.any_applied() && search.is_empty() {
                                     let new_list = core.get_pokemon_page(
                                         (*current_page - 1) * self.config.pokemon_per_page,
                                         self.config.pokemon_per_page,
