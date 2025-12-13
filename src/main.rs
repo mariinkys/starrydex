@@ -12,9 +12,6 @@ mod icons;
 mod images;
 mod key_binds;
 
-// TODO: Improve config + new option for view homepage
-// improve Ready state code...
-
 fn main() -> cosmic::iced::Result {
     // Get the system's preferred languages.
     let requested_languages = i18n_embed::DesktopLanguageRequester::requested_languages();
