@@ -1435,9 +1435,13 @@ fn evolution_data_view<'a>(starry_pokemon: &'a StarryPokemon) -> Element<'a, Mes
             evo_items.push(item);
         }
 
-        let evo_data_row = widget::flex_row(evo_items)
-            .align_items(Alignment::Center)
-            .justify_content(JustifyContent::SpaceEvenly);
+        let evo_data_row = if evo_items.len() <= 2 {
+            widget::flex_row(evo_items).align_items(Alignment::Center)
+        } else {
+            widget::flex_row(evo_items)
+                .align_items(Alignment::Center)
+                .justify_content(JustifyContent::SpaceEvenly)
+        };
 
         column![
             widget::text::title3(fl!("poke-evo-data"))
