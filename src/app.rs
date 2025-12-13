@@ -972,6 +972,10 @@ pub fn homepage<'a>(
                         .push(
                             text(capitalize_string(&pokemon.name))
                                 .width(Length::Shrink)
+                                .font(cosmic::iced::Font {
+                                    weight: cosmic::iced::font::Weight::Bold,
+                                    ..Default::default()
+                                })
                                 .line_height(LineHeight::Absolute(Pixels::from(15.0))),
                         )
                         .width(Length::Fill)
@@ -980,8 +984,7 @@ pub fn homepage<'a>(
                 .width(Length::Fixed(200.0))
                 .height(Length::Fixed(135.0))
                 .on_press_down(Message::LoadPokemon(pokemon.id))
-                .class(theme::Button::Image)
-                .padding([spacing.space_none, spacing.space_s]);
+                .class(theme::Button::IconVertical);
 
                 // Insert a new row before adding the first Pokémon of each row
                 if index % pokemon_per_row == 0 {
@@ -1011,6 +1014,10 @@ pub fn homepage<'a>(
                             .push(
                                 text(capitalize_string(&pokemon.name))
                                     .width(Length::Shrink)
+                                    .font(cosmic::iced::Font {
+                                        weight: cosmic::iced::font::Weight::Bold,
+                                        ..Default::default()
+                                    })
                                     .line_height(LineHeight::Absolute(Pixels::from(15.0))),
                             )
                             .width(Length::Fill)
@@ -1019,8 +1026,7 @@ pub fn homepage<'a>(
                     .width(Length::Fixed(200.0))
                     .height(Length::Fixed(135.0))
                     .on_press_down(Message::LoadPokemon(pokemon.id))
-                    .class(theme::Button::Image)
-                    .padding([spacing.space_none, spacing.space_s])
+                    .class(theme::Button::IconVertical)
                     .into()
                 })
                 .collect();
