@@ -51,12 +51,12 @@
     </screenshot>
     <screenshot xml:lang="en">
       <image>
-        https://raw.githubusercontent.com/mariinkys/starrydex/main/resources/screenshots/main-light.png</image>
+        https://raw.githubusercontent.com/mariinkys/starrydex/main/resources/screenshots/pokemon-light.png</image>
       <caption>Pokémon Details (Light)</caption>
     </screenshot>
     <screenshot xml:lang="en">
       <image>
-        https://raw.githubusercontent.com/mariinkys/starrydex/main/resources/screenshots/main-dark.png</image>
+        https://raw.githubusercontent.com/mariinkys/starrydex/main/resources/screenshots/pokemon-dark.png</image>
       <caption>Pokémon Details (Dark)</caption>
     </screenshot>
   </screenshots>
