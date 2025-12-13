@@ -6,7 +6,7 @@
   "sdk-extensions": [
     "org.freedesktop.Sdk.Extension.rust-stable"
   ],
-  "command": "starry-dex",
+  "command": "starrydex",
   "finish-args": [
     "--share=ipc",
     "--socket=fallback-x11",
@@ -20,17 +20,17 @@
   },
   "modules": [
     {
-      "name": "starry-dex",
+      "name": "starrydex",
       "buildsystem": "simple",
       "build-options": {
         "env": {
-          "CARGO_HOME": "/run/build/starry-dex/cargo"
+          "CARGO_HOME": "/run/build/starrydex/cargo"
         }
       },
       "build-commands": [
         "cargo --offline fetch --manifest-path Cargo.toml --verbose",
         "cargo --offline build --release --verbose",
-        "install -Dm0755 ./target/release/starry-dex /app/bin/starry-dex",
+        "install -Dm0755 ./target/release/starrydex /app/bin/starrydex",
         "install -Dm0644 ./resources/app.desktop /app/share/applications/dev.mariinkys.StarryDex.desktop",
         "install -Dm0644 ./resources/app.metainfo.xml /app/share/metainfo/dev.mariinkys.StarryDex.metainfo.xml",
         "install -Dm0644 ./resources/icons/hicolor/scalable/apps/icon.svg /app/share/icons/hicolor/scalable/apps/dev.mariinkys.StarryDex.svg"
