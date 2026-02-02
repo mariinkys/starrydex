@@ -86,9 +86,9 @@ spd = מהירות
 
 <#-- Pokemon Generations -->
 gen-i = הדור הראשון
-gen-ii = הדור השני 
+gen-ii = הדור השני
 gen-iii = הדור השלישי
-gen-iv = הדור הרביעי 
+gen-iv = הדור הרביעי
 gen-v = הדור החמישי
 gen-vi = הדור השישי
 gen-vii = הדור השביעי
