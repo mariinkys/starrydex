@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8" ?>
 <component type="desktop-application">
   <id>dev.mariinkys.StarryDex</id>
   <developer id="dev.mariinkys">
@@ -19,12 +19,14 @@
       Embark on your Pokémon journey with StarryDex, a simple Pokédex application.
     </p>
     <ul>
-      <li>Browse detailed info on all Pokémon species, including stats, evolution
+      <li
+            >Browse detailed info on all Pokémon species, including stats, evolution
         requirements, and more.</li>
       <li>Quickly search Pokémon by name, type, stats, and other filters.</li>
       <li>Works completely offline.</li>
     </ul>
-    <p>This app has been developed with libcosmic for the COSMIC™ desktop, and issues may occur on
+    <p
+        >This app has been developed with libcosmic for the COSMIC™ desktop, and issues may occur on
       other platforms</p>
   </description>
 
@@ -93,14 +95,24 @@
   </keywords>
 
   <releases>
+    <release version="0.3.3" date="2026-02-06">
+    <description>
+      <p>Improved mobile support</p>
+      <p
+                >Updated bundled application data to include the latest PokeApi updates</p>
+      <p>Updated dependencies</p>
+    </description>
+  </release>
     <release version="0.3.2" date="2025-12-13">
       <description>
         <p>Full rewrite of the application GUI</p>
         <p>New responsive viewmode available for the homepage</p>
         <p>New homepage Design</p>
         <p>Improved evolution data row wrapping strategy</p>
-        <p>Fixed bug that caused weird behavior when moving pages after searching</p>
-        <p>Updated bundled application data to include last PokeApi updates</p>
+        <p
+                >Fixed bug that caused weird behavior when moving pages after searching</p>
+        <p
+                >Updated bundled application data to include latest PokeApi updates</p>
         <p>Updated dependencies</p>
       </description>
     </release>
@@ -114,7 +126,8 @@
       <description>
         <p>Pokémon data is now bundled with the application</p>
         <p>Updated application runtime to 25.08</p>
-        <p>The application no longer needs network access, so the permission has been
+        <p
+                >The application no longer needs network access, so the permission has been
           removed</p>
         <p>Updated dependencies</p>
       </description>
@@ -132,7 +145,8 @@
         <p>Added Pokémon evolution data to the details page</p>
         <p>Allow the user to switch Pokémon by clicking on evolution data</p>
         <p>Added filtering by Pokémon generation</p>
-        <p>Added keyboard navigation via arrow keys in both details and main page</p>
+        <p
+                >Added keyboard navigation via arrow keys in both details and main page</p>
         <p>General bug fixes and improvements</p>
         <p>Updated dependencies</p>
       </description>
@@ -143,7 +157,8 @@
         <p>Add total stats count to Pokémon details page</p>
         <p>Improved overall design of the application with new icons</p>
         <p>Pokémon types are now displayed as a nice icon below the Pokémon</p>
-        <p>Pokémon stats are now displayed with a nice bar chart instead of plain text</p>
+        <p
+                >Pokémon stats are now displayed with a nice bar chart instead of plain text</p>
         <p>Allow switching detail Pokémon from the details page</p>
         <p>Improved behavior on smaller screens</p>
         <p>General bug fixes and improvements</p>
@@ -154,7 +169,8 @@
       <description>
         <p>Complete backend rewrite featuring many improvements</p>
         <p>RAM consumption halved by using memory-mapping</p>
-        <p>Implemented pagination and the ability to customize Pokémon per page</p>
+        <p
+                >Implemented pagination and the ability to customize Pokémon per page</p>
         <p>Improved overall smoothness of the application</p>
         <p>Improved cache size</p>
         <p>Updated dependencies</p>
@@ -187,7 +203,8 @@
     <release version="0.2.0" date="2024-09-30">
       <description>
         <p>Complete code rewrite</p>
-        <p>Implemented custom cache that improves performance and drastically reduces disk
+        <p
+                >Implemented custom cache that improves performance and drastically reduces disk
           usage</p>
         <p>Basic Pokémon filtering implementation</p>
         <p>Now you can customize how many Pokémon are shown per each row</p>
@@ -211,7 +228,8 @@
       <description>
         <p>First Stable Release</p>
         <p>Search for Pokémon by Name</p>
-        <p>Look at a specific Pokémon Types, Weight, Height, Stats, Abilities as well as
+        <p
+                >Look at a specific Pokémon Types, Weight, Height, Stats, Abilities as well as
           Encounter Details for that Pokémon on each game.</p>
         <p>Ability to work offline after initial setup</p>
       </description>
