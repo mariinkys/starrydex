@@ -16,12 +16,12 @@ use rustemon::client::{
 use tokio::sync::Semaphore;
 
 use crate::models::starry_pokemon::{
-    StarryEvolutionData, StarryMoveDetails, StarryMoves, StarryPokemon, StarryPokemonData,
-    StarryPokemonEncounterInfo, StarryPokemonGeneration, StarryPokemonSpecie, StarryPokemonStats,
-    StarryPokemonType,
+    StarryMoveDetails, StarryMoves, StarryPokemon, StarryPokemonData, StarryPokemonEncounterInfo,
+    StarryPokemonSpecie, StarryPokemonStats, StarryPokemonType,
 };
 
 mod models;
+mod utils;
 
 #[derive(Debug, Clone)]
 struct StarryApi {
@@ -55,7 +55,7 @@ impl StarryApi {
             .await
             .unwrap_or_default();
 
-        let semaphore = Arc::new(Semaphore::new(30));
+        let semaphore = Arc::new(Semaphore::new(5));
 
         let pokemon_stream = futures::stream::iter(all_entries)
             .map(|entry| {
@@ -73,7 +73,7 @@ impl StarryApi {
                     details_res
                 }
             })
-            .buffer_unordered(30);
+            .buffer_unordered(5);
 
         pokemon_stream
             .collect::<Vec<Result<StarryPokemon, Error>>>()
@@ -87,48 +87,16 @@ impl StarryApi {
     /// Retrieve a single Pokémon Data from PokéApi and parse it to our own data structure
     async fn fetch_pokemon_details(
         name: &str,
-        client: Arc<rustemon::client::RustemonClient>,
+        client: Arc<RustemonClient>,
     ) -> Result<StarryPokemon, Error> {
         let pokemon = rustemon::pokemon::pokemon::get_by_name(name, &client).await?;
-
         let encounter_info =
             rustemon::pokemon::pokemon::encounters::get_by_id(pokemon.id, &client).await?;
-
         let specie_info = rustemon::pokemon::pokemon_species::get_by_name(name, &client).await;
-
-        let evolution_info = if let Ok(specie_info) = &specie_info {
-            async {
-                let url = specie_info
-                    .evolution_chain
-                    .as_ref()
-                    .ok_or_else(|| anywho!("No evolution chain data"))?
-                    .url
-                    .clone();
-
-                let id: i64 = url
-                    .trim_end_matches('/')
-                    .split('/')
-                    .next_back()
-                    .ok_or_else(|| anywho!("Invalid URL format"))?
-                    .parse()
-                    .map_err(|_| anywho!("Could not parse evolution chain ID"))?;
-
-                if id == 0 {
-                    return Err(anywho!("Invalid evolution chain ID"));
-                }
-
-                rustemon::evolution::evolution_chain::get_by_id(id, &client)
-                    .await
-                    .map_err(|err| anywho!("{err}"))
-            }
-            .await
-        } else {
-            Err(anywho!("Species info not available"))
-        };
-
+        let evolution_info = Self::fetch_evolution_info(&specie_info, &client).await;
         let resources_path = Path::new("sprites");
 
-        let image_path = if let Some(_front_default_sprite) = &pokemon.sprites.front_default {
+        let sprite_path = if let Some(_front_default_sprite) = &pokemon.sprites.front_default {
             let image_filename = format!("{}_front.png", pokemon.name);
             let full_image_path = resources_path.join(&pokemon.name).join(&image_filename);
             full_image_path.to_str().map(String::from)
@@ -136,9 +104,87 @@ impl StarryApi {
             None
         };
 
-        let semaphore = Arc::new(Semaphore::new(30));
-        let moves = pokemon.moves;
-        let parsed_moves: Vec<StarryMoves> = futures::stream::iter(moves)
+        let parsed_moves = Self::fetch_moves(pokemon.moves, Arc::clone(&client)).await;
+
+        let starry_pokemon_data = StarryPokemonData {
+            id: pokemon.id,
+            name: pokemon.name.clone(),
+            weight: pokemon.weight,
+            height: pokemon.height,
+            types: pokemon
+                .types
+                .iter()
+                .map(|t| {
+                    StarryPokemonType::try_from(t.type_.name.as_str())
+                        .unwrap_or(StarryPokemonType::Normal)
+                })
+                .collect(),
+            abilities: pokemon
+                .abilities
+                .iter()
+                .map(StarryPokemonData::format_ability)
+                .collect(),
+            stats: StarryPokemonStats::from_stats(&pokemon.stats),
+            moves: parsed_moves,
+        };
+
+        let starry_encounter_info = encounter_info
+            .iter()
+            .map(StarryPokemonEncounterInfo::from)
+            .collect();
+
+        let starry_specie_info = specie_info
+            .ok()
+            .map(|s| StarryPokemonSpecie::try_from_specie(s, evolution_info, resources_path))
+            .transpose()?;
+
+        Ok(StarryPokemon {
+            pokemon: starry_pokemon_data,
+            specie: starry_specie_info,
+            sprite_path,
+            encounter_info: Some(starry_encounter_info),
+        })
+    }
+
+    /// Fetches and parses the evolution chain for a pokemon species
+    async fn fetch_evolution_info(
+        specie_info: &Result<rustemon::model::pokemon::PokemonSpecies, rustemon::error::Error>,
+        client: &Arc<RustemonClient>,
+    ) -> Result<rustemon::model::evolution::EvolutionChain, Error> {
+        let specie_info = specie_info.as_ref().map_err(|e| anywho!("{e}"))?;
+
+        let url = specie_info
+            .evolution_chain
+            .as_ref()
+            .ok_or_else(|| anywho!("No evolution chain data"))?
+            .url
+            .clone();
+
+        let id: i64 = url
+            .trim_end_matches('/')
+            .split('/')
+            .next_back()
+            .ok_or_else(|| anywho!("Invalid URL format"))?
+            .parse()
+            .map_err(|_| anywho!("Could not parse evolution chain ID"))?;
+
+        if id == 0 {
+            return Err(anywho!("Invalid evolution chain ID"));
+        }
+
+        rustemon::evolution::evolution_chain::get_by_id(id, client)
+            .await
+            .map_err(|e| anywho!("{e}"))
+    }
+
+    /// Fetches and parses all moves for a pokemon concurrently
+    async fn fetch_moves(
+        moves: Vec<rustemon::model::pokemon::PokemonMove>,
+        client: Arc<RustemonClient>,
+    ) -> Vec<StarryMoves> {
+        let semaphore = Arc::new(Semaphore::new(5));
+
+        futures::stream::iter(moves)
             .map(|p_move| {
                 let client = Arc::clone(&client);
                 let sem = Arc::clone(&semaphore);
@@ -150,124 +196,32 @@ impl StarryApi {
                             .await
                             .map_err(|e| anywho!("{e}"))?;
 
-                    let movement_type = StarryPokemonType::from_name(&poke_move.type_.name);
+                    let movement_type = StarryPokemonType::try_from(poke_move.type_.name.as_str())
+                        .unwrap_or(StarryPokemonType::Normal);
+
+                    // let primary_vgd = p_move.version_group_details.first().ok_or_else(|| {
+                    //     anywho!("No version group details for '{}'", p_move.move_.name)
+                    // })?;
 
                     let move_details: Vec<StarryMoveDetails> = p_move
                         .version_group_details
                         .iter()
-                        .map(|vgd| StarryMoveDetails {
-                            movement_type: Some(movement_type.clone()),
-                            ..StarryMoveDetails::from(vgd)
-                        })
+                        .map(StarryMoveDetails::from)
                         .collect();
-
-                    let primary = move_details.into_iter().next().ok_or_else(|| {
-                        anywho!("No version group details for '{}'", p_move.move_.name)
-                    })?;
 
                     Ok::<StarryMoves, Error>(StarryMoves {
                         name: poke_move.name.clone(),
                         movement_type,
-                        move_details: primary,
+                        move_details,
                     })
                 }
             })
-            .buffer_unordered(30)
+            .buffer_unordered(5)
             .collect::<Vec<Result<StarryMoves, Error>>>()
             .await
             .into_iter()
-            .filter_map(Result::ok)
-            .collect();
-
-        // Parse Rustemon data to the StarryDex format
-        let starry_pokemon_data = StarryPokemonData {
-            id: pokemon.id,
-            name: pokemon.name,
-            weight: pokemon.weight,
-            height: pokemon.height,
-            types: pokemon
-                .types
-                .iter()
-                .map(|types| StarryPokemonType::from_name(&types.type_.name.to_string()))
-                .collect(),
-            abilities: pokemon
-                .abilities
-                .iter()
-                .map(|a| {
-                    if a.is_hidden {
-                        format!("{} (HIDDEN)", a.ability.name)
-                    } else {
-                        a.ability.name.clone()
-                    }
-                })
-                .collect(),
-            stats: parse_pokemon_stats(&pokemon.stats),
-            moves: parsed_moves,
-        };
-
-        // Parse Rustemon encounter info data to the StarryDex format
-        let starry_encounter_info: Vec<StarryPokemonEncounterInfo> = encounter_info
-            .iter()
-            .map(|ef| StarryPokemonEncounterInfo {
-                city: capitalize_string(&ef.location_area.name),
-                games_method: ef
-                    .version_details
-                    .iter()
-                    .map(|vd| {
-                        // Remove repeated methods
-                        let unique_methods: std::collections::HashSet<String> = vd
-                            .encounter_details
-                            .iter()
-                            .map(|ed| capitalize_string(&ed.method.name))
-                            .collect();
-
-                        format!(
-                            "{}: {}",
-                            capitalize_string(&vd.version.name),
-                            unique_methods
-                                .into_iter()
-                                .collect::<Vec<String>>()
-                                .join(", ")
-                        )
-                    })
-                    .collect(),
-            })
-            .collect();
-
-        // Parse specie info
-        let starry_specie_info = if let Ok(specie_info) = specie_info {
-            Some(StarryPokemonSpecie {
-                evolution_chain_url: specie_info.evolution_chain.as_ref().map(|x| x.url.clone()),
-                flavor_text: specie_info
-                    .flavor_text_entries
-                    .iter()
-                    .find(|x| x.language.name == "en")
-                    .map(|x| {
-                        x.flavor_text
-                            .chars()
-                            .map(|c| if c.is_control() { ' ' } else { c })
-                            .collect::<String>()
-                            .split_whitespace()
-                            .collect::<Vec<&str>>()
-                            .join(" ")
-                    }),
-                generation: StarryPokemonGeneration::from_name(&specie_info.generation.name),
-                evolution_data: if let Ok(evolution_info) = evolution_info {
-                    extract_evolution_data_from_chain_link(&evolution_info.chain, resources_path)
-                } else {
-                    Vec::new()
-                },
-            })
-        } else {
-            None
-        };
-
-        Ok(StarryPokemon {
-            pokemon: starry_pokemon_data,
-            specie: starry_specie_info,
-            sprite_path: image_path,
-            encounter_info: Some(starry_encounter_info),
-        })
+            .filter_map(|r| r.map_err(|e| eprintln!("Move fetch error: {e}")).ok())
+            .collect()
     }
 
     /// Download Pokémon Sprites to the designed folder
@@ -349,155 +303,6 @@ async fn download_image(
             response.status()
         ))
     }
-}
-
-/// Parses the rustemon pokemon stats to the StarryDex ones
-pub fn parse_pokemon_stats(stats: &[rustemon::model::pokemon::PokemonStat]) -> StarryPokemonStats {
-    let mut starry_stats = StarryPokemonStats {
-        hp: 0,
-        attack: 0,
-        defense: 0,
-        sp_attack: 0,
-        sp_defense: 0,
-        speed: 0,
-    };
-
-    for stat in stats {
-        match stat.stat.name.as_str() {
-            "hp" => starry_stats.hp = stat.base_stat,
-            "attack" => starry_stats.attack = stat.base_stat,
-            "defense" => starry_stats.defense = stat.base_stat,
-            "special-attack" => starry_stats.sp_attack = stat.base_stat,
-            "special-defense" => starry_stats.sp_defense = stat.base_stat,
-            "speed" => starry_stats.speed = stat.base_stat,
-            _ => {} // Ignore any unknown stats
-        }
-    }
-
-    starry_stats
-}
-
-/// Extracts the evolution data from a Rustemon ChainLink
-fn extract_evolution_data_from_chain_link(
-    chain_link: &rustemon::model::evolution::ChainLink,
-    resources_path: &std::path::Path,
-) -> Vec<StarryEvolutionData> {
-    let mut evolution_data = Vec::new();
-
-    let sprite_path = resources_path
-        .join(&chain_link.species.name)
-        .join(format!("{}_front.png", chain_link.species.name))
-        .to_str()
-        .map(String::from);
-
-    evolution_data.push(StarryEvolutionData {
-        id: chain_link
-            .species
-            .url
-            .trim_end_matches('/')
-            .split('/')
-            .next_back()
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(0),
-        name: capitalize_string(&chain_link.species.name),
-        sprite_path: sprite_path.clone(),
-        needs_to_evolve: None, // base form doesn't need requirements
-    });
-
-    // add evolved forms
-    for evolution in &chain_link.evolves_to {
-        let mut evolved_data = extract_evolution_data_from_chain_link(evolution, resources_path);
-
-        // set the evolution requirement for the first Pokémon in this evolution line
-        if let Some(first_evolution) = evolved_data.first_mut() {
-            first_evolution.needs_to_evolve =
-                extract_evolution_requirement(&evolution.evolution_details);
-        }
-
-        evolution_data.extend(evolved_data);
-    }
-
-    evolution_data
-}
-
-/// Extracts evolution requirements from evolution details
-fn extract_evolution_requirement(
-    evolution_details: &[rustemon::model::evolution::EvolutionDetail],
-) -> Option<String> {
-    if evolution_details.is_empty() {
-        return None;
-    }
-
-    let detail = &evolution_details[0];
-
-    // level requirement
-    if let Some(min_level) = detail.min_level {
-        return Some(format!("Level {min_level}"));
-    }
-
-    // item requirement
-    if let Some(ref item) = detail.item {
-        return Some(capitalize_string(&item.name));
-    }
-
-    // held item requirement
-    if let Some(ref held_item) = detail.held_item {
-        return Some(format!("Holding {}", capitalize_string(&held_item.name)));
-    }
-
-    // happiness requirement
-    if let Some(min_happiness) = detail.min_happiness {
-        return Some(format!("Happiness {min_happiness}"));
-    }
-
-    // time of day requirement
-    if !detail.time_of_day.is_empty() {
-        return Some(format!(
-            "During {}",
-            capitalize_string(detail.time_of_day.as_str())
-        ));
-    }
-
-    // location requirement
-    if let Some(ref location) = detail.location {
-        return Some(format!("At {}", capitalize_string(&location.name)));
-    }
-
-    // known move requirement
-    if let Some(ref known_move) = detail.known_move {
-        return Some(format!("Knowing {}", capitalize_string(&known_move.name)));
-    }
-
-    // relative physical stats
-    if let Some(relative_physical_stats) = detail.relative_physical_stats {
-        match relative_physical_stats {
-            1 => return Some("Attack > Defense".to_string()),
-            -1 => return Some("Defense > Attack".to_string()),
-            0 => return Some("Attack = Defense".to_string()),
-            _ => {}
-        }
-    }
-
-    None
-}
-
-/// Transforms a kebab-case string into a space-separated string where each word starts with an uppercase letter.
-pub fn capitalize_string(input: &str) -> String {
-    let words: Vec<&str> = input.split('-').collect();
-
-    let capitalized_words: Vec<String> = words
-        .iter()
-        .map(|word| {
-            let mut chars = word.chars();
-            if let Some(first_char) = chars.next() {
-                first_char.to_uppercase().collect::<String>() + chars.as_str()
-            } else {
-                String::new()
-            }
-        })
-        .collect();
-
-    capitalized_words.join(" ")
 }
 
 #[tokio::main]

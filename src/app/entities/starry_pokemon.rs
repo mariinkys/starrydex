@@ -48,6 +48,7 @@ pub struct StarryPokemonData {
     pub types: Vec<StarryPokemonType>,
     pub abilities: Vec<String>,
     pub stats: StarryPokemonStats,
+    pub moves: Vec<StarryMoves>,
 }
 
 impl Debug for StarryPokemonData {
@@ -164,6 +165,35 @@ impl StarryPokemonType {
         };
 
         String::from(name)
+    }
+
+    pub fn get_class(&self) -> cosmic::theme::Svg {
+        use cosmic::iced::Color;
+        use cosmic::widget::svg::Style;
+        use std::rc::Rc;
+
+        let color = match self {
+            StarryPokemonType::Normal => Color::parse("#A0A29F"),
+            StarryPokemonType::Fire => Color::parse("#FBA54C"),
+            StarryPokemonType::Water => Color::parse("#539DDF"),
+            StarryPokemonType::Electric => Color::parse("#F2D94E"),
+            StarryPokemonType::Grass => Color::parse("#5FBD58"),
+            StarryPokemonType::Ice => Color::parse("#75D0C1"),
+            StarryPokemonType::Fighting => Color::parse("#D3425F"),
+            StarryPokemonType::Poison => Color::parse("#B763CF"),
+            StarryPokemonType::Ground => Color::parse("#DA7C4D"),
+            StarryPokemonType::Flying => Color::parse("#A1BBEC"),
+            StarryPokemonType::Psychic => Color::parse("#FA8581"),
+            StarryPokemonType::Bug => Color::parse("#92BC2C"),
+            StarryPokemonType::Rock => Color::parse("#C9BB8A"),
+            StarryPokemonType::Ghost => Color::parse("#5F6DBC"),
+            StarryPokemonType::Dragon => Color::parse("#0C69C8"),
+            StarryPokemonType::Dark => Color::parse("#595761"),
+            StarryPokemonType::Steel => Color::parse("#5695A3"),
+            StarryPokemonType::Fairy => Color::parse("#EE90E6"),
+        };
+
+        cosmic::theme::Svg::Custom(Rc::new(move |_theme| Style { color }))
     }
 }
 
@@ -283,4 +313,49 @@ pub struct StarryEvolutionData {
     pub name: String,
     pub sprite_path: Option<String>,
     pub needs_to_evolve: Option<String>,
+}
+
+#[derive(
+    Archive, CheckBytes, Serialize, Deserialize, Debug, serde::Serialize, serde::Deserialize,
+)]
+#[rkyv(derive(Debug))]
+pub struct StarryMoves {
+    pub name: String,
+    pub movement_type: StarryPokemonType,
+    pub move_details: Vec<StarryMoveDetails>,
+    #[serde(skip, default)]
+    pub show_details: bool,
+}
+
+#[derive(
+    Archive, CheckBytes, Serialize, Deserialize, Debug, serde::Serialize, serde::Deserialize,
+)]
+#[rkyv(derive(Debug))]
+pub struct StarryMoveDetails {
+    pub game: String,
+    pub learned_at: Option<i64>,
+    pub learn_method: Vec<StarryMoveLearnMethod>,
+}
+
+#[derive(
+    Archive, CheckBytes, Serialize, Deserialize, Debug, serde::Serialize, serde::Deserialize,
+)]
+#[rkyv(derive(Debug))]
+#[repr(u8)]
+pub enum StarryMoveLearnMethod {
+    LevelUp,
+    Tutor,
+    TM,
+    Unknown,
+}
+
+impl std::fmt::Display for StarryMoveLearnMethod {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            StarryMoveLearnMethod::LevelUp => write!(f, "{}", fl!("level-up")),
+            StarryMoveLearnMethod::Tutor => write!(f, "{}", fl!("tutor")),
+            StarryMoveLearnMethod::TM => write!(f, "{}", fl!("tm")),
+            StarryMoveLearnMethod::Unknown => write!(f, "{}", fl!("unknown")),
+        }
+    }
 }

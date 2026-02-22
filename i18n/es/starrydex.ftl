@@ -43,6 +43,10 @@ no-encounter-info = No hay detalles de encuentro...
 link-more-info = Más Información
 pokemon-abilities = Habilidades
 no-flavor-text = Sin descripción...
+pokemon-moves = Movimientos
+level-up = Subir Nivel
+tutor = Tutor
+tm = MT
 
 <#-- Filters Page -->
 filters-page = Filtros
@@ -83,15 +87,15 @@ sp-d = Defensa Especial
 spd = Velocidad
 
 <#-- Pokemon Generations -->
-gen-i = Gen I 
-gen-ii = Gen II 
+gen-i = Gen I
+gen-ii = Gen II
 gen-iii = Gen III
-gen-iv = Gen IV 
+gen-iv = Gen IV
 gen-v = Gen V
 gen-vi = Gen VI
 gen-vii = Gen VII
 gen-viii = Gen VIII
-gen-ix = Gen IX 
+gen-ix = Gen IX
 unknown = Desconocida
 
 <#-- Pokemon Evolution Data -->
