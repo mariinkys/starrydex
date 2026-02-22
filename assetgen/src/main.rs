@@ -16,8 +16,9 @@ use rustemon::client::{
 use tokio::sync::Semaphore;
 
 use crate::models::starry_pokemon::{
-    StarryEvolutionData, StarryPokemon, StarryPokemonData, StarryPokemonEncounterInfo,
-    StarryPokemonGeneration, StarryPokemonSpecie, StarryPokemonStats, StarryPokemonType,
+    StarryEvolutionData, StarryMoveDetails, StarryMoves, StarryPokemon, StarryPokemonData,
+    StarryPokemonEncounterInfo, StarryPokemonGeneration, StarryPokemonSpecie, StarryPokemonStats,
+    StarryPokemonType,
 };
 
 mod models;
@@ -58,11 +59,11 @@ impl StarryApi {
 
         let pokemon_stream = futures::stream::iter(all_entries)
             .map(|entry| {
-                let client = self.client.clone();
+                let client = Arc::clone(&self.client);
                 let sem = Arc::clone(&semaphore);
                 async move {
                     let _permit = sem.acquire().await.unwrap();
-                    let details_res = Self::fetch_pokemon_details(&entry.name, &client).await;
+                    let details_res = Self::fetch_pokemon_details(&entry.name, client).await;
                     if let Err(details_err) = &details_res {
                         eprintln!(
                             "Error downlading details for {}, Error: {}",
@@ -86,14 +87,14 @@ impl StarryApi {
     /// Retrieve a single Pokémon Data from PokéApi and parse it to our own data structure
     async fn fetch_pokemon_details(
         name: &str,
-        client: &rustemon::client::RustemonClient,
+        client: Arc<rustemon::client::RustemonClient>,
     ) -> Result<StarryPokemon, Error> {
-        let pokemon = rustemon::pokemon::pokemon::get_by_name(name, client).await?;
+        let pokemon = rustemon::pokemon::pokemon::get_by_name(name, &client).await?;
 
         let encounter_info =
-            rustemon::pokemon::pokemon::encounters::get_by_id(pokemon.id, client).await?;
+            rustemon::pokemon::pokemon::encounters::get_by_id(pokemon.id, &client).await?;
 
-        let specie_info = rustemon::pokemon::pokemon_species::get_by_name(name, client).await;
+        let specie_info = rustemon::pokemon::pokemon_species::get_by_name(name, &client).await;
 
         let evolution_info = if let Ok(specie_info) = &specie_info {
             async {
@@ -116,7 +117,7 @@ impl StarryApi {
                     return Err(anywho!("Invalid evolution chain ID"));
                 }
 
-                rustemon::evolution::evolution_chain::get_by_id(id, client)
+                rustemon::evolution::evolution_chain::get_by_id(id, &client)
                     .await
                     .map_err(|err| anywho!("{err}"))
             }
@@ -134,6 +135,49 @@ impl StarryApi {
         } else {
             None
         };
+
+        let semaphore = Arc::new(Semaphore::new(30));
+        let moves = pokemon.moves;
+        let parsed_moves: Vec<StarryMoves> = futures::stream::iter(moves)
+            .map(|p_move| {
+                let client = Arc::clone(&client);
+                let sem = Arc::clone(&semaphore);
+                async move {
+                    let _permit = sem.acquire().await.map_err(|e| anywho!("{e}"))?;
+
+                    let poke_move =
+                        rustemon::moves::move_::get_by_name(&p_move.move_.name, &client)
+                            .await
+                            .map_err(|e| anywho!("{e}"))?;
+
+                    let movement_type = StarryPokemonType::from_name(&poke_move.type_.name);
+
+                    let move_details: Vec<StarryMoveDetails> = p_move
+                        .version_group_details
+                        .iter()
+                        .map(|vgd| StarryMoveDetails {
+                            movement_type: Some(movement_type.clone()),
+                            ..StarryMoveDetails::from(vgd)
+                        })
+                        .collect();
+
+                    let primary = move_details.into_iter().next().ok_or_else(|| {
+                        anywho!("No version group details for '{}'", p_move.move_.name)
+                    })?;
+
+                    Ok::<StarryMoves, Error>(StarryMoves {
+                        name: poke_move.name.clone(),
+                        movement_type,
+                        move_details: primary,
+                    })
+                }
+            })
+            .buffer_unordered(30)
+            .collect::<Vec<Result<StarryMoves, Error>>>()
+            .await
+            .into_iter()
+            .filter_map(Result::ok)
+            .collect();
 
         // Parse Rustemon data to the StarryDex format
         let starry_pokemon_data = StarryPokemonData {
@@ -158,6 +202,7 @@ impl StarryApi {
                 })
                 .collect(),
             stats: parse_pokemon_stats(&pokemon.stats),
+            moves: parsed_moves,
         };
 
         // Parse Rustemon encounter info data to the StarryDex format

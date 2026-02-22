@@ -17,9 +17,10 @@ pub struct StarryPokemonData {
     pub types: Vec<StarryPokemonType>,
     pub abilities: Vec<String>,
     pub stats: StarryPokemonStats,
+    pub moves: Vec<StarryMoves>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub enum StarryPokemonType {
     Normal,
     Fire,
@@ -130,4 +131,51 @@ pub struct StarryEvolutionData {
     pub name: String,
     pub sprite_path: Option<String>,
     pub needs_to_evolve: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct StarryMoves {
+    pub name: String,
+    pub movement_type: StarryPokemonType,
+    pub move_details: StarryMoveDetails,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct StarryMoveDetails {
+    pub game: String,
+    pub learned_at: Option<i64>,
+    pub learn_method: Vec<StarryMoveLearnMethod>,
+    pub movement_type: Option<StarryPokemonType>,
+}
+
+impl From<&rustemon::model::pokemon::PokemonMoveVersion> for StarryMoveDetails {
+    fn from(vgd: &rustemon::model::pokemon::PokemonMoveVersion) -> Self {
+        StarryMoveDetails {
+            game: vgd.version_group.name.clone(),
+            learned_at: (vgd.level_learned_at != 0).then_some(vgd.level_learned_at),
+            learn_method: vec![StarryMoveLearnMethod::from(
+                vgd.move_learn_method.name.as_str(),
+            )],
+            movement_type: None,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum StarryMoveLearnMethod {
+    LevelUp,
+    Tutor,
+    TM,
+    Unknown,
+}
+
+impl From<&str> for StarryMoveLearnMethod {
+    fn from(s: &str) -> Self {
+        match s {
+            "level-up" => StarryMoveLearnMethod::LevelUp,
+            "tutor" => StarryMoveLearnMethod::Tutor,
+            "machine" => StarryMoveLearnMethod::TM,
+            _ => StarryMoveLearnMethod::Unknown,
+        }
+    }
 }
