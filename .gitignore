@@ -11,5 +11,6 @@ target/
 
 # Flatpak Support
 .flatpak-builder
+builddir
 flatpak-cargo-generator.py
 repo
