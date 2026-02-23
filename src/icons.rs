@@ -41,6 +41,7 @@ impl IconCache {
         bundle!("go-previous-symbolic", 18);
         bundle!("go-up-symbolic", 18);
         bundle!("go-down-symbolic", 18);
+        bundle!("audio-speaker-symbolic", 18);
         bundle!("type-bug", 18);
         bundle!("type-dark", 18);
         bundle!("type-dragon", 18);

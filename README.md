@@ -54,6 +54,11 @@ To update/generate your assets you have to execute: `cargo run -p assetgen -- -a
 -s = Only Sprites
 ```
 
+### Dependencies
+
+All of [libcosmic dependencies](https://github.com/pop-os/libcosmic?tab=readme-ov-file#dependencies) and
+- GStreamer 1.0 with plugins (base)
+
 ## Copyright and Licensing
 
 Copyright 2024 © Alex Marín

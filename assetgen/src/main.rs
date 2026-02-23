@@ -95,10 +95,19 @@ impl StarryApi {
         let specie_info = rustemon::pokemon::pokemon_species::get_by_name(name, &client).await;
         let evolution_info = Self::fetch_evolution_info(&specie_info, &client).await;
         let resources_path = Path::new("sprites");
+        let cries_path = Path::new("cries");
 
         let sprite_path = if let Some(_front_default_sprite) = &pokemon.sprites.front_default {
             let image_filename = format!("{}_front.png", pokemon.name);
             let full_image_path = resources_path.join(&pokemon.name).join(&image_filename);
+            full_image_path.to_str().map(String::from)
+        } else {
+            None
+        };
+
+        let cry_path = if let Some(_latest_cry) = &pokemon.cries.latest {
+            let cry_filename = format!("{}_cry.ogg", pokemon.name);
+            let full_image_path = cries_path.join(&pokemon.name).join(&cry_filename);
             full_image_path.to_str().map(String::from)
         } else {
             None
@@ -142,6 +151,7 @@ impl StarryApi {
             pokemon: starry_pokemon_data,
             specie: starry_specie_info,
             sprite_path,
+            cry_path,
             encounter_info: Some(starry_encounter_info),
         })
     }
@@ -266,6 +276,49 @@ impl StarryApi {
 
         Ok(())
     }
+
+    /// Download Pokémon Sprites to the designed folder
+    async fn download_all_pokemon_cries(&self, download_path: &Path) -> Result<(), Error> {
+        let all_entries = rustemon::pokemon::pokemon::get_all_entries(&self.client)
+            .await
+            .unwrap_or_default();
+
+        let client = reqwest::Client::builder()
+            .pool_max_idle_per_host(10)
+            .build()?;
+
+        let semaphore = Arc::new(Semaphore::new(20));
+
+        let results = futures::stream::iter(all_entries)
+            .map(|entry| {
+                let client = client.clone();
+                let semaphore = Arc::clone(&semaphore);
+                let download_path = download_path.to_path_buf();
+
+                async move {
+                    let _permit = semaphore.acquire().await.unwrap();
+                    let pokemon =
+                        rustemon::pokemon::pokemon::get_by_name(&entry.name, &self.client).await?;
+                    if let Some(cry_url) = pokemon.cries.latest {
+                        download_cry(&client, cry_url, pokemon.name.to_string(), download_path)
+                            .await
+                    } else {
+                        Ok(())
+                    }
+                }
+            })
+            .buffer_unordered(20) // Adjust the number of concurrent tasks
+            .collect::<Vec<_>>()
+            .await;
+
+        for result in results {
+            if let Err(e) = result {
+                eprintln!("Error downloading cry: {e}");
+            }
+        }
+
+        Ok(())
+    }
 }
 
 /// Attempts to download a pokemon sprite (image_url) to the preconfigured location following the naming scheme of the app
@@ -305,6 +358,43 @@ async fn download_image(
     }
 }
 
+/// Attempts to download a pokemon sprite (image_url) to the preconfigured location following the naming scheme of the app
+async fn download_cry(
+    client: &reqwest::Client,
+    cry_url: String,
+    pokemon_name: String,
+    download_path: PathBuf,
+) -> Result<(), Error> {
+    if !download_path.exists() {
+        std::fs::create_dir_all(&download_path).expect("Failed to create the resources path");
+    }
+
+    let cry_filename = format!("{pokemon_name}_cry.ogg");
+    let cry_path = download_path.join(&pokemon_name).join(&cry_filename);
+
+    // Check if file already exists
+    if tokio::fs::metadata(&cry_path).await.is_ok() {
+        return Ok(());
+    }
+
+    let response = client.get(&cry_url).send().await?;
+    if response.status().is_success() {
+        let bytes = response.bytes().await?;
+        let path = std::path::PathBuf::from(&cry_path);
+        if let Some(parent) = path.parent() {
+            tokio::fs::create_dir_all(parent).await?;
+        }
+        tokio::fs::write(&cry_path, &bytes).await?;
+        Ok(())
+    } else {
+        eprintln!("Error downloading cry for Pokémon: {}", &pokemon_name);
+        Err(anywho!(
+            "Failed to download cry. Status: {}",
+            response.status()
+        ))
+    }
+}
+
 #[tokio::main]
 async fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -323,6 +413,7 @@ async fn main() {
             println!("Executing all operations...");
             download_pokemon_data(&api_client).await;
             download_sprites(&api_client).await;
+            download_cries(&api_client).await;
         }
         "-p" => {
             println!("Downloading Pokémon data only...");
@@ -331,6 +422,10 @@ async fn main() {
         "-s" => {
             println!("Downloading sprites only...");
             download_sprites(&api_client).await;
+        }
+        "-c" => {
+            println!("Downloading cries only...");
+            download_cries(&api_client).await;
         }
         _ => {
             println!("Invalid flag: {}", flag);
@@ -411,5 +506,36 @@ async fn download_sprites(api_client: &StarryApi) {
         println!("Archive created successfully");
     } else {
         println!("Failed to download sprites");
+    }
+}
+
+async fn download_cries(api_client: &StarryApi) {
+    let temp_cries_dir = std::env::temp_dir().join("starry_cries");
+
+    println!("Downloading Pokémon Cries");
+    let download_images = api_client.download_all_pokemon_cries(&temp_cries_dir).await;
+
+    if let Ok(_res) = download_images {
+        println!("Cries downloaded successfully to: {:?}", &temp_cries_dir);
+
+        if let Err(e) = tokio::fs::create_dir_all("assets").await {
+            println!("Failed to create assets directory: {}", e);
+            return;
+        }
+
+        let assets_path = Path::new("assets").join("cries.tar.gz");
+        let tar_gz = std::fs::File::create(assets_path).unwrap();
+        let enc = GzEncoder::new(tar_gz, Compression::default());
+        let mut tar = tar::Builder::new(enc);
+
+        // add the entire sprites directory to the archive
+        let _res = tar.append_dir_all("cries", &temp_cries_dir);
+        tar.finish().unwrap();
+
+        // clean up temp directory
+        let _res = std::fs::remove_dir_all(&temp_cries_dir);
+        println!("Archive created successfully");
+    } else {
+        println!("Failed to download cries");
     }
 }
