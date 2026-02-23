@@ -95,14 +95,23 @@
   </keywords>
 
   <releases>
-    <release version="0.3.3" date="2026-02-06">
-    <description>
-      <p>Improved mobile support</p>
-      <p
+    <release version="0.3.4" date="2026-02-23">
+        <description>
+        <p>Added Pokémon movements data</p>
+        <p>Added Pokémon cries data</p>
+        <p
                 >Updated bundled application data to include the latest PokeApi updates</p>
-      <p>Updated dependencies</p>
-    </description>
-  </release>
+        <p>Updated dependencies</p>
+        </description>
+    </release>
+    <release version="0.3.3" date="2026-02-06">
+        <description>
+        <p>Improved mobile support</p>
+        <p
+                >Updated bundled application data to include the latest PokeApi updates</p>
+        <p>Updated dependencies</p>
+        </description>
+    </release>
     <release version="0.3.2" date="2025-12-13">
       <description>
         <p>Full rewrite of the application GUI</p>
