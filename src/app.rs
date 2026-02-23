@@ -7,7 +7,7 @@ use crate::app::entities::{
     PokemonInfo, StarryPokemon, StarryPokemonGeneration, StarryPokemonType,
 };
 use crate::app::utils::presentation::{capitalize_string, scale_numbers};
-use crate::app::utils::{Filters, PaginationAction, remove_dir_contents};
+use crate::app::utils::{Filters, PaginationAction, play_audio_file, remove_dir_contents};
 use crate::app::widgets::barchart::BarChart;
 use crate::config::{AppTheme, ConfigInput, StarryConfig, TypeFilteringMode, ViewMode};
 use crate::key_binds::key_binds;
@@ -138,6 +138,8 @@ pub enum PokemonListInput {
 pub enum PokemonDetailsInput {
     /// Some pagination action has been requested
     PaginationAction(PaginationAction),
+    /// User wants to play the given audio file
+    PlayAudioFile(String),
     /// User wants to toggle the details of a move
     ToggleMoveDetails(String),
     /// User wants to toggle the pokemon details view
@@ -685,6 +687,10 @@ impl cosmic::Application for AppModel {
                             }
                         }
                     },
+                    PokemonDetailsInput::PlayAudioFile(file_path) => {
+                        #[cfg(unix)]
+                        play_audio_file(file_path.as_str());
+                    }
                     PokemonDetailsInput::ToggleMoveDetails(move_name) => {
                         #[allow(clippy::collapsible_if)]
                         if let Some(current_pokemon) = selected_pokemon.as_mut() {
@@ -1171,6 +1177,13 @@ pub fn pokemon_details<'a>(
                             .unwrap_or_default()
                     ))
                 ]
+                .push_maybe(starry_pokemon.cry_path.as_ref().map(|path| {
+                    button::icon(icons::get_handle("audio-speaker-symbolic", 18)).on_press(
+                        Message::PokemonDetailsInput(PokemonDetailsInput::PlayAudioFile(
+                            path.clone(),
+                        )),
+                    )
+                }))
                 .align_x(Alignment::Center)
                 .width(Length::Fill),
             )

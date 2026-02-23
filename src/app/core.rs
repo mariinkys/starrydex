@@ -99,7 +99,17 @@ impl StarryCore {
             .join(APP_ID)
             .join(format!("resources_v{}", CACHE_VERSION));
         if let Err(e) = Self::extract_sprite_archive(&sprites_directory).await {
-            eprintln!("Error downloading sprites: {e}");
+            eprintln!("Error extracting sprites: {e}");
+        }
+
+        println!("Extracting Cries");
+        // we don't join sprites because the archive already has a /sprites folder
+        let cries_directory = dirs::data_dir()
+            .unwrap()
+            .join(APP_ID)
+            .join(format!("cries_v{}", CACHE_VERSION));
+        if let Err(e) = Self::extract_cry_archive(&cries_directory).await {
+            eprintln!("Error extracting cries: {e}");
         }
 
         Ok(())
@@ -118,6 +128,11 @@ impl StarryCore {
             .join(APP_ID)
             .join(format!("resources_v{}", CACHE_VERSION));
 
+        let base_cry_path = dirs::data_dir()
+            .unwrap()
+            .join(APP_ID)
+            .join(format!("cries_v{}", CACHE_VERSION));
+
         // Modify sprite_path for all pokémon
         pokemon_data = pokemon_data
             .into_iter()
@@ -125,6 +140,13 @@ impl StarryCore {
                 if let Some(sprite_path) = pokemon.sprite_path {
                     pokemon.sprite_path = std::path::Path::new(&base_sprite_path)
                         .join(sprite_path)
+                        .to_str()
+                        .map(String::from);
+                }
+
+                if let Some(cry_path) = pokemon.cry_path {
+                    pokemon.cry_path = std::path::Path::new(&base_cry_path)
+                        .join(cry_path)
                         .to_str()
                         .map(String::from);
                 }
@@ -155,6 +177,18 @@ impl StarryCore {
 
         // Extract using tar crate
         let mut archive = tar::Archive::new(flate2::read::GzDecoder::new(BUNDLED_SPRITES));
+        archive.unpack(target_dir)?;
+
+        Ok(())
+    }
+
+    /// Extract cries archive
+    async fn extract_cry_archive(target_dir: &std::path::Path) -> Result<(), Error> {
+        // Bundle sprites as tar.gz and extract
+        const BUNDLED_CRIES: &[u8] = include_bytes!("../../assets/cries.tar.gz");
+
+        // Extract using tar crate
+        let mut archive = tar::Archive::new(flate2::read::GzDecoder::new(BUNDLED_CRIES));
         archive.unpack(target_dir)?;
 
         Ok(())

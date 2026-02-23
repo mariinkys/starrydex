@@ -14,6 +14,7 @@ pub struct StarryPokemon {
     pub pokemon: StarryPokemonData,
     pub specie: Option<StarryPokemonSpecie>,
     pub sprite_path: Option<String>,
+    pub cry_path: Option<String>,
     pub encounter_info: Option<Vec<StarryPokemonEncounterInfo>>,
 }
 
