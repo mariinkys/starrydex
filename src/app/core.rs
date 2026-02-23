@@ -16,7 +16,7 @@ use crate::app::entities::{
 
 /// Unique identifier in RDNN (reverse domain name notation) format.
 pub const APP_ID: &str = "dev.mariinkys.StarryDex";
-pub const CACHE_VERSION: i32 = 6;
+pub const CACHE_VERSION: i32 = 7;
 
 type ArchivedStarryPokemonMap = rkyv::Archived<BTreeMap<i64, StarryPokemon>>;
 
