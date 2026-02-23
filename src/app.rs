@@ -138,6 +138,8 @@ pub enum PokemonListInput {
 pub enum PokemonDetailsInput {
     /// Some pagination action has been requested
     PaginationAction(PaginationAction),
+    /// User wants to toggle the details of a move
+    ToggleMoveDetails(String),
     /// User wants to toggle the pokemon details view
     TogglePokemonDetails(bool),
 }
@@ -683,6 +685,19 @@ impl cosmic::Application for AppModel {
                             }
                         }
                     },
+                    PokemonDetailsInput::ToggleMoveDetails(move_name) => {
+                        #[allow(clippy::collapsible_if)]
+                        if let Some(current_pokemon) = selected_pokemon.as_mut() {
+                            if let Some(m) = current_pokemon
+                                .pokemon
+                                .moves
+                                .iter_mut()
+                                .find(|m| m.name == move_name)
+                            {
+                                m.show_details = !m.show_details;
+                            }
+                        }
+                    }
                     PokemonDetailsInput::TogglePokemonDetails(value) => {
                         *wants_pokemon_details = value;
                     }
@@ -1173,7 +1188,8 @@ pub fn pokemon_details<'a>(
             container(Row::new().spacing(spacing.space_s).extend(
                 starry_pokemon.pokemon.types.iter().map(|poke_type| {
                     widget::tooltip(
-                        widget::icon(icons::get_handle_owned(poke_type.icon_name(), 18)),
+                        widget::icon(icons::get_handle_owned(poke_type.icon_name(), 18))
+                            .class(poke_type.get_class()),
                         text(capitalize_string(&poke_type.to_string())),
                         widget::tooltip::Position::Bottom,
                     )
@@ -1269,6 +1285,95 @@ pub fn pokemon_details<'a>(
                 .align_x(Alignment::Center)
                 .padding(10.)
                 .class(theme::Container::Card),
+        )
+        // MOVES DATA
+        .push(
+            container(
+                widget::Column::new()
+                    .push(
+                        widget::text::title3(fl!("pokemon-moves"))
+                            .width(Length::Fill)
+                            .align_x(Alignment::Center),
+                    )
+                    .extend(starry_pokemon.pokemon.moves.iter().map(|starry_move| {
+                        let header = widget::container(
+                            row![
+                                widget::tooltip(
+                                    widget::icon(icons::get_handle_owned(
+                                        starry_move.movement_type.icon_name(),
+                                        18
+                                    ))
+                                    .class(starry_move.movement_type.get_class()),
+                                    text(capitalize_string(&starry_move.movement_type.to_string())),
+                                    widget::tooltip::Position::Bottom,
+                                ),
+                                text(capitalize_string(&starry_move.name)).width(Length::Fill),
+                                button::icon(icons::get_handle(
+                                    if starry_move.show_details {
+                                        "go-up-symbolic"
+                                    } else {
+                                        "go-down-symbolic"
+                                    },
+                                    16,
+                                ))
+                                .on_press(
+                                    Message::PokemonDetailsInput(
+                                        PokemonDetailsInput::ToggleMoveDetails(
+                                            starry_move.name.clone()
+                                        ),
+                                    )
+                                ),
+                            ]
+                            .spacing(spacing.space_xs)
+                            .align_y(Alignment::Center),
+                        )
+                        .width(Length::Fill)
+                        .padding([spacing.space_none, spacing.space_xxs]);
+
+                        let mut move_col = widget::Column::new().push(header);
+
+                        if starry_move.show_details {
+                            let details = widget::container(
+                                widget::Column::new()
+                                    .extend(starry_move.move_details.iter().map(|detail| {
+                                        row![
+                                            text(capitalize_string(&detail.game))
+                                                .width(Length::Fill)
+                                                .size(13.),
+                                            text(capitalize_string(
+                                                &detail
+                                                    .learn_method
+                                                    .first()
+                                                    .map(|m| m.to_string())
+                                                    .unwrap_or_default()
+                                            ))
+                                            .size(13.),
+                                            text(
+                                                detail
+                                                    .learned_at
+                                                    .map(|lvl| format!("Lv.{lvl}"))
+                                                    .unwrap_or_default()
+                                            )
+                                            .size(13.),
+                                        ]
+                                        .spacing(spacing.space_xs)
+                                        .align_y(Alignment::Center)
+                                        .into()
+                                    }))
+                                    .padding([spacing.space_none, spacing.space_s]),
+                            )
+                            .width(Length::Fill)
+                            .class(theme::Container::List);
+
+                            move_col = move_col.push(details);
+                        }
+
+                        move_col.into()
+                    })),
+            )
+            .width(Length::Fill)
+            .class(theme::Container::Card)
+            .padding(10),
         )
         // ENCOUNTER DATA (IF ANY)
         .extend(

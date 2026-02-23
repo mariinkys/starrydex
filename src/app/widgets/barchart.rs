@@ -311,6 +311,7 @@ impl<'a, Message: 'static + Clone> Widget<Message, cosmic::Theme, cosmic::Render
                         vertical_alignment: Vertical::Center,
                         shaping: cosmic::iced::advanced::text::Shaping::Basic,
                         wrapping: cosmic::iced_core::text::Wrapping::Word,
+                        ellipsize: cosmic::iced_core::text::Ellipsize::None,
                     },
                     Point::new(text_x, bar_y - value_height + 10.), // we know value height is 20 if we are here
                     theme.cosmic().on_bg_color().into(),
@@ -333,6 +334,7 @@ impl<'a, Message: 'static + Clone> Widget<Message, cosmic::Theme, cosmic::Render
                         vertical_alignment: Vertical::Top,
                         shaping: cosmic::iced::advanced::text::Shaping::Advanced,
                         wrapping: cosmic::iced_core::text::Wrapping::Word,
+                        ellipsize: cosmic::iced_core::text::Ellipsize::None,
                     },
                     Point::new(text_x, chart_y + chart_height + self.row_spacing),
                     theme.cosmic().on_bg_color().into(),
