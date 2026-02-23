@@ -1,6 +1,3 @@
-use gst::prelude::*;
-use gstreamer as gst;
-
 #[cfg(unix)]
 pub fn play_audio_file(file_path: &str) {
     let uri = if file_path.starts_with('/') {
@@ -9,26 +6,13 @@ pub fn play_audio_file(file_path: &str) {
         format!("file:///{file_path}")
     };
 
-    let Ok(playbin) = gst::ElementFactory::make("playbin")
-        .property("uri", &uri)
-        .build()
-    else {
-        eprintln!("Failed to create playbin");
-        return;
-    };
+    let child = std::process::Command::new("gst-launch-1.0")
+        .args(["playbin", &format!("uri={uri}")])
+        .spawn();
 
-    let _ = playbin.set_state(gst::State::Playing);
-
-    std::thread::spawn(move || {
-        let bus = playbin.bus().unwrap();
-        for msg in bus.iter_timed(gst::ClockTime::NONE) {
-            use gst::MessageView;
-            match msg.view() {
-                MessageView::Eos(..) | MessageView::Error(..) => break,
-                _ => {}
-            }
-        }
-        let _ = playbin.set_state(gst::State::Null);
-        drop(playbin);
-    });
+    if let Ok(mut child) = child {
+        std::thread::spawn(move || {
+            let _ = child.wait();
+        });
+    }
 }

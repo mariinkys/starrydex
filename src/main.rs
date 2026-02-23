@@ -13,9 +13,6 @@ mod images;
 mod key_binds;
 
 fn main() -> cosmic::iced::Result {
-    // Init Gstreamer
-    gstreamer::init().expect("Failed to initialize GStreamer");
-
     // Get the system's preferred languages.
     let requested_languages = i18n_embed::DesktopLanguageRequester::requested_languages();
 

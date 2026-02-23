@@ -28,9 +28,6 @@ anywho.workspace = true
 rkyv.workspace = true
 bytecheck.workspace = true
 
-[target.'cfg(unix)'.dependencies] # gstreamer dependencies for ogg file reproduction support
-gstreamer = "0.24.4"
-
 [workspace]
 members = ["assetgen"]
 
