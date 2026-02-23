@@ -346,6 +346,7 @@ pub enum StarryMoveLearnMethod {
     LevelUp,
     Tutor,
     TM,
+    Egg,
     Unknown,
 }
 
@@ -355,6 +356,7 @@ impl std::fmt::Display for StarryMoveLearnMethod {
             StarryMoveLearnMethod::LevelUp => write!(f, "{}", fl!("level-up")),
             StarryMoveLearnMethod::Tutor => write!(f, "{}", fl!("tutor")),
             StarryMoveLearnMethod::TM => write!(f, "{}", fl!("tm")),
+            StarryMoveLearnMethod::Egg => write!(f, "{}", fl!("egg")),
             StarryMoveLearnMethod::Unknown => write!(f, "{}", fl!("unknown")),
         }
     }

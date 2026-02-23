@@ -46,7 +46,8 @@ no-flavor-text = Sin descripción...
 pokemon-moves = Movimientos
 level-up = Subir Nivel
 tutor = Tutor
-tm = MT
+tm = MT/MO
+egg = Huevo
 
 <#-- Filters Page -->
 filters-page = Filtros

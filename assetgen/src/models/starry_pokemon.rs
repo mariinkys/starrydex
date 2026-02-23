@@ -326,6 +326,7 @@ pub enum StarryMoveLearnMethod {
     LevelUp,
     Tutor,
     TM,
+    Egg,
     Unknown,
 }
 
@@ -335,6 +336,7 @@ impl From<&str> for StarryMoveLearnMethod {
             "level-up" => StarryMoveLearnMethod::LevelUp,
             "tutor" => StarryMoveLearnMethod::Tutor,
             "machine" => StarryMoveLearnMethod::TM,
+            "egg" => StarryMoveLearnMethod::Egg,
             _ => StarryMoveLearnMethod::Unknown,
         }
     }

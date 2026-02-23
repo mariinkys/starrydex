@@ -46,7 +46,8 @@ no-flavor-text = No flavor text available...
 pokemon-moves = Pokémon Moves
 level-up = Level Up
 tutor = Tutor
-tm = TM
+tm = TM/HM
+egg = Egg
 
 <#-- Filters Page -->
 filters-page = Filters
