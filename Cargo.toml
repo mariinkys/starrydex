@@ -55,6 +55,7 @@ reqwest = { version = "0.13.2", features = ["json"] }
 
 [dependencies.libcosmic]
 git = "https://github.com/pop-os/libcosmic.git"
+branch = "iced-rebase"
 # See https://github.com/pop-os/libcosmic/blob/master/Cargo.toml for available features.
 features = [
     # Accessibility support
