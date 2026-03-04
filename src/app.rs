@@ -1218,6 +1218,18 @@ pub fn pokemon_details<'a>(
             ))
             .align_x(Alignment::Center),
         )
+        // FLAVOR TEXT
+        .push_maybe(
+            starry_pokemon
+                .specie
+                .as_ref()
+                .and_then(|s| s.flavor_text.as_ref())
+                .map(|text| {
+                    widget::text::body(text)
+                        .align_x(Alignment::Center)
+                        .width(Length::Fill)
+                }),
+        )
         // WEIGHT & HEIGHT
         .push(
             row![
