@@ -174,27 +174,27 @@ impl StarryPokemonType {
         use std::rc::Rc;
 
         let color = match self {
-            StarryPokemonType::Normal => Color::parse("#A0A29F"),
-            StarryPokemonType::Fire => Color::parse("#FBA54C"),
-            StarryPokemonType::Water => Color::parse("#539DDF"),
-            StarryPokemonType::Electric => Color::parse("#F2D94E"),
-            StarryPokemonType::Grass => Color::parse("#5FBD58"),
-            StarryPokemonType::Ice => Color::parse("#75D0C1"),
-            StarryPokemonType::Fighting => Color::parse("#D3425F"),
-            StarryPokemonType::Poison => Color::parse("#B763CF"),
-            StarryPokemonType::Ground => Color::parse("#DA7C4D"),
-            StarryPokemonType::Flying => Color::parse("#A1BBEC"),
-            StarryPokemonType::Psychic => Color::parse("#FA8581"),
-            StarryPokemonType::Bug => Color::parse("#92BC2C"),
-            StarryPokemonType::Rock => Color::parse("#C9BB8A"),
-            StarryPokemonType::Ghost => Color::parse("#5F6DBC"),
-            StarryPokemonType::Dragon => Color::parse("#0C69C8"),
-            StarryPokemonType::Dark => Color::parse("#595761"),
-            StarryPokemonType::Steel => Color::parse("#5695A3"),
-            StarryPokemonType::Fairy => Color::parse("#EE90E6"),
+            StarryPokemonType::Normal => Color::from_rgb8(160, 162, 159),
+            StarryPokemonType::Fire => Color::from_rgb8(251, 165, 76),
+            StarryPokemonType::Water => Color::from_rgb8(83, 157, 223),
+            StarryPokemonType::Electric => Color::from_rgb8(242, 217, 78),
+            StarryPokemonType::Grass => Color::from_rgb8(95, 189, 88),
+            StarryPokemonType::Ice => Color::from_rgb8(117, 208, 193),
+            StarryPokemonType::Fighting => Color::from_rgb8(211, 66, 95),
+            StarryPokemonType::Poison => Color::from_rgb8(183, 99, 207),
+            StarryPokemonType::Ground => Color::from_rgb8(218, 124, 77),
+            StarryPokemonType::Flying => Color::from_rgb8(161, 187, 236),
+            StarryPokemonType::Psychic => Color::from_rgb8(250, 133, 129),
+            StarryPokemonType::Bug => Color::from_rgb8(146, 188, 44),
+            StarryPokemonType::Rock => Color::from_rgb8(201, 187, 138),
+            StarryPokemonType::Ghost => Color::from_rgb8(95, 109, 188),
+            StarryPokemonType::Dragon => Color::from_rgb8(12, 105, 200),
+            StarryPokemonType::Dark => Color::from_rgb8(89, 87, 97),
+            StarryPokemonType::Steel => Color::from_rgb8(86, 149, 163),
+            StarryPokemonType::Fairy => Color::from_rgb8(238, 144, 230),
         };
 
-        cosmic::theme::Svg::Custom(Rc::new(move |_theme| Style { color }))
+        cosmic::theme::Svg::Custom(Rc::new(move |_theme| Style { color: Some(color) }))
     }
 }
 

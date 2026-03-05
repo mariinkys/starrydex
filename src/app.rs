@@ -1119,8 +1119,15 @@ pub fn pokemon_details<'a>(
     wants_pokemon_details: &'a bool,
     spacing: &Spacing,
 ) -> Element<'a, Message> {
-    let show_details = checkbox(fl!("show-encounter-details"), *wants_pokemon_details)
-        .on_toggle(|v| Message::PokemonDetailsInput(PokemonDetailsInput::TogglePokemonDetails(v)));
+    let show_details = row![
+        text(fl!("show-encounter-details")),
+        checkbox(*wants_pokemon_details).on_toggle(|v| {
+            Message::PokemonDetailsInput(PokemonDetailsInput::TogglePokemonDetails(v))
+        })
+    ]
+    .spacing(6.)
+    .width(Length::Shrink)
+    .align_y(Alignment::Center);
 
     let encounter_info = match &starry_pokemon.encounter_info {
         Some(info) => {
@@ -1210,6 +1217,18 @@ pub fn pokemon_details<'a>(
                 }),
             ))
             .align_x(Alignment::Center),
+        )
+        // FLAVOR TEXT
+        .push_maybe(
+            starry_pokemon
+                .specie
+                .as_ref()
+                .and_then(|s| s.flavor_text.as_ref())
+                .map(|text| {
+                    widget::text::body(text)
+                        .align_x(Alignment::Center)
+                        .width(Length::Fill)
+                }),
         )
         // WEIGHT & HEIGHT
         .push(
@@ -1422,14 +1441,19 @@ pub fn filters_page<'a>(filters: &'a Filters, _spacing: &Spacing) -> Element<'a,
         let mut row = widget::Row::new();
         for generation in chunk {
             let is_checked = filters.selected_generations.contains(generation);
-            let checkbox: Element<Message> = checkbox(generation.to_string(), is_checked)
-                .on_toggle(move |v| {
+            let checkbox: Element<Message> = row![
+                text(generation.to_string()),
+                widget::space::horizontal(),
+                checkbox(is_checked).on_toggle(move |v| {
                     Message::FiltersInput(FiltersInput::GenerationFilterToggled(
                         v,
                         generation.clone(),
                     ))
                 })
-                .into();
+            ]
+            .padding(cosmic::iced::padding::horizontal(10.))
+            .align_y(Alignment::Center)
+            .into();
 
             row = row.push(widget::container(checkbox).width(Length::Fill));
         }
@@ -1445,11 +1469,16 @@ pub fn filters_page<'a>(filters: &'a Filters, _spacing: &Spacing) -> Element<'a,
         let mut row = widget::Row::new();
         for pokemon_type in chunk {
             let is_checked = filters.selected_types.contains(pokemon_type);
-            let checkbox: Element<Message> = checkbox(pokemon_type.to_string(), is_checked)
-                .on_toggle(move |v| {
+            let checkbox: Element<Message> = row![
+                text(pokemon_type.to_string()),
+                widget::space::horizontal(),
+                checkbox(is_checked).on_toggle(move |v| {
                     Message::FiltersInput(FiltersInput::TypeFilterToggled(v, pokemon_type.clone()))
                 })
-                .into();
+            ]
+            .padding(cosmic::iced::padding::horizontal(10.))
+            .align_y(Alignment::Center)
+            .into();
 
             row = row.push(widget::container(checkbox).width(Length::Fill));
         }
@@ -1460,9 +1489,14 @@ pub fn filters_page<'a>(filters: &'a Filters, _spacing: &Spacing) -> Element<'a,
         widget::text::title3(fl!("stats-filter")),
         widget::Row::new()
             .push(
-                checkbox(fl!("enabled"), filters.total_stats.0)
-                    .on_toggle(|v| Message::FiltersInput(FiltersInput::StatsFilterToggled(v)))
-                    .width(Length::Fill),
+                row![
+                    text(fl!("enabled")),
+                    widget::space::horizontal(),
+                    checkbox(filters.total_stats.0)
+                        .on_toggle(|v| Message::FiltersInput(FiltersInput::StatsFilterToggled(v)))
+                ]
+                .padding(cosmic::iced::padding::horizontal(10.))
+                .width(Length::Fill),
             )
             .push(
                 column![
