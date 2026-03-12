@@ -45,6 +45,7 @@ impl ContextPage {
                 let State::Ready {
                     selected_pokemon,
                     wants_pokemon_details,
+                    wants_flavor_text,
                     ..
                 } = &app_model.state
                 else {
@@ -53,7 +54,12 @@ impl ContextPage {
 
                 if let Some(pokemon) = selected_pokemon.as_ref().as_ref() {
                     context_drawer::context_drawer(
-                        crate::app::pokemon_details(pokemon, wants_pokemon_details, &spacing),
+                        crate::app::pokemon_details(
+                            pokemon,
+                            wants_pokemon_details,
+                            wants_flavor_text,
+                            &spacing,
+                        ),
                         Message::ToggleContextPage(ContextPage::PokemonDetails),
                     )
                     .title(fl!("pokemon-page"))

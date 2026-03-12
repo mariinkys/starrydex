@@ -22,8 +22,8 @@ use cosmic::iced_widget::{center, column, row, scrollable};
 use cosmic::widget::menu::Action;
 use cosmic::widget::{self, about::About, menu};
 use cosmic::widget::{
-    Column, Grid, Image, JustifyContent, Row, button, checkbox, container, flex_row, search_input,
-    text,
+    Column, Grid, Image, JustifyContent, Row, button, checkbox, container, flex_row, mouse_area,
+    search_input, text,
 };
 use cosmic::{prelude::*, theme};
 use rkyv::rancor;
@@ -77,6 +77,8 @@ enum State {
         selected_pokemon: Box<Option<StarryPokemon>>,
         /// Controls the Pokémon Details Toggle of the Pokémon Context Page
         wants_pokemon_details: bool,
+        /// Controls the Pokémon Flavor Text Toggle of the Pokémon Context Page
+        wants_flavor_text: bool,
         /// Holds the search input value
         search: String,
         /// Holds the currently applied filters if there are any
@@ -144,6 +146,8 @@ pub enum PokemonDetailsInput {
     ToggleMoveDetails(String),
     /// User wants to toggle the pokemon details view
     TogglePokemonDetails(bool),
+    /// User wants to toggle the pokemon flavor text view
+    TogglePokemonFlavorText,
 }
 
 /// Some user interaction that happens on the Filters [`ContextPage`]
@@ -467,6 +471,7 @@ impl cosmic::Application for AppModel {
                     pokemon_list,
                     selected_pokemon: Box::from(None),
                     wants_pokemon_details: false,
+                    wants_flavor_text: false,
                     search: String::new(),
                     filters: Filters::default(),
                     current_page: 0,
@@ -624,6 +629,7 @@ impl cosmic::Application for AppModel {
                     pokemon_list,
                     selected_pokemon,
                     wants_pokemon_details,
+                    wants_flavor_text,
                     ..
                 } = &mut self.state
                 else {
@@ -707,6 +713,10 @@ impl cosmic::Application for AppModel {
                     PokemonDetailsInput::TogglePokemonDetails(value) => {
                         *wants_pokemon_details = value;
                     }
+                    PokemonDetailsInput::TogglePokemonFlavorText => match wants_flavor_text {
+                        true => *wants_flavor_text = false,
+                        false => *wants_flavor_text = true,
+                    },
                 }
 
                 Task::none()
@@ -1117,6 +1127,7 @@ pub fn homepage<'a>(
 pub fn pokemon_details<'a>(
     starry_pokemon: &'a StarryPokemon,
     wants_pokemon_details: &'a bool,
+    wants_flavor_text: &'a bool,
     spacing: &Spacing,
 ) -> Element<'a, Message> {
     let show_details = row![
@@ -1199,9 +1210,16 @@ pub fn pokemon_details<'a>(
         )
         // IMAGE (SPRITE)
         .push(if let Some(path) = &starry_pokemon.sprite_path {
-            Image::new(path).content_fit(cosmic::iced::ContentFit::Fill)
+            mouse_area(Image::new(path).content_fit(cosmic::iced::ContentFit::Fill)).on_press(
+                Message::PokemonDetailsInput(PokemonDetailsInput::TogglePokemonFlavorText),
+            )
         } else {
-            Image::new(images::get("fallback")).content_fit(cosmic::iced::ContentFit::Fill)
+            mouse_area(
+                Image::new(images::get("fallback")).content_fit(cosmic::iced::ContentFit::Fill),
+            )
+            .on_press(Message::PokemonDetailsInput(
+                PokemonDetailsInput::TogglePokemonFlavorText,
+            ))
         })
         // POKÉMON TYPES
         .push(
@@ -1224,6 +1242,7 @@ pub fn pokemon_details<'a>(
                 .specie
                 .as_ref()
                 .and_then(|s| s.flavor_text.as_ref())
+                .filter(|_| *wants_flavor_text)
                 .map(|text| {
                     widget::text::body(text)
                         .align_x(Alignment::Center)
