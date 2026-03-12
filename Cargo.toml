@@ -36,7 +36,7 @@ futures-util = "0.3.32"
 i18n-embed-fl = "0.10.0"
 open = "5.3.3"
 rust-embed = "8.11.0"
-tokio = { version = "1.49.0", features = ["full"] }
+tokio = { version = "1.50.0", features = ["full"] }
 serde = { version = "1.0.228", features = ["serde_derive"] }
 
 # Added by me
