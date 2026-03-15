@@ -11,6 +11,7 @@ const CONFIG_VERSION: u64 = 3;
 
 /// Contains the configurations fields of the application
 #[derive(Debug, Clone, CosmicConfigEntry, Eq, PartialEq)]
+#[version = 3]
 pub struct StarryConfig {
     pub app_theme: AppTheme,
     pub view_mode: ViewMode,
