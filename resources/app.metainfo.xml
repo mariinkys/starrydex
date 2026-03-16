@@ -10,6 +10,7 @@
 
   <name>StarryDex</name>
   <summary>A Pokédex Application</summary>
+  <summary xml:lang="cs">Pokédex aplikace</summary>
 
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-only</project_license>
@@ -18,16 +19,27 @@
     <p>
       Embark on your Pokémon journey with StarryDex, a simple Pokédex application.
     </p>
+    <p xml:lang="cs">
+      Vydejte se na svou Pokémon cestu se StarryDex, jednoduchou Pokédex aplikací.
+    </p>
     <ul>
       <li
             >Browse detailed info on all Pokémon species, including stats, evolution
         requirements, and more.</li>
+      <li xml:lang="cs"
+            >Prohlížejte podrobné informace o všech druzích Pokémonů, včetně statistik,
+        požadavků na evoluci a dalších údajů.</li>
       <li>Quickly search Pokémon by name, type, stats, and other filters.</li>
+      <li xml:lang="cs">Rychle vyhledávejte Pokémony podle jména, typu, statistik a dalších filtrů.</li>
       <li>Works completely offline.</li>
+      <li xml:lang="cs">Funguje zcela offline.</li>
     </ul>
     <p
         >This app has been developed with libcosmic for the COSMIC™ desktop, and issues may occur on
       other platforms</p>
+    <p xml:lang="cs"
+        >Tato aplikace byla vyvinuta pomocí libcosmic pro prostředí COSMIC™. Na jiných platformách
+      mohou nastat problémy.</p>
   </description>
 
   <icon type="remote" height="256" width="256">
@@ -41,25 +53,29 @@
   </provides>
 
   <screenshots>
-    <screenshot type="default" xml:lang="en">
+    <screenshot type="default">
       <image>
         https://raw.githubusercontent.com/mariinkys/starrydex/main/resources/screenshots/main-light.png</image>
       <caption>Pokémon List (Light)</caption>
+      <caption xml:lang="cs">Seznam Pokémonů (Světlý režim)</caption>
     </screenshot>
-    <screenshot xml:lang="en">
+    <screenshot>
       <image>
         https://raw.githubusercontent.com/mariinkys/starrydex/main/resources/screenshots/main-dark.png</image>
       <caption>Pokémon List (Dark)</caption>
+      <caption xml:lang="cs">Seznam Pokémonů (Tmavý režim)</caption>
     </screenshot>
-    <screenshot xml:lang="en">
+    <screenshot>
       <image>
         https://raw.githubusercontent.com/mariinkys/starrydex/main/resources/screenshots/pokemon-light.png</image>
       <caption>Pokémon Details (Light)</caption>
+      <caption xml:lang="cs">Podrobnosti Pokémonů (Světlý režim)</caption>
     </screenshot>
-    <screenshot xml:lang="en">
+    <screenshot>
       <image>
         https://raw.githubusercontent.com/mariinkys/starrydex/main/resources/screenshots/pokemon-dark.png</image>
       <caption>Pokémon Details (Dark)</caption>
+      <caption xml:lang="cs">Podrobnosti Pokémonů (Tmavý režim)</caption>
     </screenshot>
   </screenshots>
 
@@ -92,6 +108,10 @@
     <keyword>Encyclopedia</keyword>
     <keyword>Pocket Monsters</keyword>
     <keyword>Game</keyword>
+    
+    <keyword xml:lang="cs">Encyklopedie</keyword>
+    <keyword xml:lang="cs">Kapesní monstra</keyword>
+    <keyword xml:lang="cs">Hra</keyword>
   </keywords>
 
   <releases>
