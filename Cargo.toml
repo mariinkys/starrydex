@@ -42,7 +42,7 @@ serde = { version = "1.0.228", features = ["serde_derive"] }
 # Added by me
 dirs = "6.0.0"
 ron = "0.12.0"
-tar = "0.4.44"
+tar = "0.4.45"
 flate2 = "1.1.9"
 memmap2 = "0.9.10"
 anywho = "0.1.2"
