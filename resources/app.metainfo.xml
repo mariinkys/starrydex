@@ -26,18 +26,22 @@
       <li
             >Browse detailed info on all Pokémon species, including stats, evolution
         requirements, and more.</li>
-      <li xml:lang="cs"
+      <li
+                xml:lang="cs"
             >Prohlížejte podrobné informace o všech druzích Pokémonů, včetně statistik,
         požadavků na evoluci a dalších údajů.</li>
       <li>Quickly search Pokémon by name, type, stats, and other filters.</li>
-      <li xml:lang="cs">Rychle vyhledávejte Pokémony podle jména, typu, statistik a dalších filtrů.</li>
+      <li
+                xml:lang="cs"
+            >Rychle vyhledávejte Pokémony podle jména, typu, statistik a dalších filtrů.</li>
       <li>Works completely offline.</li>
       <li xml:lang="cs">Funguje zcela offline.</li>
     </ul>
     <p
         >This app has been developed with libcosmic for the COSMIC™ desktop, and issues may occur on
       other platforms</p>
-    <p xml:lang="cs"
+    <p
+            xml:lang="cs"
         >Tato aplikace byla vyvinuta pomocí libcosmic pro prostředí COSMIC™. Na jiných platformách
       mohou nastat problémy.</p>
   </description>
@@ -108,28 +112,38 @@
     <keyword>Encyclopedia</keyword>
     <keyword>Pocket Monsters</keyword>
     <keyword>Game</keyword>
-    
+
     <keyword xml:lang="cs">Encyklopedie</keyword>
     <keyword xml:lang="cs">Kapesní monstra</keyword>
     <keyword xml:lang="cs">Hra</keyword>
   </keywords>
 
   <releases>
+    <release version="0.3.5" date="2026-04-08">
+        <description>
+            <p>Added Pokémon flavor text</p>
+            <p>Improved theme detection</p>
+            <p>Fixed configuration saving issues</p>
+            <p
+                >Updated bundled application data to include the latest PokeApi updates</p>
+            <p>Updated dependencies</p>
+        </description>
+    </release>
     <release version="0.3.4" date="2026-02-23">
         <description>
-        <p>Added Pokémon movements data</p>
-        <p>Added Pokémon cries data</p>
-        <p
+            <p>Added Pokémon movements data</p>
+            <p>Added Pokémon cries data</p>
+            <p
                 >Updated bundled application data to include the latest PokeApi updates</p>
-        <p>Updated dependencies</p>
+            <p>Updated dependencies</p>
         </description>
     </release>
     <release version="0.3.3" date="2026-02-06">
         <description>
-        <p>Improved mobile support</p>
-        <p
+            <p>Improved mobile support</p>
+            <p
                 >Updated bundled application data to include the latest PokeApi updates</p>
-        <p>Updated dependencies</p>
+            <p>Updated dependencies</p>
         </description>
     </release>
     <release version="0.3.2" date="2025-12-13">
