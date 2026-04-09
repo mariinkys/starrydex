@@ -12,6 +12,10 @@ support = Support
 appearance = Utseende
 theme = Tema 
 pokemon-per-row = Pokémon per rad
+pokemon-per-page = Pokémon per sida
+view-mode = Visningsläge
+view-mode-manual = Manuell
+view-mode-responsive = Responsiv
 match-desktop = Matcha skrivbordet
 dark = Mörkt
 light = Ljust
@@ -31,7 +35,7 @@ renew-cache-button = Förnya
 
 <#-- Landningssida (huvudsida). -->
 search = Sök
-filter = Filtrera
+page = Sida
 
 <#-- Pokémon detaljsida-->
 pokemon-page = Pokémon
@@ -40,11 +44,22 @@ weight = VIKT
 show-encounter-details = Visa mötesdetaljer
 no-encounter-info = Ingen information om möte...
 link-more-info = Mer information
+pokemon-abilities = Pokémon förmågor
+no-flavor-text = Ingen smaktext tillgänglig...
+pokemon-moves = Pokémon-rörelser
+level-up = Nivå upp
+tutor = Uppfostrare
+tm = TM/HM
+egg = Ägg
 
 <#-- Filtersida -->
 filters-page = Filter
 apply-filters = Använd filter
 type-filters = Filtrera efter typ
+generation-filters = Filtrera efter generation
+stats-filter = Filtrera efter Pokémon-statistik
+minimum-poke-stats = Minsta Pokémon-statistik
+enabled = Aktiverad
 
 <#-- Pokemon typer -->
 normal = Normal
@@ -66,6 +81,18 @@ dark = Mörk
 steel = Stål
 fairy = Fe
 
+<#-- Pokemon Generationer -->
+gen-i = Gen I
+gen-ii = Gen II
+gen-iii = Gen III
+gen-iv = Gen IV
+gen-v = Gen V
+gen-vi = Gen VI
+gen-vii = Gen VII
+gen-viii = Gen VIII
+gen-ix = Gen IX
+unknown = Okänd
+
 
 <#-- Pokemon Statistik -->
 hp = HP
@@ -74,3 +101,7 @@ defense = Försvar
 sp-a = Special Attack
 sp-d = Special Försvar
 spd = Hastighet
+
+<#-- Pokemon Evolution-data -->
+poke-evo-data = Pokémon Evolution-data
+no-evo-data = Inga evolutionsdata tillgänglig...
