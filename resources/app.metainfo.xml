@@ -119,11 +119,13 @@
   </keywords>
 
   <releases>
-    <release version="0.3.5" date="2026-04-08">
+    <release version="0.3.5" date="2026-04-12">
         <description>
             <p>Added Pokémon flavor text</p>
             <p>Improved theme detection</p>
             <p>Fixed configuration saving issues</p>
+            <p
+                >Fixed issue that made some icons disappear when app goes fullscreen</p>
             <p
                 >Updated bundled application data to include the latest PokeApi updates</p>
             <p>Updated dependencies</p>

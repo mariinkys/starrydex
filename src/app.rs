@@ -15,10 +15,10 @@ use crate::{fl, icons, images};
 use cosmic::app::context_drawer;
 use cosmic::cosmic_theme::Spacing;
 use cosmic::iced::alignment::{Horizontal, Vertical};
+use cosmic::iced::core::keyboard::{Key, Modifiers};
+use cosmic::iced::core::text::LineHeight;
+use cosmic::iced::widget::{center, column, row, scrollable};
 use cosmic::iced::{Alignment, Event, Length, Pixels, Subscription};
-use cosmic::iced_core::keyboard::{Key, Modifiers};
-use cosmic::iced_core::text::LineHeight;
-use cosmic::iced_widget::{center, column, row, scrollable};
 use cosmic::widget::menu::Action;
 use cosmic::widget::{self, about::About, menu};
 use cosmic::widget::{

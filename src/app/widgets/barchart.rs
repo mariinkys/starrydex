@@ -5,9 +5,9 @@ use cosmic::{
         Background, Border, Color, Element, Length, Padding, Point, Rectangle, Size,
         alignment::Vertical, event::Event, mouse,
     },
-    iced_core::{
-        Clipboard, Layout, Renderer as IcedRenderer, Shell, layout, renderer, text::Renderer,
-        widget::Tree,
+    iced::{
+        core::Clipboard, core::Layout, core::Renderer as IcedRenderer, core::Shell, core::layout,
+        core::renderer, core::text::Renderer, core::widget::Tree,
     },
     widget::{Operation, Widget},
 };
@@ -299,17 +299,17 @@ impl<'a, Message: 'static + Clone> Widget<Message, cosmic::Theme, cosmic::Render
                 let text_x = bar_x + column_width / 2.0;
 
                 renderer.fill_text(
-                    cosmic::iced_core::text::Text {
+                    cosmic::iced::core::text::Text {
                         content: value_text,
                         bounds: Size::new(column_width, value_height),
                         size: cosmic::iced::Pixels(12.0),
-                        line_height: cosmic::iced_core::text::LineHeight::default(),
+                        line_height: cosmic::iced::core::text::LineHeight::default(),
                         font: cosmic::font::Font::default(),
-                        align_x: cosmic::iced_core::text::Alignment::Center,
+                        align_x: cosmic::iced::core::text::Alignment::Center,
                         align_y: Vertical::Center,
                         shaping: cosmic::iced::advanced::text::Shaping::Basic,
-                        wrapping: cosmic::iced_core::text::Wrapping::Word,
-                        ellipsize: cosmic::iced_core::text::Ellipsize::None,
+                        wrapping: cosmic::iced::core::text::Wrapping::Word,
+                        ellipsize: cosmic::iced::core::text::Ellipsize::None,
                     },
                     Point::new(text_x, bar_y - value_height + 10.), // we know value height is 20 if we are here
                     theme.cosmic().on_bg_color().into(),
@@ -322,17 +322,17 @@ impl<'a, Message: 'static + Clone> Widget<Message, cosmic::Theme, cosmic::Render
                 let text_x = bar_x + column_width / 2.0;
 
                 renderer.fill_text(
-                    cosmic::iced_core::text::Text {
+                    cosmic::iced::core::text::Text {
                         content: column.label.clone(),
                         bounds: Size::new(column_width, label_height),
                         size: cosmic::iced::Pixels(9.0),
-                        line_height: cosmic::iced_core::text::LineHeight::Relative(1.1),
+                        line_height: cosmic::iced::core::text::LineHeight::Relative(1.1),
                         font: cosmic::font::Font::default(),
-                        align_x: cosmic::iced_core::text::Alignment::Center,
+                        align_x: cosmic::iced::core::text::Alignment::Center,
                         align_y: Vertical::Top,
                         shaping: cosmic::iced::advanced::text::Shaping::Advanced,
-                        wrapping: cosmic::iced_core::text::Wrapping::Word,
-                        ellipsize: cosmic::iced_core::text::Ellipsize::None,
+                        wrapping: cosmic::iced::core::text::Wrapping::Word,
+                        ellipsize: cosmic::iced::core::text::Ellipsize::None,
                     },
                     Point::new(text_x, chart_y + chart_height + self.row_spacing),
                     theme.cosmic().on_bg_color().into(),

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-use cosmic::iced_core::image;
+use cosmic::iced::core::image;
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 
