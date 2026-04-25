@@ -1,5 +1,5 @@
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     path::{Path, PathBuf},
     sync::Arc,
     time::Duration,
@@ -51,6 +51,10 @@ impl Default for StarryApi {
 impl StarryApi {
     /// Fetches the details of all Pokémon in PokéApi and parses it to our own data structure.
     async fn fetch_all_pokemon(&self) -> BTreeMap<i64, StarryPokemon> {
+        println!("Pre-fetching all moves...");
+        let move_cache = self.fetch_all_moves().await;
+        println!("Move cache ready ({} moves)", move_cache.len());
+
         let all_entries = rustemon::pokemon::pokemon::get_all_entries(&self.client)
             .await
             .unwrap_or_default();
@@ -61,9 +65,12 @@ impl StarryApi {
             .map(|entry| {
                 let client = Arc::clone(&self.client);
                 let sem = Arc::clone(&semaphore);
+                let move_cache = Arc::clone(&move_cache);
+
                 async move {
                     let _permit = sem.acquire().await.unwrap();
-                    let details_res = Self::fetch_pokemon_details(&entry.name, client).await;
+                    let details_res =
+                        Self::fetch_pokemon_details(&entry.name, client, &move_cache).await;
                     if let Err(details_err) = &details_res {
                         eprintln!(
                             "Error downlading details for {}, Error: {}",
@@ -88,6 +95,7 @@ impl StarryApi {
     async fn fetch_pokemon_details(
         name: &str,
         client: Arc<RustemonClient>,
+        move_cache: &HashMap<String, StarryMoves>,
     ) -> Result<StarryPokemon, Error> {
         let pokemon = rustemon::pokemon::pokemon::get_by_name(name, &client).await?;
         let encounter_info =
@@ -113,7 +121,7 @@ impl StarryApi {
             None
         };
 
-        let parsed_moves = Self::fetch_moves(pokemon.moves, Arc::clone(&client)).await;
+        let parsed_moves = Self::resolve_moves(pokemon.moves, move_cache);
 
         let starry_pokemon_data = StarryPokemonData {
             id: pokemon.id,
@@ -187,50 +195,67 @@ impl StarryApi {
             .map_err(|e| anywho!("{e}"))
     }
 
-    /// Fetches and parses all moves for a pokemon concurrently
-    async fn fetch_moves(
-        moves: Vec<rustemon::model::pokemon::PokemonMove>,
-        client: Arc<RustemonClient>,
-    ) -> Vec<StarryMoves> {
-        let semaphore = Arc::new(Semaphore::new(5));
+    /// Pre-fetches all moves from PokéApi into a shared lookup map
+    async fn fetch_all_moves(&self) -> Arc<HashMap<String, StarryMoves>> {
+        let all_entries = rustemon::moves::move_::get_all_entries(&self.client)
+            .await
+            .unwrap_or_default();
 
-        futures::stream::iter(moves)
-            .map(|p_move| {
-                let client = Arc::clone(&client);
+        let semaphore = Arc::new(Semaphore::new(10));
+
+        let moves: HashMap<String, StarryMoves> = futures::stream::iter(all_entries)
+            .map(|entry| {
+                let client = Arc::clone(&self.client);
                 let sem = Arc::clone(&semaphore);
                 async move {
-                    let _permit = sem.acquire().await.map_err(|e| anywho!("{e}"))?;
-
-                    let poke_move =
-                        rustemon::moves::move_::get_by_name(&p_move.move_.name, &client)
-                            .await
-                            .map_err(|e| anywho!("{e}"))?;
+                    let _permit = sem.acquire().await.unwrap();
+                    let poke_move = rustemon::moves::move_::get_by_name(&entry.name, &client)
+                        .await
+                        .map_err(|e| anywho!("{e}"))?;
 
                     let movement_type = StarryPokemonType::try_from(poke_move.type_.name.as_str())
                         .unwrap_or(StarryPokemonType::Normal);
 
-                    // let primary_vgd = p_move.version_group_details.first().ok_or_else(|| {
-                    //     anywho!("No version group details for '{}'", p_move.move_.name)
-                    // })?;
-
-                    let move_details: Vec<StarryMoveDetails> = p_move
-                        .version_group_details
-                        .iter()
-                        .map(StarryMoveDetails::from)
-                        .collect();
-
-                    Ok::<StarryMoves, Error>(StarryMoves {
-                        name: poke_move.name.clone(),
-                        movement_type,
-                        move_details,
-                    })
+                    Ok::<(String, StarryMoves), Error>((
+                        poke_move.name.clone(),
+                        StarryMoves {
+                            name: poke_move.name.clone(),
+                            movement_type,
+                            move_details: vec![], // populated per-pokemon after
+                        },
+                    ))
                 }
             })
-            .buffer_unordered(5)
-            .collect::<Vec<Result<StarryMoves, Error>>>()
+            .buffer_unordered(10)
+            .collect::<Vec<_>>()
             .await
             .into_iter()
             .filter_map(|r| r.map_err(|e| eprintln!("Move fetch error: {e}")).ok())
+            .collect();
+
+        Arc::new(moves)
+    }
+
+    /// Resolves moves for a single Pokémon from the pre-fetched cache
+    fn resolve_moves(
+        pokemon_moves: Vec<rustemon::model::pokemon::PokemonMove>,
+        move_cache: &HashMap<String, StarryMoves>,
+    ) -> Vec<StarryMoves> {
+        pokemon_moves
+            .iter()
+            .filter_map(|p_move| {
+                let cached = move_cache.get(&p_move.move_.name)?;
+                let move_details = p_move
+                    .version_group_details
+                    .iter()
+                    .map(StarryMoveDetails::from)
+                    .collect();
+                Some(StarryMoves {
+                    name: cached.name.clone(),
+                    movement_type: cached.movement_type.clone(),
+                    move_details,
+                })
+            })
             .collect()
     }
 
