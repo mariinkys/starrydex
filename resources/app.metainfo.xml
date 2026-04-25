@@ -119,7 +119,7 @@
   </keywords>
 
   <releases>
-    <release version="0.3.5" date="2026-04-12">
+    <release version="0.3.5" date="2026-04-26">
         <description>
             <p>Added Pokémon flavor text</p>
             <p>Improved theme detection</p>

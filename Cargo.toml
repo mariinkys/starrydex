@@ -34,9 +34,9 @@ members = ["assetgen"]
 [workspace.dependencies]
 futures-util = "0.3.32"
 i18n-embed-fl = "0.10.0"
-open = "5.3.3"
+open = "5.3.4"
 rust-embed = "8.11.0"
-tokio = { version = "1.51.0", features = ["full"] }
+tokio = { version = "1.52.1", features = ["full"] }
 serde = { version = "1.0.228", features = ["serde_derive"] }
 
 # Added by me
@@ -46,7 +46,7 @@ tar = "0.4.45"
 flate2 = "1.1.9"
 memmap2 = "0.9.10"
 anywho = "0.1.2"
-rkyv = { version = "0.8.15", features = ["bytecheck"] }
+rkyv = { version = "0.8.16", features = ["bytecheck"] }
 bytecheck = "0.8.2"
 
 futures = "0.3.32"
