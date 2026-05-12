@@ -34,9 +34,9 @@ members = ["assetgen"]
 [workspace.dependencies]
 futures-util = "0.3.32"
 i18n-embed-fl = "0.10.0"
-open = "5.3.4"
+open = "5.3.5"
 rust-embed = "8.11.0"
-tokio = { version = "1.52.1", features = ["full"] }
+tokio = { version = "1.52.3", features = ["full"] }
 serde = { version = "1.0.228", features = ["serde_derive"] }
 
 # Added by me
@@ -51,7 +51,7 @@ bytecheck = "0.8.2"
 
 futures = "0.3.32"
 rustemon = { version = "4.5.0" }
-reqwest = { version = "0.13.2", features = ["json"] }
+reqwest = { version = "0.13.3", features = ["json"] }
 
 [dependencies.libcosmic]
 git = "https://github.com/pop-os/libcosmic.git"
