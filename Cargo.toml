@@ -42,7 +42,7 @@ serde = { version = "1.0.228", features = ["serde_derive"] }
 # Added by me
 dirs = "6.0.0"
 ron = "0.12.1"
-tar = "0.4.45"
+tar = "0.4.46"
 flate2 = "1.1.9"
 memmap2 = "0.9.10"
 anywho = "0.1.2"
@@ -51,7 +51,7 @@ bytecheck = "0.8.2"
 
 futures = "0.3.32"
 rustemon = { version = "4.5.0" }
-reqwest = { version = "0.13.3", features = ["json"] }
+reqwest = { version = "0.13.4", features = ["json"] }
 
 [dependencies.libcosmic]
 git = "https://github.com/pop-os/libcosmic.git"

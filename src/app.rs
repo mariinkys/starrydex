@@ -446,7 +446,7 @@ impl cosmic::Application for AppModel {
             }
             Message::Key(modifiers, key) => {
                 for (key_bind, action) in self.key_binds.iter() {
-                    if key_bind.matches(modifiers, &key) {
+                    if key_bind.matches(modifiers, &key, None) {
                         return self.update(action.message());
                     }
                 }
