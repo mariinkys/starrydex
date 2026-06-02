@@ -37,13 +37,6 @@
       <li>Works completely offline.</li>
       <li xml:lang="cs">Funguje zcela offline.</li>
     </ul>
-    <p
-        >This app has been developed with libcosmic for the COSMIC™ desktop, and issues may occur on
-      other platforms</p>
-    <p
-            xml:lang="cs"
-        >Tato aplikace byla vyvinuta pomocí libcosmic pro prostředí COSMIC™. Na jiných platformách
-      mohou nastat problémy.</p>
   </description>
 
   <icon type="remote" height="256" width="256">
