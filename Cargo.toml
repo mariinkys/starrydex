@@ -1,6 +1,6 @@
 [package]
 name = "starrydex"
-version = "0.3.5"
+version = "0.3.6"
 authors = ["mariinkys (kysdev.owjga@aleeas.com)"]
 edition = "2024"
 license = "GPL-3.0"
