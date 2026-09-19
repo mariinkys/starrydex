@@ -74,7 +74,7 @@ impl StarryApi {
                     if let Err(details_err) = &details_res {
                         eprintln!(
                             "Error downlading details for {}, Error: {}",
-                            &entry.name, &details_err
+                            entry.name, details_err
                         );
                     }
                     details_res
@@ -375,7 +375,7 @@ async fn download_image(
         tokio::fs::write(&image_path, &bytes).await?;
         Ok(())
     } else {
-        eprintln!("Error downloading image for Pokémon: {}", &pokemon_name);
+        eprintln!("Error downloading image for Pokémon: {}", pokemon_name);
         Err(anywho!(
             "Failed to download image. Status: {}",
             response.status()
@@ -412,7 +412,7 @@ async fn download_cry(
         tokio::fs::write(&cry_path, &bytes).await?;
         Ok(())
     } else {
-        eprintln!("Error downloading cry for Pokémon: {}", &pokemon_name);
+        eprintln!("Error downloading cry for Pokémon: {}", pokemon_name);
         Err(anywho!(
             "Failed to download cry. Status: {}",
             response.status()
@@ -509,7 +509,7 @@ async fn download_sprites(api_client: &StarryApi) {
     if let Ok(_res) = download_images {
         println!(
             "Sprites downloaded successfully to: {:?}",
-            &temp_sprites_dir
+            temp_sprites_dir
         );
 
         if let Err(e) = tokio::fs::create_dir_all("assets").await {
@@ -541,7 +541,7 @@ async fn download_cries(api_client: &StarryApi) {
     let download_images = api_client.download_all_pokemon_cries(&temp_cries_dir).await;
 
     if let Ok(_res) = download_images {
-        println!("Cries downloaded successfully to: {:?}", &temp_cries_dir);
+        println!("Cries downloaded successfully to: {:?}", temp_cries_dir);
 
         if let Err(e) = tokio::fs::create_dir_all("assets").await {
             println!("Failed to create assets directory: {}", e);

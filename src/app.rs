@@ -1187,8 +1187,8 @@ pub fn pokemon_details<'a>(
                     .align_y(Alignment::Center),
                     text::title4(format!(
                         "#{} {}",
-                        &starry_pokemon.pokemon.id,
-                        &starry_pokemon
+                        starry_pokemon.pokemon.id,
+                        starry_pokemon
                             .specie
                             .as_ref()
                             .map(|s| format!("- {}", s.generation))
@@ -1435,7 +1435,7 @@ pub fn pokemon_details<'a>(
                     widget::button::link(format!("{} (Bulbapedia)", fl!("link-more-info")))
                         .on_press(Message::LaunchUrl(format!(
                             "https://bulbapedia.bulbagarden.net/w/index.php?search={}",
-                            &starry_pokemon.pokemon.name
+                            starry_pokemon.pokemon.name
                         )))
                         .into(),
                 ),
@@ -1522,7 +1522,7 @@ pub fn filters_page<'a>(filters: &'a Filters, _spacing: &Spacing) -> Element<'a,
                     text(format!(
                         "{}: {}",
                         fl!("minimum-poke-stats"),
-                        &filters.total_stats.1
+                        filters.total_stats.1
                     )),
                     widget::slider(
                         0.0..=800.0,

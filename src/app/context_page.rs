@@ -52,6 +52,7 @@ impl ContextPage {
                     return None;
                 };
 
+                #[allow(clippy::question_mark)]
                 if let Some(pokemon) = selected_pokemon.as_ref().as_ref() {
                     context_drawer::context_drawer(
                         crate::app::pokemon_details(
