@@ -112,6 +112,13 @@
   </keywords>
 
   <releases>
+    <release version="0.3.8" date="2026-09-19">
+        <description>
+            <p
+                >Updated bundled application data to include the latest PokeApi updates</p>
+            <p>Updated dependencies</p>
+        </description>
+    </release>
     <release version="0.3.7" date="2026-07-04">
         <description>
             <p
