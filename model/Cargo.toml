@@ -1,0 +1,13 @@
+[package]
+name = "starrydex-model"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0"
+description = "Shared, memory-mappable data model for StarryDex (written by assetgen, read by the app)"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+rkyv.workspace = true
+bytecheck.workspace = true

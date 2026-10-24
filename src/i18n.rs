@@ -45,8 +45,13 @@ macro_rules! fl {
         i18n_embed_fl::fl!($crate::i18n::LANGUAGE_LOADER, $message_id)
     }};
 
-    ($message_id:literal, $($args:expr),*) => {{
-        i18n_embed_fl::fl!($crate::i18n::LANGUAGE_LOADER, $message_id, $($args), *)
+    // Arguments are forwarded as raw tokens (`tt`) rather than `expr` fragments: an `expr`
+    // fragment wraps `key = value` in an invisible group that rust-analyzer's proc-macro
+    // expansion handles differently from rustc, producing bogus type errors in the editor.
+    // Note: the proc macro emits `value.into()`, so wrap unary/binary values in parentheses,
+    // e.g. `fl!("evo-level", level = (*level))`.
+    ($message_id:literal, $($args:tt)*) => {{
+        i18n_embed_fl::fl!($crate::i18n::LANGUAGE_LOADER, $message_id, $($args)*)
     }};
 }
 

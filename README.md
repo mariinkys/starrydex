@@ -47,12 +47,36 @@ This application uses [PokeApi](https://github.com/PokeAPI/) and its resources.
 
 ## Development
 
-To update/generate your assets you have to execute: `cargo run -p assetgen -- -a`
+The workspace has three crates:
+
+- `starrydex` — the COSMIC app
+- `assetgen` — downloads PokéAPI data and builds the bundled assets
+- `model` (`starrydex-model`) — the data model shared by both. `assetgen` writes it as an
+  [rkyv](https://rkyv.org) archive and the app memory-maps that archive and reads it in place,
+  so the whole Pokédex never has to be deserialized into RAM.
+
+To update/generate the assets run:
+
+```sh
+cargo run --release -p assetgen -- -a
 ```
--a = All Assets
--p = Only Pokémon Data
--s = Only Sprites
+
 ```
+-a                 All assets (default): data, sprites and cries
+-p                 Only Pokémon data      -> assets/pokedex.bin.gz
+-s                 Only sprites           -> assets/sprites.tar.gz
+-c                 Only cries             -> assets/cries.tar.gz
+--base-url <URL>   PokéAPI to use (default https://pokeapi.co/api/v2/)
+--concurrency <N>  Parallel requests (default 16)
+```
+
+The data records which sprites and cries exist, so prefer regenerating everything together with `-a`.
+A full run makes roughly 10,000 API requests; pointing `--base-url` at a
+[self-hosted PokéAPI](https://github.com/PokeAPI/pokeapi#docker-and-compose-) is much faster and
+spares the public servers.
+
+If you change any type in `model/`, bump `FORMAT_VERSION` there and `CACHE_VERSION` in
+`src/app/core.rs`, then regenerate the assets.
 
 ### Dependencies
 

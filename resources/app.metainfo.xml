@@ -81,10 +81,6 @@
     <color type="primary" scheme_preference="dark">#F1C6F5</color>
   </branding>
 
-  <requires>
-    <display_length compare="ge">360</display_length>
-  </requires>
-
   <supports>
     <control>keyboard</control>
     <control>pointing</control>

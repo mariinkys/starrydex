@@ -275,15 +275,18 @@ dependencies = [
 
 [[package]]
 name = "assetgen"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anywho",
  "flate2",
  "futures",
+ "image",
  "reqwest 0.13.5",
- "ron",
+ "rkyv",
  "rustemon",
  "serde",
+ "serde_json",
+ "starrydex-model",
  "tar",
  "tokio",
 ]
@@ -5546,10 +5549,9 @@ checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
 
 [[package]]
 name = "starrydex"
-version = "0.3.8"
+version = "0.4.0"
 dependencies = [
  "anywho",
- "bytecheck",
  "dirs 7.0.0",
  "flate2",
  "futures-util",
@@ -5559,11 +5561,19 @@ dependencies = [
  "memmap2 0.9.12",
  "open",
  "rkyv",
- "ron",
  "rust-embed",
  "serde",
+ "starrydex-model",
  "tar",
  "tokio",
+]
+
+[[package]]
+name = "starrydex-model"
+version = "0.1.0"
+dependencies = [
+ "bytecheck",
+ "rkyv",
 ]
 
 [[package]]

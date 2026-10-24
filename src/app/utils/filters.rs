@@ -1,35 +1,90 @@
 // SPDX-License-Identifier: GPL-3.0
 
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 
-use crate::app::entities::{StarryPokemonGeneration, StarryPokemonType};
+use starrydex_model::{Generation, PokemonType};
 
-/// Different filters you can apply to the Pokémon List
+/// Rarity bucket of a species.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Category {
+    Regular,
+    Baby,
+    Legendary,
+    Mythical,
+}
+
+impl Category {
+    pub const ALL: &'static [Self] = &[Self::Regular, Self::Baby, Self::Legendary, Self::Mythical];
+}
+
+/// Different filters you can apply to the Pokémon list.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Filters {
-    pub selected_types: HashSet<StarryPokemonType>,
-    pub selected_generations: HashSet<StarryPokemonGeneration>,
-    pub total_stats: (bool, i64),
+    pub types: BTreeSet<PokemonType>,
+    pub generations: BTreeSet<Generation>,
+    pub categories: BTreeSet<Category>,
+    pub stats_enabled: bool,
+    pub min_total: u16,
 }
 
 impl Default for Filters {
     fn default() -> Self {
         Self {
-            selected_types: HashSet::new(),
-            total_stats: (false, 50),
-            selected_generations: HashSet::new(),
+            types: BTreeSet::new(),
+            generations: BTreeSet::new(),
+            categories: BTreeSet::new(),
+            stats_enabled: false,
+            min_total: 400,
         }
     }
 }
 
 impl Filters {
     pub fn any_applied(&self) -> bool {
-        if !self.selected_types.is_empty()
-            || !self.selected_generations.is_empty()
-            || self.total_stats.0
-        {
-            return true;
-        }
-
-        false
+        !self.types.is_empty()
+            || !self.generations.is_empty()
+            || !self.categories.is_empty()
+            || self.stats_enabled
     }
+
+    /// Number of active filter groups (shown as a badge on the filter button).
+    pub fn active_count(&self) -> usize {
+        usize::from(!self.types.is_empty())
+            + usize::from(!self.generations.is_empty())
+            + usize::from(!self.categories.is_empty())
+            + usize::from(self.stats_enabled)
+    }
+}
+
+/// Order of the Pokémon list.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SortBy {
+    #[default]
+    Number,
+    Name,
+    Total,
+    Hp,
+    Attack,
+    Defense,
+    SpAttack,
+    SpDefense,
+    Speed,
+    Height,
+    Weight,
+}
+
+impl SortBy {
+    pub const ALL: &'static [Self] = &[
+        Self::Number,
+        Self::Name,
+        Self::Total,
+        Self::Hp,
+        Self::Attack,
+        Self::Defense,
+        Self::SpAttack,
+        Self::SpDefense,
+        Self::Speed,
+        Self::Height,
+        Self::Weight,
+    ];
 }
