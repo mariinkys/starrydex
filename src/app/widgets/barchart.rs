@@ -11,7 +11,6 @@ use cosmic::{
     },
     widget::{Operation, Widget},
 };
-use std::f32;
 
 /// A bar chart widget that displays data as vertical bars
 #[must_use]
