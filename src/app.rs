@@ -436,7 +436,7 @@ impl cosmic::Application for AppModel {
                     }
                     DetailsInput::PlayAudio(path) => {
                         #[cfg(unix)]
-                        play_audio_file(&path);
+                        play_audio_file(&path, f32::from(self.config.cry_volume) / 100.0);
                     }
                     DetailsInput::ToggleShiny => details.shiny = !details.shiny,
                     DetailsInput::ToggleBack => details.back = !details.back,
@@ -668,6 +668,9 @@ impl AppModel {
                 return Task::perform(StarryCore::initialize(), |core| {
                     cosmic::action::app(Message::CoreLoaded(core))
                 });
+            }
+            ConfigInput::UpdateCryVolume(value) => {
+                self.save_config(|c, h| c.set_cry_volume(h, value), |c| c.cry_volume = value);
             }
         }
         Task::none()

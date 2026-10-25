@@ -34,6 +34,7 @@ pokemon-per-page = Pokémon per page
 pokedex-section = Pokédex
 show-forms = Show alternate forms
 show-forms-description = List megas, regional forms and other varieties as separate entries
+cry-volume = Cry volume
 type-filter-mode = Type filtering mode
 exclusive = Exclusive
 inclusive = Inclusive

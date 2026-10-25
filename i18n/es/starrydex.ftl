@@ -34,6 +34,7 @@ pokemon-per-page = Pokémon por página
 pokedex-section = Pokédex
 show-forms = Mostrar formas alternativas
 show-forms-description = Lista megaevoluciones, formas regionales y otras variedades como entradas separadas
+cry-volume = Volumen de los gritos
 type-filter-mode = Modo de filtrado por tipos
 exclusive = Exclusivo
 inclusive = Inclusivo

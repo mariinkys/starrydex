@@ -72,6 +72,16 @@ pub fn view(app: &AppModel) -> Element<'_, Message> {
                 }),
         )
         .add(
+            widget::settings::item::builder(fl!("cry-volume"))
+                .description(format!("{}%", config.cry_volume))
+                .control(
+                    widget::slider(0..=100u8, config.cry_volume, |v| {
+                        Message::ConfigInput(ConfigInput::UpdateCryVolume(v))
+                    })
+                    .step(5u8),
+                ),
+        )
+        .add(
             widget::settings::item::builder(fl!("type-filter-mode")).control(widget::dropdown(
                 &app.type_filter_modes,
                 Some(type_filter_mode_selected),
