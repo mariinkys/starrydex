@@ -19,6 +19,7 @@ use crate::{fl, icons};
 
 const CARD_WIDTH: f32 = 168.0;
 const CARD_HEIGHT: f32 = 168.0;
+pub const LIST_SCROLL_ID: &str = "pokemon-list";
 
 pub fn view<'a>(app: &'a AppModel, ready: &'a Ready) -> Element<'a, Message> {
     let spacing = theme::active().cosmic().spacing;
@@ -160,6 +161,8 @@ pub fn view<'a>(app: &'a AppModel, ready: &'a Ready) -> Element<'a, Message> {
     widget::column::with_children(vec![
         toolbar.into(),
         widget::scrollable(container(content).padding([spacing.space_xs, 0]))
+            .id(LIST_SCROLL_ID)
+            .on_scroll(|viewport| Message::List(ListInput::Scrolled(viewport.absolute_offset())))
             .height(Length::Fill)
             .width(Length::Fill)
             .into(),

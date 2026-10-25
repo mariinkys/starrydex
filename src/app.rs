@@ -7,7 +7,8 @@ use cosmic::app::context_drawer;
 use cosmic::iced::alignment::{Horizontal, Vertical};
 use cosmic::iced::core::keyboard::{Key, Modifiers};
 use cosmic::iced::keyboard::key::Named;
-use cosmic::iced::widget::center;
+use cosmic::iced::widget::operation::AbsoluteOffset;
+use cosmic::iced::widget::{center, scrollable};
 use cosmic::iced::{Event, Length, Subscription};
 use cosmic::prelude::*;
 use cosmic::widget::menu::Action;
@@ -90,6 +91,8 @@ pub struct Ready {
     pub descending: bool,
     /// The open Pokémon, if any
     pub details: Option<Details>,
+    /// Scroll position of the Pokémon list, restored when coming back from a details page
+    pub list_scroll: AbsoluteOffset,
 }
 
 /// Messages emitted by the application and its widgets.
@@ -135,6 +138,10 @@ pub enum ListInput {
     Sort(usize),
     ToggleOrder,
     ClearAll,
+    /// The list was scrolled (remembers where the user was)
+    Scrolled(AbsoluteOffset),
+    /// Scroll the list back to the remembered position
+    RestoreScroll(AbsoluteOffset),
 }
 
 /// Some user interaction that happens on the details page
@@ -379,6 +386,7 @@ impl cosmic::Application for AppModel {
                     sort: SortBy::default(),
                     descending: false,
                     details: None,
+                    list_scroll: AbsoluteOffset::default(),
                 }));
                 self.refresh_results();
                 Task::none()
@@ -409,7 +417,15 @@ impl cosmic::Application for AppModel {
                 {
                     match details.history.pop() {
                         Some(previous) => details.show(previous, ready.core.dex()),
-                        None => ready.details = None,
+                        None => {
+                            ready.details = None;
+                            // Restore on the next update, once the list view exists again. The offset is
+                            // captured now because the new scrollable reports 0 through `on_scroll` when it
+                            // first draws, which would overwrite `list_scroll`.
+                            return Task::done(cosmic::action::app(Message::List(
+                                ListInput::RestoreScroll(ready.list_scroll),
+                            )));
+                        }
                     }
                 }
                 Task::none()
@@ -472,7 +488,16 @@ impl cosmic::Application for AppModel {
                             PaginationAction::Next => (ready.page + 1).min(pages - 1),
                             PaginationAction::Back => ready.page.saturating_sub(1),
                         };
-                        return Task::none();
+
+                        // go back to the top of the page when changing paage
+                        ready.list_scroll = AbsoluteOffset::default();
+                        return scrollable::scroll_to(
+                            pages::home::LIST_SCROLL_ID.into(),
+                            AbsoluteOffset {
+                                x: None,
+                                y: Some(0.0),
+                            },
+                        );
                     }
                     ListInput::Search(value) => ready.search = value,
                     ListInput::Sort(index) => {
@@ -485,6 +510,17 @@ impl cosmic::Application for AppModel {
                         ready.filters = Filters::default();
                         ready.sort = SortBy::default();
                         ready.descending = false;
+                    }
+                    ListInput::Scrolled(offset) => {
+                        ready.list_scroll = offset;
+                        return Task::none();
+                    }
+                    ListInput::RestoreScroll(offset) => {
+                        ready.list_scroll = offset;
+                        return scrollable::scroll_to(
+                            pages::home::LIST_SCROLL_ID.into(),
+                            offset.into(),
+                        );
                     }
                 }
                 self.refresh_results();
@@ -542,6 +578,7 @@ impl AppModel {
             lang: data_lang(),
         });
         ready.page = 0;
+        ready.list_scroll = AbsoluteOffset::default();
     }
 
     fn on_hotkey(&mut self, hotkey: Hotkey) -> Task<cosmic::Action<Message>> {
