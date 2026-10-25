@@ -2661,19 +2661,6 @@
     {
         "type": "archive",
         "archive-type": "tar-gzip",
-        "url": "https://static.crates.io/crates/fsevent-sys/fsevent-sys-4.1.0.crate",
-        "sha256": "76ee7a02da4d231650c7cea31349b889be2f45ddb3ef3032d2ec8185f6313fd2",
-        "dest": "cargo/vendor/fsevent-sys-4.1.0"
-    },
-    {
-        "type": "inline",
-        "contents": "{\"package\": \"76ee7a02da4d231650c7cea31349b889be2f45ddb3ef3032d2ec8185f6313fd2\", \"files\": {}}",
-        "dest": "cargo/vendor/fsevent-sys-4.1.0",
-        "dest-filename": ".cargo-checksum.json"
-    },
-    {
-        "type": "archive",
-        "archive-type": "tar-gzip",
         "url": "https://static.crates.io/crates/futures/futures-0.3.34.crate",
         "sha256": "9a31d2a3fbaaeb2af2368bbdd904aa8e812d3c04a1ee10d3171f52d556e5d0a3",
         "dest": "cargo/vendor/futures-0.3.34"
@@ -4790,14 +4777,14 @@
     {
         "type": "archive",
         "archive-type": "tar-gzip",
-        "url": "https://static.crates.io/crates/notify/notify-8.2.0.crate",
-        "sha256": "4d3d07927151ff8575b7087f245456e549fea62edf0ec4e565a5ee50c8402bc3",
-        "dest": "cargo/vendor/notify-8.2.0"
+        "url": "https://static.crates.io/crates/notify/notify-8.2.1.crate",
+        "sha256": "82f812702fbc75d35416d3f884e04925be7e9498f4eceea2e24ba34559284674",
+        "dest": "cargo/vendor/notify-8.2.1"
     },
     {
         "type": "inline",
-        "contents": "{\"package\": \"4d3d07927151ff8575b7087f245456e549fea62edf0ec4e565a5ee50c8402bc3\", \"files\": {}}",
-        "dest": "cargo/vendor/notify-8.2.0",
+        "contents": "{\"package\": \"82f812702fbc75d35416d3f884e04925be7e9498f4eceea2e24ba34559284674\", \"files\": {}}",
+        "dest": "cargo/vendor/notify-8.2.1",
         "dest-filename": ".cargo-checksum.json"
     },
     {
@@ -5006,6 +4993,19 @@
         "type": "inline",
         "contents": "{\"package\": \"55260963a527c99f1819c4f8e3b47fe04f9650694ef348ffd2227e8196d34c80\", \"files\": {}}",
         "dest": "cargo/vendor/objc2-core-image-0.2.2",
+        "dest-filename": ".cargo-checksum.json"
+    },
+    {
+        "type": "archive",
+        "archive-type": "tar-gzip",
+        "url": "https://static.crates.io/crates/objc2-core-services/objc2-core-services-0.3.2.crate",
+        "sha256": "583300ad934cba24ff5292aee751ecc070f7ca6b39a574cc21b7b5e588e06a0b",
+        "dest": "cargo/vendor/objc2-core-services-0.3.2"
+    },
+    {
+        "type": "inline",
+        "contents": "{\"package\": \"583300ad934cba24ff5292aee751ecc070f7ca6b39a574cc21b7b5e588e06a0b\", \"files\": {}}",
+        "dest": "cargo/vendor/objc2-core-services-0.3.2",
         "dest-filename": ".cargo-checksum.json"
     },
     {

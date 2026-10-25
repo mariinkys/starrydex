@@ -108,6 +108,13 @@
   </keywords>
 
   <releases>
+    <release version="0.4.0" date="2026-10-25">
+        <description>
+            <p
+                >Application rewrite, much more data, new GUI...</p>
+            <p>Updated dependencies</p>
+        </description>
+    </release>
     <release version="0.3.8" date="2026-09-19">
         <description>
             <p
