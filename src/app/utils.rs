@@ -2,11 +2,11 @@
 
 mod audio;
 mod filesystem;
-mod filters;
+pub mod filters;
 mod pagination;
 pub mod presentation;
 
 pub use audio::play_audio_file;
 pub use filesystem::remove_dir_contents;
-pub use filters::Filters;
+pub use filters::{Category, Filters, SortBy};
 pub use pagination::PaginationAction;

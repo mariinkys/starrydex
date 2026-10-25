@@ -1,5 +1,8 @@
 #[cfg(unix)]
-pub fn play_audio_file(file_path: &str) {
+pub fn play_audio_file(file_path: &str, volume: f32) {
+    if volume <= 0.0 {
+        return;
+    }
     let uri = if file_path.starts_with('/') {
         format!("file://{file_path}")
     } else {
@@ -7,7 +10,11 @@ pub fn play_audio_file(file_path: &str) {
     };
 
     let child = std::process::Command::new("gst-launch-1.0")
-        .args(["playbin", &format!("uri={uri}")])
+        .args([
+            "playbin",
+            &format!("uri={uri}"),
+            &format!("volume={volume:.2}"),
+        ])
         .spawn();
 
     if let Ok(mut child) = child {

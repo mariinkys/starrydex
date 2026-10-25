@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0
-#![allow(mismatched_lifetime_syntaxes)]
 
 use crate::flags::flags;
 use std::sync::Mutex;
@@ -23,8 +22,8 @@ fn main() -> cosmic::iced::Result {
     let settings = cosmic::app::Settings::default()
         .size_limits(
             cosmic::iced::Limits::NONE
-                .min_height(420.0)
-                .min_width(360.0),
+                .min_height(520.0)
+                .min_width(500.0),
         )
         .size(cosmic::iced::Size::new(1200.0, 800.0));
 

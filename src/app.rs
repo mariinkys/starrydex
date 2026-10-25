@@ -1,38 +1,36 @@
 // SPDX-License-Identifier: GPL-3.0
 
-use crate::app::app_menu::MenuAction;
-use crate::app::context_page::ContextPage;
-use crate::app::core::StarryCore;
-use crate::app::entities::{
-    PokemonInfo, StarryPokemon, StarryPokemonGeneration, StarryPokemonType,
-};
-use crate::app::utils::presentation::{capitalize_string, scale_numbers};
-use crate::app::utils::{Filters, PaginationAction, play_audio_file, remove_dir_contents};
-use crate::app::widgets::barchart::BarChart;
-use crate::config::{AppTheme, ConfigInput, StarryConfig, TypeFilteringMode, ViewMode};
-use crate::key_binds::key_binds;
-use crate::{fl, icons, images};
+use std::collections::HashMap;
+
+use cosmic::Application;
 use cosmic::app::context_drawer;
-use cosmic::cosmic_theme::Spacing;
 use cosmic::iced::alignment::{Horizontal, Vertical};
 use cosmic::iced::core::keyboard::{Key, Modifiers};
-use cosmic::iced::core::text::LineHeight;
-use cosmic::iced::widget::{center, column, row, scrollable};
-use cosmic::iced::{Alignment, Event, Length, Pixels, Subscription};
+use cosmic::iced::keyboard::key::Named;
+use cosmic::iced::widget::operation::AbsoluteOffset;
+use cosmic::iced::widget::{center, scrollable};
+use cosmic::iced::{Event, Length, Subscription};
+use cosmic::prelude::*;
 use cosmic::widget::menu::Action;
-use cosmic::widget::{self, about::About, menu};
-use cosmic::widget::{
-    Column, Grid, Image, JustifyContent, Row, button, checkbox, container, flex_row, mouse_area,
-    search_input, text,
+use cosmic::widget::{self, about::About, menu, segmented_button, text};
+use starrydex_model::{Generation, PokemonType};
+
+use crate::app::app_menu::MenuAction;
+use crate::app::context_page::ContextPage;
+use crate::app::core::{ListQuery, StarryCore};
+use crate::app::pages::details::{DetailTab, Details};
+use crate::app::utils::presentation::{Label, data_lang};
+use crate::app::utils::{
+    Category, Filters, PaginationAction, SortBy, play_audio_file, remove_dir_contents,
 };
-use cosmic::{prelude::*, theme};
-use rkyv::rancor;
-use std::collections::HashMap;
+use crate::config::{AppTheme, ConfigInput, StarryConfig, TypeFilteringMode, ViewMode};
+use crate::fl;
+use crate::key_binds::key_binds;
 
 pub mod app_menu;
 mod context_page;
 mod core;
-mod entities;
+mod pages;
 mod utils;
 mod widgets;
 
@@ -55,37 +53,46 @@ pub struct AppModel {
     config_handler: Option<cosmic::cosmic_config::Config>,
     /// Configuration data that persists between application runs.
     config: StarryConfig,
-    // Application Themes
+    /// Application Themes
     app_themes: Vec<String>,
     /// Available Type Filter Modes
     type_filter_modes: Vec<String>,
     /// Available View Modes
     view_modes: Vec<String>,
+    /// Labels of the sort options
+    sort_options: Vec<String>,
+    /// Tabs of the Pokémon details page
+    detail_tabs: segmented_button::SingleSelectModel,
     /// Application State
     state: State,
 }
 
-enum State {
+pub enum State {
     Loading,
     Error(String),
-    Ready {
-        /// Application Core (allows us to get pokemons...)
-        core: StarryCore,
-        /// List of Pokémon to show on the main page
-        pokemon_list: Vec<PokemonInfo>,
-        /// Holds the data of the currently selected Pokémon to show it on the context page
-        selected_pokemon: Box<Option<StarryPokemon>>,
-        /// Controls the Pokémon Details Toggle of the Pokémon Context Page
-        wants_pokemon_details: bool,
-        /// Controls the Pokémon Flavor Text Toggle of the Pokémon Context Page
-        wants_flavor_text: bool,
-        /// Holds the search input value
-        search: String,
-        /// Holds the currently applied filters if there are any
-        filters: Filters,
-        /// Controls in which page are we currently (mainscreen pagination)
-        current_page: usize,
-    },
+    Ready(Box<Ready>),
+}
+
+/// Everything that exists once the Pokédex is loaded.
+pub struct Ready {
+    /// Memory-mapped Pokédex
+    pub core: StarryCore,
+    /// Indices (into the Pokédex) of the Pokémon matching the current search/filters/sort
+    pub results: Vec<u32>,
+    /// Current page of the list (0-based)
+    pub page: usize,
+    /// Search input value
+    pub search: String,
+    /// Currently applied filters
+    pub filters: Filters,
+    /// Curenntly applied sorting
+    pub sort: SortBy,
+    /// Is sort descending?
+    pub descending: bool,
+    /// The open Pokémon, if any
+    pub details: Option<Details>,
+    /// Scroll position of the Pokémon list, restored when coming back from a details page
+    pub list_scroll: AbsoluteOffset,
 }
 
 /// Messages emitted by the application and its widgets.
@@ -99,84 +106,74 @@ pub enum Message {
     ToggleContextPage(ContextPage),
     /// Update the application config
     UpdateConfig(StarryConfig),
-    /// Callback after updating the config, needed in some cases to refresh the data
-    ConfigUpdated,
     /// Callback after clicking something in the app menu
     MenuAction(app_menu::MenuAction),
     /// Executes the appropiate cosmic binding on keyboard shortcut
     Key(Modifiers, Key),
     /// Updates the current state of keyboard modifiers
     Modifiers(Modifiers),
-
     /// Callback after loading the application core
     CoreLoaded(Result<StarryCore, anywho::Error>),
-
-    /// Load the Pokémon with the given id and show it in the Pokémon Details [`ContextPage`]
-    LoadPokemon(i64),
-
+    /// Open the details page of the Pokémon with the given id
+    OpenPokemon(u32),
+    /// Leave the details page (or go back to the previously viewed Pokémon)
+    Back,
+    /// A tab of the details page was selected
+    DetailTab(segmented_button::Entity),
     /// Callback after input on the Config [`ContextPage`]
     ConfigInput(ConfigInput),
-    /// Callback after input on the Pokémon Details [`ContextPage`]
-    PokemonDetailsInput(PokemonDetailsInput),
-    /// Callback after input on the on the Pokémon List Page (HomePage)
-    PokemonListInput(PokemonListInput),
-    /// Callback after input on the Filters [`ContextPage`]
-    FiltersInput(FiltersInput),
+    /// Input on the details page
+    Details(DetailsInput),
+    /// Input on the Pokémon list
+    List(ListInput),
+    /// Input on the Filters [`ContextPage`]
+    Filters(FiltersInput),
 }
 
-/// Some user interaction that happens on the Pokémon List Page (HomePage)
+/// Some user interaction that happens on the Pokémon list
 #[derive(Debug, Clone)]
-pub enum PokemonListInput {
-    /// Some pagination action has been requested
-    PaginationAction(PaginationAction),
-    /// Search Input
-    SearchInput(String),
-    /// Clear currently applied filters
-    ClearFilters,
+pub enum ListInput {
+    Page(PaginationAction),
+    Search(String),
+    Sort(usize),
+    ToggleOrder,
+    ClearAll,
+    /// The list was scrolled (remembers where the user was)
+    Scrolled(AbsoluteOffset),
+    /// Scroll the list back to the remembered position
+    RestoreScroll(AbsoluteOffset),
 }
 
-/// Some user interaction that happens on the Pokémon Details [`ContextPage`]
+/// Some user interaction that happens on the details page
 #[derive(Debug, Clone)]
-pub enum PokemonDetailsInput {
-    /// Some pagination action has been requested
-    PaginationAction(PaginationAction),
-    /// User wants to play the given audio file
-    PlayAudioFile(String),
-    /// User wants to toggle the details of a move
-    ToggleMoveDetails(String),
-    /// User wants to toggle the pokemon details view
-    TogglePokemonDetails(bool),
-    /// User wants to toggle the pokemon flavor text view
-    TogglePokemonFlavorText,
+pub enum DetailsInput {
+    Step(PaginationAction),
+    PlayAudio(String),
+    ToggleShiny,
+    ToggleBack,
+    ToggleFemale,
+    FlavorEntry(usize),
+    MoveVersionGroup(usize),
+    ToggleMove(u32),
+    EncounterVersion(usize),
 }
 
 /// Some user interaction that happens on the Filters [`ContextPage`]
 #[derive(Debug, Clone)]
 pub enum FiltersInput {
-    /// User wants to toggle a specific type filter on/off
-    TypeFilterToggled(bool, StarryPokemonType),
-    /// Toggle stats filter on/off
-    StatsFilterToggled(bool),
-    /// Stats filter value changed
-    StatsFilterChanged(i64),
-    /// User wants to toggle a specific generation filter on/off
-    GenerationFilterToggled(bool, StarryPokemonGeneration),
-    /// Apply the currently selected filters
-    ApplyCurrentFilters,
+    Type(bool, PokemonType),
+    Generation(bool, Generation),
+    Category(bool, Category),
+    StatsEnabled(bool),
+    MinTotal(u16),
+    Reset,
 }
 
 /// Create a COSMIC application from the app model
 impl cosmic::Application for AppModel {
-    /// The async executor that will be used to run your application's commands.
     type Executor = cosmic::executor::Default;
-
-    /// Data that your application receives to its init method.
     type Flags = crate::flags::Flags;
-
-    /// Messages which the application and its widgets will emit.
     type Message = Message;
-
-    /// Unique identifier in RDNN (reverse domain name notation) format.
     const APP_ID: &'static str = "dev.mariinkys.StarryDex";
 
     fn core(&self) -> &cosmic::Core {
@@ -187,9 +184,7 @@ impl cosmic::Application for AppModel {
         &mut self.core
     }
 
-    /// Initializes the application with any given flags and startup commands.
     fn init(core: cosmic::Core, flags: Self::Flags) -> (Self, Task<cosmic::Action<Self::Message>>) {
-        // Create the about widget
         let about = About::default()
             .name("StarryDex")
             .icon(widget::icon::from_name(Self::APP_ID))
@@ -210,7 +205,12 @@ impl cosmic::Application for AppModel {
                 fl!("nintendo-text")
             ));
 
-        // Construct the app model with the runtime's core.
+        let mut detail_tabs = segmented_button::SingleSelectModel::default();
+        for tab in DetailTab::ALL {
+            detail_tabs.insert().text(tab.label()).data(*tab);
+        }
+        detail_tabs.activate_position(0);
+
         let mut app = AppModel {
             core,
             context_page: ContextPage::default(),
@@ -222,10 +222,11 @@ impl cosmic::Application for AppModel {
             app_themes: vec![fl!("match-desktop"), fl!("dark"), fl!("light")],
             type_filter_modes: vec![fl!("exclusive"), fl!("inclusive")],
             view_modes: vec![fl!("view-mode-responsive"), fl!("view-mode-manual")],
+            sort_options: SortBy::ALL.iter().map(Label::label).collect(),
+            detail_tabs,
             state: State::Loading,
         };
 
-        // Startup tasks.
         let tasks = vec![
             app.update_title(),
             cosmic::command::set_theme(app.config.app_theme.theme()),
@@ -237,7 +238,6 @@ impl cosmic::Application for AppModel {
         (app, Task::batch(tasks))
     }
 
-    /// Elements to pack at the start of the header bar.
     fn header_start(&self) -> Vec<Element<'_, Self::Message>> {
         let menu_bar = menu::bar(vec![menu::Tree::with_children(
             menu::root(fl!("view")).apply(Element::from),
@@ -253,199 +253,115 @@ impl cosmic::Application for AppModel {
         vec![menu_bar.into()]
     }
 
-    /// Display a context drawer if the context page is requested.
     fn context_drawer(&self) -> Option<context_drawer::ContextDrawer<'_, Self::Message>> {
         if !self.core.window.show_context {
             return None;
         }
-
         self.context_page.display(self)
     }
 
-    /// Describes the interface based on the current state of the application model.
-    ///
-    /// Application events will be processed through the view. Any messages emitted by
-    /// events received by widgets will be passed to the update method.
     fn view(&self) -> Element<'_, Self::Message> {
         let content: Element<_> = match &self.state {
-            State::Loading => center(text(fl!("loading"))).into(),
-            State::Error(error) => center(text(error)).into(),
-            State::Ready {
-                pokemon_list,
-                search,
-                filters,
-                current_page,
-                ..
-            } => {
-                let spacing = theme::active().cosmic().spacing;
-
-                homepage(
-                    &spacing,
-                    pokemon_list,
-                    &self.config.view_mode,
-                    search,
-                    current_page,
-                    filters,
-                )
-            }
+            State::Loading => center(
+                widget::column::with_children(vec![
+                    widget::progress_bar::indeterminate_circular().into(),
+                    text::body(fl!("loading")).into(),
+                ])
+                .spacing(12)
+                .align_x(cosmic::iced::Alignment::Center),
+            )
+            .into(),
+            State::Error(error) => center(text::body(error)).into(),
+            State::Ready(ready) => match &ready.details {
+                Some(details) => pages::details::view(
+                    &ready.core,
+                    details,
+                    &self.detail_tabs,
+                    self.active_tab(),
+                    &ready.results,
+                ),
+                None => pages::home::view(self, ready),
+            },
         };
 
-        container(content)
+        widget::container(content)
             .width(Length::Fill)
             .height(Length::Fill)
-            .apply(widget::container)
-            .width(Length::Fill)
             .align_x(Horizontal::Center)
             .align_y(Vertical::Center)
             .into()
     }
 
-    /// Register subscriptions for this application.
-    ///
-    /// Subscriptions are long-running async tasks running in the background which
-    /// emit messages to the application through a channel. They can be dynamically
-    /// stopped and started conditionally based on application state, or persist
-    /// indefinitely.
     fn subscription(&self) -> Subscription<Self::Message> {
-        // Add subscriptions which are always active.
-        let subscriptions = vec![
-            // Watch for key_bind inputs (cosmic)
+        Subscription::batch(vec![
             cosmic::iced::event::listen_with(|event, status, _| match event {
                 Event::Keyboard(cosmic::iced::keyboard::Event::KeyPressed {
                     key,
                     modifiers,
                     ..
-                }) => match status {
-                    cosmic::iced::event::Status::Ignored => Some(Message::Key(modifiers, key)),
-                    cosmic::iced::event::Status::Captured => None,
-                },
+                }) => {
+                    // Keys typed into a text input (the search box) are not shortcuts.
+                    if status == cosmic::iced::event::Status::Captured {
+                        return None;
+                    }
+                    match &key {
+                        Key::Named(Named::ArrowLeft) if modifiers.is_empty() => {
+                            Some(Message::Hotkey(Hotkey::ArrowLeft))
+                        }
+                        Key::Named(Named::ArrowRight) if modifiers.is_empty() => {
+                            Some(Message::Hotkey(Hotkey::ArrowRight))
+                        }
+                        Key::Named(Named::Escape) => Some(Message::Hotkey(Hotkey::Escape)),
+                        _ => Some(Message::Key(modifiers, key)),
+                    }
+                }
                 Event::Keyboard(cosmic::iced::keyboard::Event::ModifiersChanged(modifiers)) => {
                     Some(Message::Modifiers(modifiers))
                 }
                 _ => None,
             }),
-            // Watch for application configuration changes.
             self.core()
                 .watch_config::<StarryConfig>(Self::APP_ID)
-                .map(|update| {
-                    // for why in update.errors {
-                    //     tracing::error!(?why, "app config error");
-                    // }
-
-                    Message::UpdateConfig(update.config)
-                }),
-            // Application HoyKeys
-            cosmic::iced::event::listen_with(handle_event),
-        ];
-
-        Subscription::batch(subscriptions)
+                .map(|update| Message::UpdateConfig(update.config)),
+        ])
     }
 
-    /// Handles messages emitted by the application and its widgets.
-    ///
-    /// Tasks may be returned for asynchronous execution of code in the background
-    /// on the application's async runtime.
     fn update(&mut self, message: Self::Message) -> Task<cosmic::Action<Self::Message>> {
         match message {
-            Message::Hotkey(hotkey) => {
-                let State::Ready { .. } = &mut self.state else {
-                    return Task::none();
-                };
-
-                if self.context_page == ContextPage::PokemonDetails && self.core.window.show_context
-                {
-                    // We're on the Pokémon details page
-                    match hotkey {
-                        Hotkey::ArrowLeft => self.update(Message::PokemonDetailsInput(
-                            PokemonDetailsInput::PaginationAction(PaginationAction::Back),
-                        )),
-                        Hotkey::ArrowRight => self.update(Message::PokemonDetailsInput(
-                            PokemonDetailsInput::PaginationAction(PaginationAction::Next),
-                        )),
-                    }
-                } else if !self.core.window.show_context {
-                    // We're on the main page
-                    match hotkey {
-                        Hotkey::ArrowLeft => self.update(Message::PokemonListInput(
-                            PokemonListInput::PaginationAction(PaginationAction::Back),
-                        )),
-                        Hotkey::ArrowRight => self.update(Message::PokemonListInput(
-                            PokemonListInput::PaginationAction(PaginationAction::Next),
-                        )),
-                    }
-                } else {
-                    Task::none()
-                }
-            }
+            Message::Hotkey(hotkey) => self.on_hotkey(hotkey),
             Message::ToggleContextPage(context_page) => {
                 if self.context_page == context_page {
-                    // Close the context drawer if the toggled context page is the same.
                     self.core.window.show_context = !self.core.window.show_context;
                 } else {
-                    // Open the context drawer to display the requested context page.
                     self.context_page = context_page;
                     self.core.window.show_context = true;
                 }
                 Task::none()
             }
-
             Message::UpdateConfig(config) => {
+                let theme_changed = config.app_theme != self.config.app_theme;
                 self.config = config;
-                let State::Ready {
-                    core,
-                    current_page,
-                    pokemon_list,
-                    ..
-                } = &mut self.state
-                else {
-                    return Task::none();
-                };
-
-                *current_page = 0;
-                *pokemon_list = core.get_pokemon_page(0, self.config.pokemon_per_page);
-
-                cosmic::command::set_theme(self.config.app_theme.theme())
-            }
-            Message::ConfigUpdated => {
-                let State::Ready {
-                    core,
-                    current_page,
-                    pokemon_list,
-                    ..
-                } = &mut self.state
-                else {
-                    return Task::none();
-                };
-
-                *current_page = 0;
-                *pokemon_list = core.get_pokemon_page(0, self.config.pokemon_per_page);
-                Task::none()
+                self.refresh_results();
+                if theme_changed {
+                    cosmic::command::set_theme(self.config.app_theme.theme())
+                } else {
+                    Task::none()
+                }
             }
             Message::LaunchUrl(url) => {
-                match open::that_detached(&url) {
-                    Ok(()) => {}
-                    Err(err) => {
-                        eprintln!("failed to open {url:?}: {err}");
-                    }
+                if let Err(err) = open::that_detached(&url) {
+                    eprintln!("failed to open {url:?}: {err}");
                 }
                 Task::none()
             }
-            Message::MenuAction(action) => {
-                let State::Ready { .. } = &mut self.state else {
-                    return Task::none();
-                };
-
-                match action {
-                    app_menu::MenuAction::About => {
-                        self.update(Message::ToggleContextPage(ContextPage::About))
-                    }
-                    app_menu::MenuAction::Settings => {
-                        self.update(Message::ToggleContextPage(ContextPage::Settings))
-                    }
+            Message::MenuAction(action) => match action {
+                MenuAction::About => self.update(Message::ToggleContextPage(ContextPage::About)),
+                MenuAction::Settings => {
+                    self.update(Message::ToggleContextPage(ContextPage::Settings))
                 }
-            }
+            },
             Message::Key(modifiers, key) => {
-                for (key_bind, action) in self.key_binds.iter() {
+                for (key_bind, action) in &self.key_binds {
                     if key_bind.matches(modifiers, &key, None) {
                         return self.update(action.message());
                     }
@@ -456,426 +372,175 @@ impl cosmic::Application for AppModel {
                 self.modifiers = modifiers;
                 Task::none()
             }
-
-            Message::CoreLoaded(res) => {
-                if let Err(e) = res {
-                    self.state = State::Error(e.to_string());
-                    return Task::none();
-                }
-
-                let core = res.unwrap();
-                let pokemon_list = core.get_pokemon_page(0, self.config.pokemon_per_page);
-
-                self.state = State::Ready {
+            Message::CoreLoaded(Err(e)) => {
+                self.state = State::Error(e.to_string());
+                Task::none()
+            }
+            Message::CoreLoaded(Ok(core)) => {
+                self.state = State::Ready(Box::new(Ready {
                     core,
-                    pokemon_list,
-                    selected_pokemon: Box::from(None),
-                    wants_pokemon_details: false,
-                    wants_flavor_text: false,
+                    results: Vec::new(),
+                    page: 0,
                     search: String::new(),
                     filters: Filters::default(),
-                    current_page: 0,
-                };
-
+                    sort: SortBy::default(),
+                    descending: false,
+                    details: None,
+                    list_scroll: AbsoluteOffset::default(),
+                }));
+                self.refresh_results();
                 Task::none()
             }
-
-            Message::LoadPokemon(pokemon_id) => {
-                let State::Ready {
-                    core,
-                    selected_pokemon,
-                    ..
-                } = &mut self.state
-                else {
+            Message::OpenPokemon(id) => {
+                let State::Ready(ready) = &mut self.state else {
                     return Task::none();
                 };
-
-                let pokemon = core.get_pokemon_by_id(pokemon_id).map(|archived_pokemon| {
-                    // It is theoretically safe to unwrap here
-                    rkyv::deserialize::<StarryPokemon, rancor::Error>(archived_pokemon).unwrap()
-                });
-
-                *selected_pokemon = Box::from(pokemon);
-                self.context_page = ContextPage::PokemonDetails;
-                self.core.window.show_context = true;
-
+                let Some(index) = ready.core.dex().pokemon_index(id) else {
+                    return Task::none();
+                };
+                match &mut ready.details {
+                    Some(details) if details.index != index => {
+                        details.history.push(details.index);
+                        details.show(index, ready.core.dex());
+                    }
+                    Some(_) => {}
+                    None => ready.details = Some(Details::new(index, ready.core.dex())),
+                }
+                if self.context_page == ContextPage::FiltersPage {
+                    self.core.window.show_context = false;
+                }
                 Task::none()
             }
-
-            Message::ConfigInput(input) => {
-                match input {
-                    ConfigInput::UpdateTheme(index) => {
-                        let app_theme = match index {
-                            1 => AppTheme::Dark,
-                            2 => AppTheme::Light,
-                            _ => AppTheme::System,
-                        };
-
-                        if let Some(handler) = &self.config_handler {
-                            if let Err(err) = self.config.set_app_theme(handler, app_theme) {
-                                eprintln!("{err}");
-                                // even if it fails we update the config (it won't get saved after restart)
-                                let mut old_config = self.config.clone();
-                                old_config.app_theme = app_theme;
-                                self.config = old_config;
-                            }
-
-                            return cosmic::command::set_theme(self.config.app_theme.theme());
+            Message::Back => {
+                if let State::Ready(ready) = &mut self.state
+                    && let Some(details) = &mut ready.details
+                {
+                    match details.history.pop() {
+                        Some(previous) => details.show(previous, ready.core.dex()),
+                        None => {
+                            ready.details = None;
+                            // Restore on the next update, once the list view exists again. The offset is
+                            // captured now because the new scrollable reports 0 through `on_scroll` when it
+                            // first draws, which would overwrite `list_scroll`.
+                            return Task::done(cosmic::action::app(Message::List(
+                                ListInput::RestoreScroll(ready.list_scroll),
+                            )));
                         }
-                        Task::none()
-                    }
-                    ConfigInput::UpdateViewMode(index) => {
-                        let per_row_value =
-                            if let ViewMode::Manual { pokemon_per_row } = &self.config.view_mode {
-                                pokemon_per_row
-                            } else {
-                                &3
-                            };
-
-                        let view_mode = match index {
-                            0 => ViewMode::Responsive,
-                            1 => ViewMode::Manual {
-                                pokemon_per_row: *per_row_value,
-                            },
-                            _ => ViewMode::Responsive,
-                        };
-
-                        #[allow(clippy::collapsible_if)]
-                        if let Some(handler) = &self.config_handler {
-                            if let Err(err) = self.config.set_view_mode(handler, view_mode) {
-                                eprintln!("{err}");
-                                // even if it fails we update the config (it won't get saved after restart)
-                                let mut old_config = self.config.clone();
-                                old_config.view_mode = view_mode;
-                                self.config = old_config;
-                            }
-                        }
-                        Task::none()
-                    }
-                    ConfigInput::UpdatePokemonPerRow(v) => {
-                        let ViewMode::Manual { .. } = &mut self.config.view_mode else {
-                            return Task::none();
-                        };
-
-                        if let Some(handler) = &self.config_handler {
-                            let value = ViewMode::Manual {
-                                pokemon_per_row: v as usize,
-                            };
-                            if let Err(err) = self.config.set_view_mode(handler, value) {
-                                eprintln!("{err}");
-                                // even if it fails we update the config (it won't get saved after restart)
-                                let mut old_config = self.config.clone();
-                                old_config.view_mode = value;
-                                self.config = old_config;
-                            }
-                        }
-                        Task::none()
-                    }
-                    ConfigInput::UpdatePokemonPerPage(v) => {
-                        if let Some(handler) = &self.config_handler {
-                            let value = v as usize;
-                            if let Err(err) = self.config.set_pokemon_per_page(handler, value) {
-                                eprintln!("{err}");
-                                // even if it fails we update the config (it won't get saved after restart)
-                                let mut old_config = self.config.clone();
-                                old_config.pokemon_per_page = value;
-                                self.config = old_config;
-                            }
-                            return self.update(Message::ConfigUpdated);
-                        }
-                        Task::none()
-                    }
-                    ConfigInput::UpdateTypeFilterMode(index) => {
-                        let filter_mode = match index {
-                            1 => TypeFilteringMode::Inclusive,
-                            _ => TypeFilteringMode::Exclusive,
-                        };
-
-                        #[allow(clippy::collapsible_if)]
-                        if let Some(handler) = &self.config_handler {
-                            if let Err(err) =
-                                self.config.set_type_filtering_mode(handler, filter_mode)
-                            {
-                                eprintln!("{err}");
-                                // even if it fails we update the config (it won't get saved after restart)
-                                let mut old_config = self.config.clone();
-                                old_config.type_filtering_mode = filter_mode;
-                                self.config = old_config;
-                            }
-                        }
-                        Task::none()
-                    }
-                    ConfigInput::DeleteCache => {
-                        let State::Ready { .. } = &mut self.state else {
-                            return Task::none();
-                        };
-                        self.set_show_context(false);
-
-                        let data_dir = dirs::data_dir().unwrap().join(Self::APP_ID);
-                        if let Err(e) = remove_dir_contents(&data_dir) {
-                            eprintln!("Error deleting cache: {e}");
-                        }
-
-                        Task::perform(StarryCore::initialize(), |core| {
-                            cosmic::action::app(Message::CoreLoaded(core))
-                        })
                     }
                 }
+                Task::none()
             }
-
-            Message::PokemonDetailsInput(input) => {
-                let State::Ready {
-                    core,
-                    pokemon_list,
-                    selected_pokemon,
-                    wants_pokemon_details,
-                    wants_flavor_text,
-                    ..
-                } = &mut self.state
-                else {
+            Message::DetailTab(entity) => {
+                self.detail_tabs.activate(entity);
+                Task::none()
+            }
+            Message::ConfigInput(input) => self.on_config_input(input),
+            Message::Details(input) => {
+                let State::Ready(ready) = &mut self.state else {
                     return Task::none();
                 };
-
+                let Some(details) = &mut ready.details else {
+                    return Task::none();
+                };
+                let dex = ready.core.dex();
                 match input {
-                    PokemonDetailsInput::PaginationAction(action) => match action {
-                        PaginationAction::Next => {
-                            #[allow(clippy::collapsible_if)]
-                            if !pokemon_list.is_empty() {
-                                if let Some(current_pokemon) = selected_pokemon.as_ref() {
-                                    if let Some(current_index) = &pokemon_list
-                                        .iter()
-                                        .position(|p| p.id == current_pokemon.pokemon.id)
-                                    {
-                                        let next_index = (current_index + 1) % pokemon_list.len();
-                                        let next_pokemon_id = pokemon_list[next_index].id;
-                                        let pokemon = core.get_pokemon_by_id(next_pokemon_id).map(
-                                            |archived_pokemon| {
-                                                // It is theoretically safe to unwrap here
-                                                rkyv::deserialize::<StarryPokemon, rancor::Error>(
-                                                    archived_pokemon,
-                                                )
-                                                .unwrap()
-                                            },
-                                        );
-
-                                        *selected_pokemon = Box::from(pokemon)
-                                    }
-                                }
-                            }
-                        }
-                        PaginationAction::Back => {
-                            #[allow(clippy::collapsible_if)]
-                            if !pokemon_list.is_empty() {
-                                if let Some(current_pokemon) = selected_pokemon.as_ref() {
-                                    if let Some(current_index) = &pokemon_list
-                                        .iter()
-                                        .position(|p| p.id == current_pokemon.pokemon.id)
-                                    {
-                                        let prev_index = if *current_index == 0 {
-                                            pokemon_list.len() - 1
-                                        } else {
-                                            current_index - 1
-                                        };
-                                        let prev_pokemon_id = pokemon_list[prev_index].id;
-                                        let pokemon = core.get_pokemon_by_id(prev_pokemon_id).map(
-                                            |archived_pokemon| {
-                                                // It is theoretically safe to unwrap here
-                                                rkyv::deserialize::<StarryPokemon, rancor::Error>(
-                                                    archived_pokemon,
-                                                )
-                                                .unwrap()
-                                            },
-                                        );
-
-                                        *selected_pokemon = Box::from(pokemon)
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    PokemonDetailsInput::PlayAudioFile(file_path) => {
+                    DetailsInput::Step(direction) => {
+                        let next =
+                            step(&ready.results, dex.pokemon.len(), details.index, &direction);
+                        details.history.clear();
+                        details.show(next, dex);
+                    }
+                    DetailsInput::PlayAudio(path) => {
                         #[cfg(unix)]
-                        play_audio_file(file_path.as_str());
+                        play_audio_file(&path, f32::from(self.config.cry_volume) / 100.0);
                     }
-                    PokemonDetailsInput::ToggleMoveDetails(move_name) => {
-                        #[allow(clippy::collapsible_if)]
-                        if let Some(current_pokemon) = selected_pokemon.as_mut() {
-                            if let Some(m) = current_pokemon
-                                .pokemon
-                                .moves
-                                .iter_mut()
-                                .find(|m| m.name == move_name)
-                            {
-                                m.show_details = !m.show_details;
-                            }
+                    DetailsInput::ToggleShiny => details.shiny = !details.shiny,
+                    DetailsInput::ToggleBack => details.back = !details.back,
+                    DetailsInput::ToggleFemale => details.female = !details.female,
+                    DetailsInput::FlavorEntry(index) => details.flavor_entry = index,
+                    DetailsInput::MoveVersionGroup(index) => {
+                        details.move_version_group =
+                            details.move_version_groups.get(index).copied();
+                        details.expanded_moves.clear();
+                    }
+                    DetailsInput::ToggleMove(id) => {
+                        if !details.expanded_moves.remove(&id) {
+                            details.expanded_moves.insert(id);
                         }
                     }
-                    PokemonDetailsInput::TogglePokemonDetails(value) => {
-                        *wants_pokemon_details = value;
+                    DetailsInput::EncounterVersion(index) => {
+                        // Index 0 is "all games".
+                        details.encounter_version = index
+                            .checked_sub(1)
+                            .and_then(|i| details.encounter_versions.get(i).copied());
                     }
-                    PokemonDetailsInput::TogglePokemonFlavorText => match wants_flavor_text {
-                        true => *wants_flavor_text = false,
-                        false => *wants_flavor_text = true,
-                    },
                 }
-
                 Task::none()
             }
-
-            Message::PokemonListInput(input) => {
-                let State::Ready {
-                    core,
-                    pokemon_list,
-                    filters,
-                    current_page,
-                    search,
-                    ..
-                } = &mut self.state
-                else {
+            Message::List(input) => {
+                let State::Ready(ready) = &mut self.state else {
                     return Task::none();
                 };
-
                 match input {
-                    PokemonListInput::PaginationAction(action) => match action {
-                        PaginationAction::Next => {
-                            if !filters.any_applied() && search.is_empty() {
-                                let new_list = core.get_pokemon_page(
-                                    (*current_page + 1) * self.config.pokemon_per_page,
-                                    self.config.pokemon_per_page,
-                                );
-                                if !new_list.is_empty() {
-                                    *current_page += 1;
-                                    *pokemon_list = new_list;
-                                }
-                            }
-                        }
-                        PaginationAction::Back =>
-                        {
-                            #[allow(clippy::collapsible_if)]
-                            if *current_page >= 1 {
-                                if !filters.any_applied() && search.is_empty() {
-                                    let new_list = core.get_pokemon_page(
-                                        (*current_page - 1) * self.config.pokemon_per_page,
-                                        self.config.pokemon_per_page,
-                                    );
-                                    if !new_list.is_empty() {
-                                        *current_page -= 1;
-                                        *pokemon_list = new_list;
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    PokemonListInput::SearchInput(value) => {
-                        *search = value;
-                        if search.is_empty() {
-                            *pokemon_list = core.get_pokemon_page(
-                                *current_page * self.config.pokemon_per_page,
-                                self.config.pokemon_per_page,
-                            );
-                        } else {
-                            *pokemon_list = core.search_pokemon(search);
-                        }
+                    ListInput::Page(action) => {
+                        let pages = page_count(ready.results.len(), self.config.pokemon_per_page);
+                        ready.page = match action {
+                            PaginationAction::Next => (ready.page + 1).min(pages - 1),
+                            PaginationAction::Back => ready.page.saturating_sub(1),
+                        };
+
+                        // go back to the top of the page when changing paage
+                        ready.list_scroll = AbsoluteOffset::default();
+                        return scrollable::scroll_to(
+                            pages::home::LIST_SCROLL_ID.into(),
+                            AbsoluteOffset {
+                                x: None,
+                                y: Some(0.0),
+                            },
+                        );
                     }
-                    PokemonListInput::ClearFilters => {
-                        // TODO: Is this better than before, when we we're just restarting all fields except core manualy?
-                        self.state = State::Loading;
-                        return Task::perform(StarryCore::initialize(), |res| {
-                            cosmic::action::app(Message::CoreLoaded(res))
-                        });
+                    ListInput::Search(value) => ready.search = value,
+                    ListInput::Sort(index) => {
+                        ready.sort = SortBy::ALL.get(index).copied().unwrap_or_default();
+                        ready.descending = false;
+                    }
+                    ListInput::ToggleOrder => ready.descending = !ready.descending,
+                    ListInput::ClearAll => {
+                        ready.search.clear();
+                        ready.filters = Filters::default();
+                        ready.sort = SortBy::default();
+                        ready.descending = false;
+                    }
+                    ListInput::Scrolled(offset) => {
+                        ready.list_scroll = offset;
+                        return Task::none();
+                    }
+                    ListInput::RestoreScroll(offset) => {
+                        ready.list_scroll = offset;
+                        return scrollable::scroll_to(
+                            pages::home::LIST_SCROLL_ID.into(),
+                            offset.into(),
+                        );
                     }
                 }
-
+                self.refresh_results();
                 Task::none()
             }
-
-            Message::FiltersInput(input) => {
-                let State::Ready {
-                    core,
-                    filters,
-                    search,
-                    current_page,
-                    pokemon_list,
-                    ..
-                } = &mut self.state
-                else {
+            Message::Filters(input) => {
+                let State::Ready(ready) = &mut self.state else {
                     return Task::none();
                 };
-
+                let filters = &mut ready.filters;
                 match input {
-                    FiltersInput::TypeFilterToggled(value, pokemon_type) => {
-                        if value {
-                            filters.selected_types.insert(pokemon_type);
-                        } else {
-                            filters.selected_types.remove(&pokemon_type);
-                        }
-                        Task::none()
-                    }
-                    FiltersInput::StatsFilterToggled(value) => {
-                        filters.total_stats.0 = value;
-                        Task::none()
-                    }
-                    FiltersInput::StatsFilterChanged(value) => {
-                        if filters.total_stats.0 {
-                            filters.total_stats.1 = value;
-                        }
-                        Task::none()
-                    }
-                    FiltersInput::GenerationFilterToggled(value, pokemon_generation) => {
-                        if value {
-                            filters.selected_generations.insert(pokemon_generation);
-                        } else {
-                            filters.selected_generations.remove(&pokemon_generation);
-                        }
-                        Task::none()
-                    }
-                    FiltersInput::ApplyCurrentFilters => {
-                        if filters.any_applied() {
-                            *search = String::new();
-                            *current_page = 0;
-
-                            let mut all_pokemon = core.get_pokemon_list();
-
-                            // Try to apply types filter if needed
-                            if !filters.selected_types.is_empty() {
-                                match self.config.type_filtering_mode {
-                                    TypeFilteringMode::Inclusive => {
-                                        // Ej: If fire and ice are selected it will show fire pokemons and ice pokemons
-                                        all_pokemon =
-                                            core.filter_pokemon_inclusive(&filters.selected_types);
-                                    }
-                                    TypeFilteringMode::Exclusive => {
-                                        // Ej: If fire and ice are selected it will show pokemons that are both fire and ice types
-                                        all_pokemon =
-                                            core.filter_pokemon_exclusive(&filters.selected_types);
-                                    }
-                                }
-                            }
-
-                            // Try to apply stats filter if needed
-                            if filters.total_stats.0 && filters.total_stats.1 > 0 {
-                                all_pokemon = core.filter_pokemon_stats_with_list(
-                                    &all_pokemon,
-                                    filters.total_stats.1,
-                                );
-                            }
-
-                            // Try to apply generations filter if needed
-                            if !filters.selected_generations.is_empty() {
-                                all_pokemon = core.filter_pokemon_by_generation(
-                                    &all_pokemon,
-                                    &filters.selected_generations,
-                                );
-                            }
-
-                            *pokemon_list = all_pokemon;
-                        }
-
-                        self.core.window.show_context = false;
-
-                        Task::none()
-                    }
+                    FiltersInput::Type(on, t) => toggle(&mut filters.types, t, on),
+                    FiltersInput::Generation(on, g) => toggle(&mut filters.generations, g, on),
+                    FiltersInput::Category(on, c) => toggle(&mut filters.categories, c, on),
+                    FiltersInput::StatsEnabled(on) => filters.stats_enabled = on,
+                    FiltersInput::MinTotal(value) => filters.min_total = value,
+                    FiltersInput::Reset => *filters = Filters::default(),
                 }
+                self.refresh_results();
+                Task::none()
             }
         }
     }
@@ -884,801 +549,238 @@ impl cosmic::Application for AppModel {
 impl AppModel {
     /// Updates the header and window titles.
     pub fn update_title(&mut self) -> Task<cosmic::Action<Message>> {
-        let window_title = String::from("StarryDex");
-
         if let Some(id) = self.core.main_window_id() {
-            self.set_window_title(window_title, id)
+            self.set_window_title(String::from("StarryDex"), id)
         } else {
             Task::none()
         }
     }
 
-    /// The settings context page for this app.
-    pub fn settings(&self) -> Element<Message> {
-        let app_theme_selected = match self.config.app_theme {
-            AppTheme::Dark => 1,
-            AppTheme::Light => 2,
-            AppTheme::System => 0,
-        };
-        let type_filter_mode_selected = match self.config.type_filtering_mode {
-            TypeFilteringMode::Inclusive => 1,
-            TypeFilteringMode::Exclusive => 0,
-        };
-        let view_mode_selected = match self.config.view_mode {
-            ViewMode::Responsive => 0,
-            ViewMode::Manual { .. } => 1,
-        };
-
-        // Appearance Section
-        let mut appearance_section = widget::settings::section()
-            .title(fl!("appearance"))
-            .add(
-                widget::settings::item::builder(fl!("theme")).control(widget::dropdown(
-                    &self.app_themes,
-                    Some(app_theme_selected),
-                    |v| Message::ConfigInput(ConfigInput::UpdateTheme(v)),
-                )),
-            )
-            .add(
-                widget::settings::item::builder(fl!("view-mode")).control(widget::dropdown(
-                    &self.view_modes,
-                    Some(view_mode_selected),
-                    |v| Message::ConfigInput(ConfigInput::UpdateViewMode(v)),
-                )),
-            );
-        // Conditionally add pokemon-per-row slider if ViewMode::Manual is selected
-        if let ViewMode::Manual { pokemon_per_row } = self.config.view_mode {
-            appearance_section = appearance_section.add(
-                widget::settings::item::builder(fl!("pokemon-per-row"))
-                    .description(format!("{}", pokemon_per_row))
-                    .control(
-                        widget::slider(1..=10, pokemon_per_row as u16, |v| {
-                            Message::ConfigInput(ConfigInput::UpdatePokemonPerRow(v))
-                        })
-                        .step(1u16),
-                    ),
-            );
-        }
-        // Add pokemon-per-page slider
-        appearance_section = appearance_section.add(
-            widget::settings::item::builder(fl!("pokemon-per-page"))
-                .description(format!("{}", self.config.pokemon_per_page))
-                .control(
-                    widget::slider(10..=1500, self.config.pokemon_per_page as u16, |v| {
-                        Message::ConfigInput(ConfigInput::UpdatePokemonPerPage(v))
-                    })
-                    .step(10u16),
-                ),
-        );
-
-        widget::settings::view_column(vec![
-            appearance_section.into(),
-            widget::settings::section()
-                .title(fl!("other"))
-                .add(
-                    widget::settings::item::builder(fl!("type-filter-mode")).control(
-                        widget::dropdown(
-                            &self.type_filter_modes,
-                            Some(type_filter_mode_selected),
-                            |v| Message::ConfigInput(ConfigInput::UpdateTypeFilterMode(v)),
-                        ),
-                    ),
-                )
-                .add(
-                    widget::settings::item::builder(fl!("renew-cache")).control(
-                        widget::button::destructive(fl!("renew-cache-button"))
-                            .on_press(Message::ConfigInput(ConfigInput::DeleteCache)),
-                    ),
-                )
-                .into(),
-        ])
-        .into()
+    fn active_tab(&self) -> DetailTab {
+        self.detail_tabs
+            .active_data::<DetailTab>()
+            .copied()
+            .unwrap_or_default()
     }
-}
 
-/// The pokemon details context page for this app.
-pub fn homepage<'a>(
-    spacing: &Spacing,
-    pokemon_list: &'a [PokemonInfo],
-    view_mode: &'a ViewMode,
-    search: &'a str,
-    current_page: &'a usize,
-    current_filters: &'a Filters,
-) -> Element<'a, Message> {
-    let pokemon_content: Element<Message> = match view_mode {
-        ViewMode::Manual { pokemon_per_row } => {
-            let mut pokemon_grid = Grid::new().width(Length::Fill);
+    /// Re-runs the list query after search, filters, sorting or settings changed.
+    fn refresh_results(&mut self) {
+        let State::Ready(ready) = &mut self.state else {
+            return;
+        };
+        ready.results = ready.core.query(&ListQuery {
+            search: &ready.search,
+            filters: &ready.filters,
+            type_mode: self.config.type_filtering_mode,
+            show_forms: self.config.show_forms,
+            sort: ready.sort,
+            descending: ready.descending,
+            lang: data_lang(),
+        });
+        ready.page = 0;
+        ready.list_scroll = AbsoluteOffset::default();
+    }
 
-            for (index, pokemon) in pokemon_list.iter().enumerate() {
-                let pokemon_image = match pokemon.sprite_path.as_ref() {
-                    Some(path) => Image::new(path.as_str()),
-                    None => Image::new(images::get("fallback")),
-                }
-                .content_fit(cosmic::iced::ContentFit::None)
-                .width(Length::Fixed(100.0))
-                .height(Length::Fixed(100.0));
-
-                let pokemon_container = button::custom(
-                    Column::new()
-                        .push(pokemon_image.width(Length::Shrink))
-                        .push(
-                            text(capitalize_string(&pokemon.name))
-                                .width(Length::Shrink)
-                                .font(cosmic::iced::Font {
-                                    weight: cosmic::iced::font::Weight::Bold,
-                                    ..Default::default()
-                                })
-                                .line_height(LineHeight::Absolute(Pixels::from(15.0))),
-                        )
-                        .width(Length::Fill)
-                        .align_x(Alignment::Center),
-                )
-                .width(Length::Fixed(200.0))
-                .height(Length::Fixed(135.0))
-                .on_press_down(Message::LoadPokemon(pokemon.id))
-                .class(theme::Button::IconVertical);
-
-                // Insert a new row before adding the first Pokémon of each row
-                if index % pokemon_per_row == 0 {
-                    pokemon_grid = pokemon_grid.insert_row();
-                }
-
-                pokemon_grid = pokemon_grid.push(pokemon_container);
+    fn on_hotkey(&mut self, hotkey: Hotkey) -> Task<cosmic::Action<Message>> {
+        let State::Ready(ready) = &self.state else {
+            return Task::none();
+        };
+        let in_details = ready.details.is_some();
+        match hotkey {
+            Hotkey::Escape if self.core.window.show_context => {
+                self.core.window.show_context = false;
+                Task::none()
             }
-
-            pokemon_grid.into()
+            Hotkey::Escape if in_details => self.update(Message::Back),
+            Hotkey::Escape => Task::none(),
+            Hotkey::ArrowLeft | Hotkey::ArrowRight => {
+                let direction = if matches!(hotkey, Hotkey::ArrowLeft) {
+                    PaginationAction::Back
+                } else {
+                    PaginationAction::Next
+                };
+                if in_details {
+                    self.update(Message::Details(DetailsInput::Step(direction)))
+                } else {
+                    self.update(Message::List(ListInput::Page(direction)))
+                }
+            }
         }
-        ViewMode::Responsive => {
-            let pokemon_items: Vec<Element<Message>> = pokemon_list
-                .iter()
-                .map(|pokemon| {
-                    let pokemon_image = match pokemon.sprite_path.as_ref() {
-                        Some(path) => Image::new(path.as_str()),
-                        None => Image::new(images::get("fallback")),
+    }
+
+    fn save_config(
+        &mut self,
+        apply: impl Fn(
+            &mut StarryConfig,
+            &cosmic::cosmic_config::Config,
+        ) -> Result<bool, cosmic::cosmic_config::Error>,
+        fallback: impl Fn(&mut StarryConfig),
+    ) {
+        if let Some(handler) = &self.config_handler {
+            if let Err(err) = apply(&mut self.config, handler) {
+                eprintln!("Failed to save setting: {err}");
+                // Keep the change for this session even if it can't be persisted.
+                fallback(&mut self.config);
+            }
+        } else {
+            fallback(&mut self.config);
+        }
+    }
+
+    fn on_config_input(&mut self, input: ConfigInput) -> Task<cosmic::Action<Message>> {
+        match input {
+            ConfigInput::UpdateTheme(index) => {
+                let app_theme = match index {
+                    1 => AppTheme::Dark,
+                    2 => AppTheme::Light,
+                    _ => AppTheme::System,
+                };
+                self.save_config(
+                    |c, h| c.set_app_theme(h, app_theme),
+                    |c| c.app_theme = app_theme,
+                );
+                return cosmic::command::set_theme(self.config.app_theme.theme());
+            }
+            ConfigInput::UpdateViewMode(index) => {
+                let per_row = match self.config.view_mode {
+                    ViewMode::Manual { pokemon_per_row } => pokemon_per_row,
+                    ViewMode::Responsive => 5,
+                };
+                let view_mode = if index == 1 {
+                    ViewMode::Manual {
+                        pokemon_per_row: per_row,
                     }
-                    .content_fit(cosmic::iced::ContentFit::None)
-                    .width(Length::Fixed(100.0))
-                    .height(Length::Fixed(100.0));
-
-                    button::custom(
-                        Column::new()
-                            .push(pokemon_image.width(Length::Shrink))
-                            .push(
-                                text(capitalize_string(&pokemon.name))
-                                    .width(Length::Shrink)
-                                    .font(cosmic::iced::Font {
-                                        weight: cosmic::iced::font::Weight::Bold,
-                                        ..Default::default()
-                                    })
-                                    .line_height(LineHeight::Absolute(Pixels::from(15.0))),
-                            )
-                            .width(Length::Fill)
-                            .align_x(Alignment::Center),
-                    )
-                    .width(Length::Fixed(200.0))
-                    .height(Length::Fixed(135.0))
-                    .on_press_down(Message::LoadPokemon(pokemon.id))
-                    .class(theme::Button::IconVertical)
-                    .into()
-                })
-                .collect();
-
-            flex_row(pokemon_items)
-                .row_spacing(spacing.space_xs)
-                .column_spacing(spacing.space_xs)
-                .width(Length::Fill)
-                .into()
+                } else {
+                    ViewMode::Responsive
+                };
+                self.save_config(
+                    |c, h| c.set_view_mode(h, view_mode),
+                    |c| c.view_mode = view_mode,
+                );
+            }
+            ConfigInput::UpdatePokemonPerRow(v) => {
+                if let ViewMode::Manual { .. } = self.config.view_mode {
+                    let view_mode = ViewMode::Manual {
+                        pokemon_per_row: usize::from(v),
+                    };
+                    self.save_config(
+                        |c, h| c.set_view_mode(h, view_mode),
+                        |c| c.view_mode = view_mode,
+                    );
+                }
+            }
+            ConfigInput::UpdatePokemonPerPage(v) => {
+                let value = usize::from(v);
+                self.save_config(
+                    |c, h| c.set_pokemon_per_page(h, value),
+                    |c| c.pokemon_per_page = value,
+                );
+                self.refresh_results();
+            }
+            ConfigInput::UpdateTypeFilterMode(index) => {
+                let mode = if index == 1 {
+                    TypeFilteringMode::Inclusive
+                } else {
+                    TypeFilteringMode::Exclusive
+                };
+                self.save_config(
+                    |c, h| c.set_type_filtering_mode(h, mode),
+                    |c| c.type_filtering_mode = mode,
+                );
+                self.refresh_results();
+            }
+            ConfigInput::UpdateShowForms(value) => {
+                self.save_config(|c, h| c.set_show_forms(h, value), |c| c.show_forms = value);
+                self.refresh_results();
+            }
+            ConfigInput::DeleteCache => {
+                self.core.window.show_context = false;
+                self.state = State::Loading;
+                let data_dir = dirs::data_dir().map(|d| d.join(Self::APP_ID));
+                if let Some(dir) = data_dir
+                    && let Err(e) = remove_dir_contents(&dir)
+                {
+                    eprintln!("Error deleting cache: {e}");
+                }
+                return Task::perform(StarryCore::initialize(), |core| {
+                    cosmic::action::app(Message::CoreLoaded(core))
+                });
+            }
+            ConfigInput::UpdateCryVolume(value) => {
+                self.save_config(|c, h| c.set_cry_volume(h, value), |c| c.cry_volume = value);
+            }
         }
-    };
-
-    column![
-        // SEARCH ROW
-        row![
-            search_input(fl!("search"), search)
-                .style(theme::TextInput::Search)
-                .on_input(|v| Message::PokemonListInput(PokemonListInput::SearchInput(v)))
-                .line_height(LineHeight::Absolute(Pixels(30.0)))
-                .width(Length::Fill),
-            button::icon(icons::get_handle("filter-symbolic", 18))
-                .class(theme::Button::Suggested)
-                .on_press(Message::ToggleContextPage(ContextPage::FiltersPage))
-                .width(Length::Shrink),
-            button::icon(icons::get_handle("edit-clear-all-symbolic", 18))
-                .class(theme::Button::Destructive)
-                .on_press(Message::PokemonListInput(PokemonListInput::ClearFilters))
-                .width(Length::Shrink)
-        ]
-        .spacing(spacing.space_xxxs)
-        .width(Length::Fill),
-        // POKEMON LIST
-        scrollable(container(pokemon_content).align_x(Alignment::Center))
-            .height(Length::FillPortion(8))
-            .width(Length::Fill),
-        // PAGINATION
-        container(
-            row![
-                widget::button::icon(icons::get_handle("go-previous-symbolic", 18)).on_press_maybe(
-                    (!current_filters.any_applied()).then_some(Message::PokemonListInput(
-                        PokemonListInput::PaginationAction(PaginationAction::Back),
-                    )),
-                ),
-                text(format!("{} - {}", fl!("page"), (current_page + 1))),
-                widget::button::icon(icons::get_handle("go-next-symbolic", 18)).on_press_maybe(
-                    (!current_filters.any_applied()).then_some(Message::PokemonListInput(
-                        PokemonListInput::PaginationAction(PaginationAction::Next),
-                    )),
-                )
-            ]
-            .spacing(spacing.space_xxl)
-            .width(Length::Shrink)
-            .align_y(Alignment::Center)
-        )
-        .width(Length::Fill)
-        .align_x(Alignment::Center)
-        .align_y(Alignment::Center)
-    ]
-    .width(Length::Fill)
-    .padding(5.)
-    .spacing(spacing.space_xxs)
-    .into()
-}
-
-/// The pokemon details context page for this app.
-pub fn pokemon_details<'a>(
-    starry_pokemon: &'a StarryPokemon,
-    wants_pokemon_details: &'a bool,
-    wants_flavor_text: &'a bool,
-    spacing: &Spacing,
-) -> Element<'a, Message> {
-    let show_details = row![
-        text(fl!("show-encounter-details")),
-        checkbox(*wants_pokemon_details).on_toggle(|v| {
-            Message::PokemonDetailsInput(PokemonDetailsInput::TogglePokemonDetails(v))
-        })
-    ]
-    .spacing(6.)
-    .width(Length::Shrink)
-    .align_y(Alignment::Center);
-
-    let encounter_info = match &starry_pokemon.encounter_info {
-        Some(info) => {
-            let children = info.iter().map(|ef| {
-                widget::Column::new()
-                    .width(Length::Fill)
-                    .push(
-                        text(capitalize_string(&ef.city))
-                            .class(theme::Text::Accent)
-                            .size(15.),
-                    )
-                    .extend(ef.games_method.iter().map(|method| text(method).into()))
-                    .into()
-            });
-            widget::container(Column::with_children(children))
-                .class(theme::Container::Card)
-                .padding([spacing.space_none, spacing.space_xxs])
-        }
-        None => widget::container(text(fl!("no-encounter-info"))).class(theme::Container::Card),
-    };
-
-    let has_encounters = starry_pokemon
-        .encounter_info
-        .as_ref()
-        .is_some_and(|info| !info.is_empty());
-
-    Column::new()
-        // TITLE
-        .push(
-            container(
-                column![
-                    row![
-                        button::icon(icons::get_handle("go-previous-symbolic", 18)).on_press(
-                            Message::PokemonDetailsInput(PokemonDetailsInput::PaginationAction(
-                                PaginationAction::Back
-                            ))
-                        ),
-                        text::title1(capitalize_string(starry_pokemon.pokemon.name.as_str())),
-                        button::icon(icons::get_handle("go-next-symbolic", 18)).on_press(
-                            Message::PokemonDetailsInput(PokemonDetailsInput::PaginationAction(
-                                PaginationAction::Next
-                            ))
-                        )
-                    ]
-                    .spacing(spacing.space_s)
-                    .align_y(Alignment::Center),
-                    text::title4(format!(
-                        "#{} {}",
-                        starry_pokemon.pokemon.id,
-                        starry_pokemon
-                            .specie
-                            .as_ref()
-                            .map(|s| format!("- {}", s.generation))
-                            .unwrap_or_default()
-                    ))
-                ]
-                .push_maybe(starry_pokemon.cry_path.as_ref().map(|path| {
-                    button::icon(icons::get_handle("audio-speaker-symbolic", 18)).on_press(
-                        Message::PokemonDetailsInput(PokemonDetailsInput::PlayAudioFile(
-                            path.clone(),
-                        )),
-                    )
-                }))
-                .align_x(Alignment::Center)
-                .width(Length::Fill),
-            )
-            .width(Length::Fill)
-            .align_x(Alignment::Center),
-        )
-        // IMAGE (SPRITE)
-        .push(if let Some(path) = &starry_pokemon.sprite_path {
-            mouse_area(Image::new(path).content_fit(cosmic::iced::ContentFit::Fill)).on_press(
-                Message::PokemonDetailsInput(PokemonDetailsInput::TogglePokemonFlavorText),
-            )
-        } else {
-            mouse_area(
-                Image::new(images::get("fallback")).content_fit(cosmic::iced::ContentFit::Fill),
-            )
-            .on_press(Message::PokemonDetailsInput(
-                PokemonDetailsInput::TogglePokemonFlavorText,
-            ))
-        })
-        // POKÉMON TYPES
-        .push(
-            container(Row::new().spacing(spacing.space_s).extend(
-                starry_pokemon.pokemon.types.iter().map(|poke_type| {
-                    widget::tooltip(
-                        widget::icon(icons::get_handle_owned(poke_type.icon_name(), 18))
-                            .class(poke_type.get_class()),
-                        text(capitalize_string(&poke_type.to_string())),
-                        widget::tooltip::Position::Bottom,
-                    )
-                    .into()
-                }),
-            ))
-            .align_x(Alignment::Center),
-        )
-        // FLAVOR TEXT
-        .push_maybe(
-            starry_pokemon
-                .specie
-                .as_ref()
-                .and_then(|s| s.flavor_text.as_ref())
-                .filter(|_| *wants_flavor_text)
-                .map(|text| {
-                    widget::text::body(text)
-                        .align_x(Alignment::Center)
-                        .width(Length::Fill)
-                }),
-        )
-        // WEIGHT & HEIGHT
-        .push(
-            row![
-                container(
-                    column![
-                        text::title3(fl!("weight")),
-                        text(format!(
-                            "{} Kg",
-                            scale_numbers(starry_pokemon.pokemon.weight)
-                        ))
-                        .size(15.)
-                    ]
-                    .align_x(Alignment::Center)
-                    .width(Length::Fill),
-                )
-                .class(theme::Container::Card)
-                .padding([spacing.space_none, spacing.space_xxs]),
-                container(
-                    column![
-                        text::title3(fl!("height")),
-                        text(format!(
-                            "{} m",
-                            scale_numbers(starry_pokemon.pokemon.height)
-                        ))
-                        .size(15.)
-                    ]
-                    .align_x(Alignment::Center)
-                    .width(Length::Fill),
-                )
-                .class(theme::Container::Card)
-                .padding([spacing.space_none, spacing.space_xxs])
-            ]
-            .spacing(8.)
-            .align_y(Alignment::Center),
-        )
-        // POKÉMON ABILITIES
-        .push(
-            widget::container(
-                widget::Column::new()
-                    .push(
-                        widget::text::title3(fl!("pokemon-abilities"))
-                            .width(Length::Fill)
-                            .align_x(Alignment::Center),
-                    )
-                    .extend(starry_pokemon.pokemon.abilities.iter().map(|ability| {
-                        text(capitalize_string(ability))
-                            .width(Length::Fill)
-                            .align_x(Alignment::Center)
-                            .into()
-                    })),
-            )
-            .width(Length::Fill)
-            .class(theme::Container::Card)
-            .padding([spacing.space_none, spacing.space_xxs]),
-        )
-        // POKÉMON STATS
-        .push(
-            container(column![
-                widget::text::title3(fl!("poke-stats"))
-                    .width(Length::Fill)
-                    .align_x(Alignment::Center),
-                BarChart::new()
-                    .column_spacing(3.)
-                    .padding(3.)
-                    .push(fl!("hp"), starry_pokemon.pokemon.stats.hp as f32)
-                    .push(fl!("attack"), starry_pokemon.pokemon.stats.attack as f32)
-                    .push(fl!("defense"), starry_pokemon.pokemon.stats.defense as f32)
-                    .push(fl!("sp-a"), starry_pokemon.pokemon.stats.sp_attack as f32)
-                    .push(fl!("sp-d"), starry_pokemon.pokemon.stats.sp_defense as f32)
-                    .push(fl!("spd"), starry_pokemon.pokemon.stats.speed as f32),
-                widget::text(format!(
-                    "{}: {}",
-                    fl!("total"),
-                    starry_pokemon.get_total_stats()
-                ))
-                .width(Length::Fill)
-                .align_x(Alignment::Center)
-            ])
-            .padding(10.)
-            .class(theme::Container::Card),
-        )
-        // EVOLUTION DATA
-        .push(
-            container(evolution_data_view(starry_pokemon))
-                .align_x(Alignment::Center)
-                .padding(10.)
-                .class(theme::Container::Card),
-        )
-        // MOVES DATA
-        .push(
-            container(
-                widget::Column::new()
-                    .push(
-                        widget::text::title3(fl!("pokemon-moves"))
-                            .width(Length::Fill)
-                            .align_x(Alignment::Center),
-                    )
-                    .extend(starry_pokemon.pokemon.moves.iter().map(|starry_move| {
-                        let header = widget::container(
-                            row![
-                                widget::tooltip(
-                                    widget::icon(icons::get_handle_owned(
-                                        starry_move.movement_type.icon_name(),
-                                        18
-                                    ))
-                                    .class(starry_move.movement_type.get_class()),
-                                    text(capitalize_string(&starry_move.movement_type.to_string())),
-                                    widget::tooltip::Position::Bottom,
-                                ),
-                                text(capitalize_string(&starry_move.name)).width(Length::Fill),
-                                button::icon(icons::get_handle(
-                                    if starry_move.show_details {
-                                        "go-up-symbolic"
-                                    } else {
-                                        "go-down-symbolic"
-                                    },
-                                    16,
-                                ))
-                                .on_press(
-                                    Message::PokemonDetailsInput(
-                                        PokemonDetailsInput::ToggleMoveDetails(
-                                            starry_move.name.clone()
-                                        ),
-                                    )
-                                ),
-                            ]
-                            .spacing(spacing.space_xs)
-                            .align_y(Alignment::Center),
-                        )
-                        .width(Length::Fill)
-                        .padding([spacing.space_none, spacing.space_xxs]);
-
-                        let mut move_col = widget::Column::new().push(header);
-
-                        if starry_move.show_details {
-                            let details = widget::container(
-                                widget::Column::new()
-                                    .extend(starry_move.move_details.iter().map(|detail| {
-                                        row![
-                                            text(capitalize_string(&detail.game))
-                                                .width(Length::Fill)
-                                                .size(13.),
-                                            text(capitalize_string(
-                                                &detail
-                                                    .learn_method
-                                                    .first()
-                                                    .map(|m| m.to_string())
-                                                    .unwrap_or_default()
-                                            ))
-                                            .size(13.),
-                                            text(
-                                                detail
-                                                    .learned_at
-                                                    .map(|lvl| format!("Lv.{lvl}"))
-                                                    .unwrap_or_default()
-                                            )
-                                            .size(13.),
-                                        ]
-                                        .spacing(spacing.space_xs)
-                                        .align_y(Alignment::Center)
-                                        .into()
-                                    }))
-                                    .padding([spacing.space_none, spacing.space_s]),
-                            )
-                            .width(Length::Fill)
-                            .class(theme::Container::List);
-
-                            move_col = move_col.push(details);
-                        }
-
-                        move_col.into()
-                    })),
-            )
-            .width(Length::Fill)
-            .class(theme::Container::Card)
-            .padding(10),
-        )
-        // ENCOUNTER DATA (IF ANY)
-        .extend(
-            [
-                has_encounters.then(|| show_details.into()),
-                (has_encounters && *wants_pokemon_details).then(|| encounter_info.into()),
-                Some(
-                    widget::button::link(format!("{} (Bulbapedia)", fl!("link-more-info")))
-                        .on_press(Message::LaunchUrl(format!(
-                            "https://bulbapedia.bulbagarden.net/w/index.php?search={}",
-                            starry_pokemon.pokemon.name
-                        )))
-                        .into(),
-                ),
-            ]
-            .into_iter()
-            .flatten(),
-        )
-        .align_x(Alignment::Center)
-        .height(Length::Shrink)
-        .spacing(10.0)
-        .into()
-}
-
-/// The filters context page for this app.
-pub fn filters_page<'a>(filters: &'a Filters, _spacing: &Spacing) -> Element<'a, Message> {
-    let mut generations_column = Column::new()
-        .push(widget::text::title3(fl!("generation-filters")))
-        .spacing(5)
-        .width(Length::Fill);
-
-    for chunk in StarryPokemonGeneration::ALL.chunks(2) {
-        let mut row = widget::Row::new();
-        for generation in chunk {
-            let is_checked = filters.selected_generations.contains(generation);
-            let checkbox: Element<Message> = row![
-                text(generation.to_string()),
-                widget::space::horizontal(),
-                checkbox(is_checked).on_toggle(move |v| {
-                    Message::FiltersInput(FiltersInput::GenerationFilterToggled(
-                        v,
-                        generation.clone(),
-                    ))
-                })
-            ]
-            .padding(cosmic::iced::padding::horizontal(10.))
-            .align_y(Alignment::Center)
-            .into();
-
-            row = row.push(widget::container(checkbox).width(Length::Fill));
-        }
-        generations_column = generations_column.push(row);
+        Task::none()
     }
 
-    let mut types_column = Column::new()
-        .push(widget::text::title3(fl!("type-filters")))
-        .spacing(5)
-        .width(Length::Fill);
-
-    for chunk in StarryPokemonType::ALL.chunks(2) {
-        let mut row = widget::Row::new();
-        for pokemon_type in chunk {
-            let is_checked = filters.selected_types.contains(pokemon_type);
-            let checkbox: Element<Message> = row![
-                text(pokemon_type.to_string()),
-                widget::space::horizontal(),
-                checkbox(is_checked).on_toggle(move |v| {
-                    Message::FiltersInput(FiltersInput::TypeFilterToggled(v, pokemon_type.clone()))
-                })
-            ]
-            .padding(cosmic::iced::padding::horizontal(10.))
-            .align_y(Alignment::Center)
-            .into();
-
-            row = row.push(widget::container(checkbox).width(Length::Fill));
-        }
-        types_column = types_column.push(row);
+    /// The settings context page for this app.
+    pub fn settings(&self) -> Element<'_, Message> {
+        pages::settings::view(self)
     }
-
-    let poke_stats_column = column![
-        widget::text::title3(fl!("stats-filter")),
-        widget::Row::new()
-            .push(
-                row![
-                    text(fl!("enabled")),
-                    widget::space::horizontal(),
-                    checkbox(filters.total_stats.0)
-                        .on_toggle(|v| Message::FiltersInput(FiltersInput::StatsFilterToggled(v)))
-                ]
-                .padding(cosmic::iced::padding::horizontal(10.))
-                .width(Length::Fill),
-            )
-            .push(
-                column![
-                    text(format!(
-                        "{}: {}",
-                        fl!("minimum-poke-stats"),
-                        filters.total_stats.1
-                    )),
-                    widget::slider(
-                        0.0..=800.0,
-                        filters.total_stats.1 as f64,
-                        move |new_value| Message::FiltersInput(FiltersInput::StatsFilterChanged(
-                            new_value as i64
-                        )),
-                    )
-                    .step(10.0)
-                ]
-                .spacing(2.),
-            )
-            .align_y(Alignment::Center)
-            .width(Length::Fill)
-    ];
-
-    container(
-        column![
-            types_column,
-            generations_column,
-            poke_stats_column,
-            container(
-                button::suggested(fl!("apply-filters"))
-                    .on_press(Message::FiltersInput(FiltersInput::ApplyCurrentFilters))
-                    .width(Length::Shrink)
-            )
-            .width(Length::Fill)
-            .align_x(Horizontal::Center)
-        ]
-        .width(Length::Fill)
-        .spacing(15.),
-    )
-    .into()
 }
 
-//
-// VIEW HELPERS
-//
-
-fn evolution_data_view<'a>(starry_pokemon: &'a StarryPokemon) -> Element<'a, Message> {
-    if let Some(specie) = &starry_pokemon.specie
-        && !specie.evolution_data.is_empty()
-    {
-        let mut evo_items = Vec::new();
-
-        for (index, data) in specie.evolution_data.iter().enumerate() {
-            let pokemon_image = {
-                let image = if let Some(path) = &data.sprite_path {
-                    widget::Image::new(path)
-                        .width(Length::Fixed(96.))
-                        .height(Length::Fixed(96.))
-                        .content_fit(cosmic::iced::ContentFit::Fill)
-                } else {
-                    widget::Image::new(images::get("fallback"))
-                        .width(Length::Fixed(96.))
-                        .height(Length::Fixed(96.))
-                        .content_fit(cosmic::iced::ContentFit::Fill)
-                };
-                widget::tooltip(
-                    widget::mouse_area(image).on_press(Message::LoadPokemon(data.id)),
-                    widget::text(data.name.to_owned()),
-                    widget::tooltip::Position::Top,
-                )
-            };
-
-            // Group arrow and image together in a row
-            let item = if index > 0 {
-                let icon_element: Element<Message> = if let Some(n) = &data.needs_to_evolve {
-                    widget::tooltip(
-                        widget::icon(icons::get_handle("go-next-symbolic", 18)),
-                        widget::text(n.to_owned()),
-                        widget::tooltip::Position::Top,
-                    )
-                    .into()
-                } else {
-                    widget::icon(icons::get_handle("go-next-symbolic", 18)).into()
-                };
-
-                row![
-                    container(icon_element)
-                        .align_x(Alignment::Center)
-                        .align_y(Alignment::Center)
-                        .height(Length::Fixed(96.0)),
-                    pokemon_image
-                ]
-                .align_y(Alignment::Center)
-                .spacing(15.)
-                .into()
-            } else {
-                pokemon_image.into()
-            };
-
-            evo_items.push(item);
-        }
-
-        let evo_data_row = if evo_items.len() <= 2 {
-            widget::flex_row(evo_items).align_items(Alignment::Center)
-        } else {
-            widget::flex_row(evo_items)
-                .align_items(Alignment::Center)
-                .justify_content(JustifyContent::SpaceEvenly)
-        };
-
-        column![
-            widget::text::title3(fl!("poke-evo-data"))
-                .width(Length::Fill)
-                .align_x(Alignment::Center),
-            container(evo_data_row)
-                .align_x(Alignment::Center)
-                .width(Length::Fill),
-        ]
-        .width(Length::Fill)
-        .align_x(Alignment::Center)
-        .into()
+fn toggle<T: Ord>(set: &mut std::collections::BTreeSet<T>, value: T, on: bool) {
+    if on {
+        set.insert(value);
     } else {
-        column![
-            widget::text::title3(fl!("poke-evo-data"))
-                .width(Length::Fill)
-                .align_x(Alignment::Center),
-            widget::text(fl!("no-evo-data")),
-        ]
-        .width(Length::Fill)
-        .align_x(Alignment::Center)
-        .into()
+        set.remove(&value);
     }
 }
 
-//
-// SUBSCRIPTION HANDLING
-//
+/// Number of pages for `len` results (at least one).
+pub fn page_count(len: usize, per_page: usize) -> usize {
+    len.div_ceil(per_page.max(1)).max(1)
+}
+
+/// Index of the previous/next Pokémon: inside the current results when the open Pokémon is
+/// part of them, otherwise in plain Pokédex order.
+fn step(results: &[u32], total: usize, current: usize, direction: &PaginationAction) -> usize {
+    let forward = matches!(direction, PaginationAction::Next);
+    if let Some(position) = results.iter().position(|&i| i as usize == current) {
+        let len = results.len();
+        let next = if forward {
+            (position + 1) % len
+        } else {
+            (position + len - 1) % len
+        };
+        return results[next] as usize;
+    }
+    if total == 0 {
+        return current;
+    }
+    if forward {
+        (current + 1) % total
+    } else {
+        (current + total - 1) % total
+    }
+}
 
 #[derive(Debug, Clone)]
 pub enum Hotkey {
     ArrowLeft,
     ArrowRight,
+    Escape,
 }
 
-fn handle_event(
-    event: cosmic::iced::event::Event,
-    _: cosmic::iced::event::Status,
-    _: cosmic::iced::window::Id,
-) -> Option<Message> {
-    match event {
-        #[allow(clippy::collapsible_match)]
-        cosmic::iced::event::Event::Keyboard(cosmic::iced::keyboard::Event::KeyPressed {
-            key,
-            ..
-        }) => match key {
-            cosmic::iced::keyboard::Key::Named(cosmic::iced::keyboard::key::Named::ArrowRight) => {
-                Some(Message::Hotkey(Hotkey::ArrowRight))
-            }
-            cosmic::iced::keyboard::Key::Named(cosmic::iced::keyboard::key::Named::ArrowLeft) => {
-                Some(Message::Hotkey(Hotkey::ArrowLeft))
-            }
-            _ => None,
-        },
-        _ => None,
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stepping_wraps_around_results() {
+        let results = [5, 9, 2];
+        assert_eq!(step(&results, 100, 9, &PaginationAction::Next), 2);
+        assert_eq!(step(&results, 100, 2, &PaginationAction::Next), 5);
+        assert_eq!(step(&results, 100, 5, &PaginationAction::Back), 2);
+        // Not in results → dex order
+        assert_eq!(step(&results, 100, 50, &PaginationAction::Next), 51);
+        assert_eq!(step(&results, 100, 0, &PaginationAction::Back), 99);
+    }
+
+    #[test]
+    fn page_counts() {
+        assert_eq!(page_count(0, 30), 1);
+        assert_eq!(page_count(30, 30), 1);
+        assert_eq!(page_count(31, 30), 2);
     }
 }

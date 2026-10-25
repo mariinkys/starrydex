@@ -17,6 +17,10 @@ pub struct StarryConfig {
     pub view_mode: ViewMode,
     pub pokemon_per_page: usize,
     pub type_filtering_mode: TypeFilteringMode,
+    /// Also list alternate forms (megas, regional forms...) as separate entries.
+    pub show_forms: bool,
+    /// Volume of the Pokémon cries, 0–100 (%).
+    pub cry_volume: u8,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Eq, PartialEq)]
@@ -31,7 +35,9 @@ impl Default for StarryConfig {
             app_theme: Default::default(),
             view_mode: ViewMode::Responsive,
             type_filtering_mode: Default::default(),
-            pokemon_per_page: 30,
+            pokemon_per_page: 60,
+            show_forms: false,
+            cry_volume: 5,
         }
     }
 }
@@ -92,6 +98,10 @@ pub enum ConfigInput {
     UpdatePokemonPerPage(u16),
     /// Update the type filtering mode setting
     UpdateTypeFilterMode(usize),
+    /// Toggle listing alternate forms
+    UpdateShowForms(bool),
     /// Ask to delete and recreate the app cache
     DeleteCache,
+    /// Update the volume of the Pokémon cries (0–100)
+    UpdateCryVolume(u8),
 }

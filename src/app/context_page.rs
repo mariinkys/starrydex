@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
-use cosmic::{app::context_drawer, theme};
+use cosmic::app::context_drawer;
 
 use crate::{
     app::{AppModel, Message, State},
@@ -15,8 +15,6 @@ pub enum ContextPage {
     About,
     /// Settings [`ContextPage`] of the application
     Settings,
-    /// Pokemon Details [`ContextPage`] of the application
-    PokemonDetails,
     /// Pokémon Filtering Options [`ContextPage`] of the application
     FiltersPage,
 }
@@ -27,8 +25,6 @@ impl ContextPage {
         &self,
         app_model: &'a AppModel,
     ) -> Option<context_drawer::ContextDrawer<'a, Message>> {
-        let spacing = theme::active().cosmic().spacing;
-
         Some(match &self {
             ContextPage::About => context_drawer::about(
                 &app_model.about,
@@ -41,40 +37,12 @@ impl ContextPage {
                 Message::ToggleContextPage(ContextPage::Settings),
             )
             .title(fl!("settings")),
-            ContextPage::PokemonDetails => {
-                let State::Ready {
-                    selected_pokemon,
-                    wants_pokemon_details,
-                    wants_flavor_text,
-                    ..
-                } = &app_model.state
-                else {
-                    return None;
-                };
-
-                #[allow(clippy::question_mark)]
-                if let Some(pokemon) = selected_pokemon.as_ref().as_ref() {
-                    context_drawer::context_drawer(
-                        crate::app::pokemon_details(
-                            pokemon,
-                            wants_pokemon_details,
-                            wants_flavor_text,
-                            &spacing,
-                        ),
-                        Message::ToggleContextPage(ContextPage::PokemonDetails),
-                    )
-                    .title(fl!("pokemon-page"))
-                } else {
-                    return None;
-                }
-            }
             ContextPage::FiltersPage => {
-                let State::Ready { filters, .. } = &app_model.state else {
+                let State::Ready(ready) = &app_model.state else {
                     return None;
                 };
-
                 context_drawer::context_drawer(
-                    crate::app::filters_page(filters, &spacing),
+                    crate::app::pages::filters::view(&ready.filters, ready.results.len()),
                     Message::ToggleContextPage(ContextPage::FiltersPage),
                 )
                 .title(fl!("filters-page"))

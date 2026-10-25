@@ -1,503 +1,486 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
+//! Owns the memory-mapped Pokédex and answers every data question the UI asks.
+//!
+//! On first start (or after an update/cache reset) the bundled archive is decompressed to disk
+//! and the sprite/cry archives are extracted next to it. After that, startup is just an `mmap`
+//! plus a one-time validation pass: Pokémon data is read straight from the mapped file and only
+//! the pages that are actually touched end up in memory.
+
 use std::{
-    collections::{BTreeMap, HashSet},
-    io::Write,
+    io::{Read, Write},
+    path::{Path, PathBuf},
     sync::Arc,
 };
 
 use anywho::{Error, anywho};
 use memmap2::{Mmap, MmapOptions};
 use rkyv::rancor;
-
-use crate::app::entities::{
-    PokemonInfo, StarryPokemon, StarryPokemonGeneration, StarryPokemonType,
+use starrydex_model::{
+    ArchivedPokedex, ArchivedPokemon, ArchivedSpecies, FORMAT_VERSION, Lang, SpriteKind,
 };
 
-/// Unique identifier in RDNN (reverse domain name notation) format.
+use crate::app::utils::filters::{Category, Filters, SortBy};
+use crate::config::TypeFilteringMode;
+
 pub const APP_ID: &str = "dev.mariinkys.StarryDex";
-pub const CACHE_VERSION: i32 = 11;
+/// Bump to force re-extraction of the bundled data on the users' machines.
+pub const CACHE_VERSION: u32 = 12;
 
-type ArchivedStarryPokemonMap = rkyv::Archived<BTreeMap<i64, StarryPokemon>>;
+const BUNDLED_POKEDEX: &[u8] = include_bytes!("../../assets/pokedex.bin.gz");
+const BUNDLED_SPRITES: &[u8] = include_bytes!("../../assets/sprites.tar.gz");
+const BUNDLED_CRIES: &[u8] = include_bytes!("../../assets/cries.tar.gz");
 
-#[derive(Debug, Clone)]
+/// Cheap-to-clone handle to the loaded Pokédex.
+#[derive(Clone)]
 pub struct StarryCore {
-    inner: Arc<StarryCoreInner>,
+    inner: Arc<Inner>,
 }
 
-#[derive(Debug)]
-struct StarryCoreInner {
-    // we need to keep the mmap alive
-    _mmap: Option<Mmap>,
-    // this points to the archived data in the mmap
-    pokemon_data: Option<&'static ArchivedStarryPokemonMap>,
+struct Inner {
+    /// The archive. Validated once in [`StarryCore::open`]; never written to afterwards.
+    mmap: Mmap,
+    /// Directory containing the extracted `sprites/` and `cries/` folders.
+    assets_dir: PathBuf,
+}
+
+impl std::fmt::Debug for StarryCore {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("StarryCore")
+            .field("bytes", &self.inner.mmap.len())
+            .finish()
+    }
+}
+
+/// Where everything lives on disk.
+struct Paths {
+    root: PathBuf,
+    data_file: PathBuf,
+    assets_dir: PathBuf,
+    /// Written once the assets are completely extracted.
+    assets_marker: PathBuf,
+}
+
+impl Paths {
+    fn new() -> Result<Self, Error> {
+        let root = dirs::data_dir()
+            .ok_or_else(|| anywho!("Could not determine the user data directory"))?
+            .join(APP_ID);
+        let assets_dir = root.join(format!("assets_v{CACHE_VERSION}"));
+        Ok(Self {
+            data_file: root
+                .join("cache")
+                .join(format!("v{CACHE_VERSION}"))
+                .join("pokedex.bin"),
+            assets_marker: assets_dir.join(".complete"),
+            assets_dir,
+            root,
+        })
+    }
 }
 
 impl StarryCore {
-    /// Initialize the core by loading data from file or fetching from API
+    /// Loads the Pokédex, installing the bundled data first if needed.
     pub async fn initialize() -> Result<Self, Error> {
-        use std::result::Result::Ok;
+        tokio::task::spawn_blocking(Self::load)
+            .await
+            .map_err(|e| anywho!("Loading task failed: {e}"))?
+    }
 
-        let mut inner = StarryCoreInner {
-            _mmap: None,
-            pokemon_data: None,
-        };
-
-        // try to load from cache first
-        match Self::load_from_file() {
-            Ok(mmap) => {
-                // access the archived data from the mmap
-                let archived_data =
-                    rkyv::access::<ArchivedStarryPokemonMap, rancor::Error>(&mmap[..])
-                        .map_err(|e| anywho!("Failed to access archived data: {}", e))?;
-
-                // extend the lifetime of the archived data to 'static
-                // This is safe (I think) because we keep the mmap alive in _mmap field
-                let static_data: &'static ArchivedStarryPokemonMap =
-                    unsafe { std::mem::transmute(archived_data) };
-
-                inner._mmap = Some(mmap);
-                inner.pokemon_data = Some(static_data);
-                println!("Loaded {} Pokémon from cache", static_data.len());
-            }
-            Err(_) => {
-                // if loading from cache fails, parse asset gen files and save to cache
-                println!("Cache not found, getting bundled data");
-                Self::get_bundled_data(&mut inner).await?;
+    fn load() -> Result<Self, Error> {
+        let paths = Paths::new()?;
+        if !paths.data_file.exists() || !paths.assets_marker.exists() {
+            Self::install(&paths)?;
+        }
+        match Self::open(&paths) {
+            Ok(core) => Ok(core),
+            Err(e) => {
+                // Corrupted or outdated file on disk: reinstall once and retry.
+                eprintln!("Cached Pokédex unusable ({e}), reinstalling");
+                Self::install(&paths)?;
+                Self::open(&paths)
             }
         }
+    }
 
-        Ok(StarryCore {
-            inner: Arc::new(inner),
+    /// Writes the bundled archive and extracts the bundled assets.
+    fn install(paths: &Paths) -> Result<(), Error> {
+        println!("Installing bundled Pokédex data");
+        Self::remove_stale_versions(&paths.root);
+
+        if let Some(parent) = paths.data_file.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        let mut bytes = Vec::new();
+        flate2::read::GzDecoder::new(BUNDLED_POKEDEX).read_to_end(&mut bytes)?;
+        // Write to a temporary file first so a crash never leaves a truncated archive behind.
+        let tmp = paths.data_file.with_extension("tmp");
+        {
+            let mut file = std::fs::File::create(&tmp)?;
+            file.write_all(&bytes)?;
+            file.sync_all()?;
+        }
+        std::fs::rename(&tmp, &paths.data_file)?;
+
+        let _ = std::fs::remove_dir_all(&paths.assets_dir);
+        std::fs::create_dir_all(&paths.assets_dir)?;
+        for archive in [BUNDLED_SPRITES, BUNDLED_CRIES] {
+            tar::Archive::new(flate2::read::GzDecoder::new(archive)).unpack(&paths.assets_dir)?;
+        }
+        std::fs::write(&paths.assets_marker, CACHE_VERSION.to_string())?;
+        Ok(())
+    }
+
+    /// Deletes data left behind by previous versions of the app.
+    fn remove_stale_versions(root: &Path) {
+        let current_cache = format!("v{CACHE_VERSION}");
+        let current_assets = format!("assets_v{CACHE_VERSION}");
+        if let Ok(entries) = std::fs::read_dir(root.join("cache")) {
+            for entry in entries.flatten() {
+                if entry.file_name().to_string_lossy() != current_cache {
+                    let _ = std::fs::remove_dir_all(entry.path());
+                }
+            }
+        }
+        if let Ok(entries) = std::fs::read_dir(root) {
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().into_owned();
+                let stale = (name.starts_with("resources_v")
+                    || name.starts_with("cries_v")
+                    || name.starts_with("assets_v"))
+                    && name != current_assets;
+                if stale {
+                    let _ = std::fs::remove_dir_all(entry.path());
+                }
+            }
+        }
+    }
+
+    fn open(paths: &Paths) -> Result<Self, Error> {
+        let file = std::fs::File::open(&paths.data_file)?;
+        // SAFETY: the file is private to the app and only ever replaced atomically (rename),
+        // never modified in place, so the mapped bytes cannot change and this is SAFE (I thnik).
+        let mmap = unsafe { MmapOptions::new().map(&file)? };
+        let dex = rkyv::access::<ArchivedPokedex, rancor::Error>(&mmap[..])
+            .map_err(|e| anywho!("Invalid Pokédex archive: {e}"))?;
+        if dex.format_version.to_native() != FORMAT_VERSION {
+            return Err(anywho!(
+                "Pokédex format {} does not match the expected {FORMAT_VERSION}",
+                dex.format_version.to_native()
+            ));
+        }
+        println!("Loaded {} Pokémon", dex.pokemon.len());
+        Ok(Self {
+            inner: Arc::new(Inner {
+                mmap,
+                assets_dir: paths.assets_dir.clone(),
+            }),
         })
     }
 
-    /// Executed if loading from cache fails, loads the data from the bundled assets
-    async fn get_bundled_data(inner: &mut StarryCoreInner) -> Result<(), Error> {
-        let pokemon_map = Self::extract_pokemon_data().await;
-        if let Err(err) = pokemon_map {
-            panic!("Failed to extract bundled Pokémon data with error: {}", err)
-        }
-        Self::save_to_file(pokemon_map.unwrap())?;
-
-        let mmap = Self::load_from_file()?;
-        let archived_data = rkyv::access::<ArchivedStarryPokemonMap, rancor::Error>(&mmap[..])
-            .map_err(|e| anywho!("Failed to access archived data: {}", e))?;
-
-        // extend the lifetime of the archived data to 'static
-        // This is safe (I think) because we keep the mmap alive in _mmap field
-        let static_data: &'static ArchivedStarryPokemonMap =
-            unsafe { std::mem::transmute(archived_data) };
-
-        inner._mmap = Some(mmap);
-        inner.pokemon_data = Some(static_data);
-
-        println!("Extracting Sprites");
-        // we don't join sprites because the archive already has a /sprites folder
-        let sprites_directory = dirs::data_dir()
-            .unwrap()
-            .join(APP_ID)
-            .join(format!("resources_v{}", CACHE_VERSION));
-        if let Err(e) = Self::extract_sprite_archive(&sprites_directory).await {
-            eprintln!("Error extracting sprites: {e}");
-        }
-
-        println!("Extracting Cries");
-        // we don't join sprites because the archive already has a /sprites folder
-        let cries_directory = dirs::data_dir()
-            .unwrap()
-            .join(APP_ID)
-            .join(format!("cries_v{}", CACHE_VERSION));
-        if let Err(e) = Self::extract_cry_archive(&cries_directory).await {
-            eprintln!("Error extracting cries: {e}");
-        }
-
-        Ok(())
+    /// The archived Pokédex, read in place from the memory map.
+    pub fn dex(&self) -> &ArchivedPokedex {
+        // SAFETY: the bytes were fully validated in `open` and are immutable for the lifetime of
+        // `self.inner`, which the returned reference borrows from, so again this is SAFE, I think.
+        unsafe { rkyv::access_unchecked::<ArchivedPokedex>(&self.inner.mmap[..]) }
     }
 
-    /// Deserialize Pokémon data in .ron format to a BTreeMap<i64, StarryPokemon>
-    async fn extract_pokemon_data() -> Result<BTreeMap<i64, StarryPokemon>, Error> {
-        // Bundle sprites as tar.gz and extract
-        const POKEMON_DATA: &[u8] = include_bytes!("../../assets/pokemon_data.ron");
+    /// Absolute path of a file inside the extracted assets.
+    pub fn asset(&self, relative: &str) -> PathBuf {
+        self.inner.assets_dir.join(relative)
+    }
 
-        let ron_str = std::str::from_utf8(POKEMON_DATA)?;
-        let mut pokemon_data: BTreeMap<i64, StarryPokemon> = ron::from_str(ron_str)?;
+    /// Absolute path of a Pokémon sprite, falling back to the front sprite.
+    pub fn sprite(&self, pokemon: &ArchivedPokemon, kind: SpriteKind) -> Option<PathBuf> {
+        pokemon
+            .sprite_path(kind)
+            .or_else(|| pokemon.sprite_path(SpriteKind::Front))
+            .map(|rel| self.asset(&rel))
+    }
 
-        let base_sprite_path = dirs::data_dir()
-            .unwrap()
-            .join(APP_ID)
-            .join(format!("resources_v{}", CACHE_VERSION));
+    /// Runs search, filters and sorting over every Pokémon. Returns indices into [`ArchivedPokedex::pokemon`].
+    pub fn query(&self, query: &ListQuery) -> Vec<u32> {
+        let dex = self.dex();
+        let needle = fold(query.search.trim());
+        let number: Option<u32> = needle.trim_start_matches('#').parse().ok();
 
-        let base_cry_path = dirs::data_dir()
-            .unwrap()
-            .join(APP_ID)
-            .join(format!("cries_v{}", CACHE_VERSION));
-
-        // Modify sprite_path for all pokémon
-        pokemon_data = pokemon_data
-            .into_iter()
-            .map(|(id, mut pokemon)| {
-                if let Some(sprite_path) = pokemon.sprite_path {
-                    pokemon.sprite_path = std::path::Path::new(&base_sprite_path)
-                        .join(sprite_path)
-                        .to_str()
-                        .map(String::from);
+        let mut results: Vec<u32> = dex
+            .pokemon
+            .iter()
+            .enumerate()
+            .filter(|(_, pokemon)| {
+                let species = dex.species_of(pokemon);
+                // Alternate forms are hidden unless asked for, but searches always find them.
+                if !pokemon.is_default && !query.show_forms && needle.is_empty() {
+                    return false;
                 }
-
-                if let Some(cry_path) = pokemon.cry_path {
-                    pokemon.cry_path = std::path::Path::new(&base_cry_path)
-                        .join(cry_path)
-                        .to_str()
-                        .map(String::from);
+                if !needle.is_empty() && !matches_search(pokemon, &needle, number, query.lang) {
+                    return false;
                 }
-
-                if let Some(mut specie) = pokemon.specie {
-                    specie.evolution_data.iter_mut().for_each(|evo_data| {
-                        if let Some(evo_data_sprite_path) = &evo_data.sprite_path {
-                            evo_data.sprite_path = std::path::Path::new(&base_sprite_path)
-                                .join(evo_data_sprite_path)
-                                .to_str()
-                                .map(String::from);
-                        }
-                    });
-                    pokemon.specie = Some(specie);
-                }
-
-                (id, pokemon)
+                matches_filters(pokemon, species, query.filters, query.type_mode)
             })
+            .map(|(index, _)| index as u32)
             .collect();
 
-        Ok(pokemon_data)
-    }
-
-    /// Extract sprites archive
-    async fn extract_sprite_archive(target_dir: &std::path::Path) -> Result<(), Error> {
-        // Bundle sprites as tar.gz and extract
-        const BUNDLED_SPRITES: &[u8] = include_bytes!("../../assets/sprites.tar.gz");
-
-        // Extract using tar crate
-        let mut archive = tar::Archive::new(flate2::read::GzDecoder::new(BUNDLED_SPRITES));
-        archive.unpack(target_dir)?;
-
-        Ok(())
-    }
-
-    /// Extract cries archive
-    async fn extract_cry_archive(target_dir: &std::path::Path) -> Result<(), Error> {
-        // Bundle sprites as tar.gz and extract
-        const BUNDLED_CRIES: &[u8] = include_bytes!("../../assets/cries.tar.gz");
-
-        // Extract using tar crate
-        let mut archive = tar::Archive::new(flate2::read::GzDecoder::new(BUNDLED_CRIES));
-        archive.unpack(target_dir)?;
-
-        Ok(())
-    }
-
-    /// Get all Pokémon (returns an iterator to avoid loading everything into memory)
-    #[allow(dead_code)]
-    pub fn get_all_pokemon(
-        &self,
-    ) -> Option<impl Iterator<Item = (i64, &rkyv::Archived<StarryPokemon>)>> {
-        self.inner
-            .pokemon_data
-            .map(|data| data.iter().map(|(id, pokemon)| (id.to_native(), pokemon)))
-    }
-
-    /// Get a single Pokémon by ID
-    pub fn get_pokemon_by_id(&self, id: i64) -> Option<&rkyv::Archived<StarryPokemon>> {
-        self.inner
-            .pokemon_data?
-            .get(&rkyv::rend::i64_le::from_native(id))
-    }
-
-    /// Get Pokémon count
-    #[allow(dead_code)]
-    pub fn pokemon_count(&self) -> usize {
-        self.inner.pokemon_data.map_or(0, |data| data.len())
-    }
-
-    /// Check if data is loaded
-    #[allow(dead_code)]
-    pub fn is_loaded(&self) -> bool {
-        self.inner.pokemon_data.is_some()
-    }
-
-    /// Get a list of all Pokémon (converts to owned data)
-    pub fn get_pokemon_list(&self) -> Vec<PokemonInfo> {
-        if let Some(data) = self.inner.pokemon_data {
-            data.iter()
-                .map(|(id, pokemon)| PokemonInfo {
-                    id: id.to_native(),
-                    name: pokemon.pokemon.name.as_str().to_string(),
-                    sprite_path: pokemon.sprite_path.as_ref().map(|s| s.as_str().to_string()),
-                })
-                .collect()
-        } else {
-            Vec::new()
-        }
-    }
-
-    /// Get a subset of Pokémon for pagination
-    pub fn get_pokemon_page(&self, offset: usize, limit: usize) -> Vec<PokemonInfo> {
-        if let Some(data) = self.inner.pokemon_data {
-            let total_count = data.len();
-
-            if total_count == 0 || limit == 0 {
-                eprintln!("Either data is empty or limit is 0");
-                return Vec::new();
+        let pokemon = &dex.pokemon;
+        match query.sort {
+            SortBy::Number => results.sort_by_key(|&i| {
+                let p = &pokemon[i as usize];
+                (p.species_id.to_native(), !p.is_default, p.id.to_native())
+            }),
+            SortBy::Name => {
+                results.sort_by_cached_key(|&i| fold(pokemon[i as usize].display.get(query.lang)))
             }
+            other => results.sort_by_cached_key(|&i| {
+                let p = &pokemon[i as usize];
+                let value = match other {
+                    SortBy::Total => p.stats.total(),
+                    SortBy::Hp => u16::from(p.stats.hp),
+                    SortBy::Attack => u16::from(p.stats.attack),
+                    SortBy::Defense => u16::from(p.stats.defense),
+                    SortBy::SpAttack => u16::from(p.stats.sp_attack),
+                    SortBy::SpDefense => u16::from(p.stats.sp_defense),
+                    SortBy::Speed => u16::from(p.stats.speed),
+                    SortBy::Height => p.height.to_native(),
+                    SortBy::Weight => p.weight.to_native(),
+                    SortBy::Number | SortBy::Name => 0,
+                };
+                // Stats sort high → low by default; ties keep dex order.
+                (
+                    std::cmp::Reverse(value),
+                    p.species_id.to_native(),
+                    p.id.to_native(),
+                )
+            }),
+        }
+        if query.descending {
+            results.reverse();
+        }
+        results
+    }
+}
 
-            // Clamp offset to valid range
-            let adjusted_offset = std::cmp::min(offset, total_count.saturating_sub(1));
-            let actual_limit = std::cmp::min(limit, total_count - adjusted_offset);
+/// Everything that decides which Pokémon the list shows, and in which order.
+pub struct ListQuery<'a> {
+    pub search: &'a str,
+    pub filters: &'a Filters,
+    pub type_mode: TypeFilteringMode,
+    pub show_forms: bool,
+    pub sort: SortBy,
+    pub descending: bool,
+    pub lang: Lang,
+}
 
-            data.iter()
-                .skip(offset)
-                .take(actual_limit)
-                .map(|(id, pokemon)| PokemonInfo {
-                    id: id.to_native(),
-                    name: pokemon.pokemon.name.as_str().to_string(),
-                    sprite_path: pokemon.sprite_path.as_ref().map(|s| s.as_str().to_string()),
-                })
-                .collect()
-        } else {
-            Vec::new()
+fn matches_search(
+    pokemon: &ArchivedPokemon,
+    needle: &str,
+    number: Option<u32>,
+    lang: Lang,
+) -> bool {
+    if let Some(number) = number {
+        return pokemon.species_id.to_native() == number || pokemon.id.to_native() == number;
+    }
+    fold(pokemon.display.get(lang)).contains(needle)
+        || fold(&pokemon.display.en).contains(needle)
+        || pokemon.name.as_str().replace('-', " ").contains(needle)
+}
+
+fn matches_filters(
+    pokemon: &ArchivedPokemon,
+    species: Option<&ArchivedSpecies>,
+    filters: &Filters,
+    type_mode: TypeFilteringMode,
+) -> bool {
+    if !filters.types.is_empty() {
+        let ok = match type_mode {
+            TypeFilteringMode::Inclusive => filters.types.iter().any(|t| pokemon.has_type(*t)),
+            TypeFilteringMode::Exclusive => filters.types.iter().all(|t| pokemon.has_type(*t)),
+        };
+        if !ok {
+            return false;
         }
     }
-
-    /// Search Pokémon by name
-    pub fn search_pokemon(&self, query: &str) -> Vec<PokemonInfo> {
-        if let Some(data) = self.inner.pokemon_data {
-            let query_lower = query.to_lowercase();
-            data.iter()
-                .filter(|(_, pokemon)| {
-                    pokemon
-                        .pokemon
-                        .name
-                        .as_str()
-                        .to_lowercase()
-                        .contains(&query_lower)
-                })
-                .map(|(id, pokemon)| PokemonInfo {
-                    id: id.to_native(),
-                    name: pokemon.pokemon.name.as_str().to_string(),
-                    sprite_path: pokemon.sprite_path.as_ref().map(|s| s.as_str().to_string()),
-                })
-                .collect()
-        } else {
-            Vec::new()
+    if filters.stats_enabled && pokemon.stats.total() < filters.min_total {
+        return false;
+    }
+    if !filters.generations.is_empty()
+        && !species.is_some_and(|s| filters.generations.contains(&s.generation))
+    {
+        return false;
+    }
+    if !filters.categories.is_empty() {
+        let category = species.map_or(Category::Regular, |s| {
+            if s.is_mythical {
+                Category::Mythical
+            } else if s.is_legendary {
+                Category::Legendary
+            } else if s.is_baby {
+                Category::Baby
+            } else {
+                Category::Regular
+            }
+        });
+        if !filters.categories.contains(&category) {
+            return false;
         }
     }
+    true
+}
 
-    /// Filter pokémon by type (inclusive)
-    pub fn filter_pokemon_inclusive(
-        &self,
-        selected_types: &HashSet<StarryPokemonType>,
-    ) -> Vec<PokemonInfo> {
-        if let Some(data) = &self.inner.pokemon_data {
-            data.iter()
-                .filter_map(|(id, archived_pokemon)| {
-                    if let Ok(pokemon) =
-                        rkyv::deserialize::<StarryPokemon, rancor::Error>(archived_pokemon)
-                    {
-                        let matches = selected_types.is_empty()
-                            || pokemon
-                                .pokemon
-                                .types
-                                .iter()
-                                .any(|t| selected_types.contains(t));
+/// Lowercases and strips the most common diacritics so "flabebe" finds "Flabébé".
+pub fn fold(text: &str) -> String {
+    text.chars()
+        .flat_map(char::to_lowercase)
+        .filter_map(|c| match c {
+            'á' | 'à' | 'â' | 'ä' | 'ã' => Some('a'),
+            'é' | 'è' | 'ê' | 'ë' => Some('e'),
+            'í' | 'ì' | 'î' | 'ï' => Some('i'),
+            'ó' | 'ò' | 'ô' | 'ö' | 'õ' => Some('o'),
+            'ú' | 'ù' | 'û' | 'ü' => Some('u'),
+            'ñ' => Some('n'),
+            'ç' => Some('c'),
+            '♀' | '♂' | '’' | '\'' | '.' => None,
+            '-' | ':' => Some(' '),
+            other => Some(other),
+        })
+        .collect::<String>()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
 
-                        if matches {
-                            Some(PokemonInfo {
-                                id: id.to_native(),
-                                name: pokemon.pokemon.name,
-                                sprite_path: pokemon.sprite_path,
-                            })
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                })
-                .collect()
-        } else {
-            Vec::new()
-        }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use starrydex_model::PokemonType;
+
+    /// Installs the real bundled assets into a temporary data dir and queries them.
+    #[test]
+    fn loads_and_queries_bundled_pokedex() {
+        let tmp = std::env::temp_dir().join(format!("starrydex-test-{}", std::process::id()));
+        // SAFETY: set before any other thread reads the environment in this test binary.
+        unsafe { std::env::set_var("XDG_DATA_HOME", &tmp) };
+        let core = StarryCore::load().expect("bundled data loads");
+        let dex = core.dex();
+        assert!(dex.pokemon.len() > 1300);
+        assert!(dex.species.len() >= 1025);
+
+        let filters = Filters::default();
+        let base = ListQuery {
+            search: "",
+            filters: &filters,
+            type_mode: TypeFilteringMode::Exclusive,
+            show_forms: false,
+            sort: SortBy::Number,
+            descending: false,
+            lang: Lang::En,
+        };
+        let all = core.query(&base);
+        assert_eq!(
+            all.len(),
+            dex.species.len(),
+            "one entry per species without forms"
+        );
+        assert_eq!(dex.pokemon[all[0] as usize].name.as_str(), "bulbasaur");
+
+        let pika = core.query(&ListQuery {
+            search: "pika",
+            ..base
+        });
+        assert!(
+            pika.iter()
+                .any(|&i| dex.pokemon[i as usize].name.as_str() == "pikachu")
+        );
+        let by_number = core.query(&ListQuery {
+            search: "#25",
+            ..base
+        });
+        assert_eq!(dex.pokemon[by_number[0] as usize].name.as_str(), "pikachu");
+        let accents = core.query(&ListQuery {
+            search: "flabebe",
+            ..base
+        });
+        assert_eq!(accents.len(), 1);
+
+        let mut fire_flying = Filters::default();
+        fire_flying.types.insert(PokemonType::Fire);
+        fire_flying.types.insert(PokemonType::Flying);
+        let found = core.query(&ListQuery {
+            filters: &fire_flying,
+            ..base
+        });
+        assert!(
+            found
+                .iter()
+                .any(|&i| dex.pokemon[i as usize].name.as_str() == "charizard")
+        );
+        assert!(found.iter().all(|&i| {
+            let p = &dex.pokemon[i as usize];
+            p.has_type(PokemonType::Fire) && p.has_type(PokemonType::Flying)
+        }));
+
+        let strongest = core.query(&ListQuery {
+            sort: SortBy::Total,
+            ..base
+        });
+        let top = &dex.pokemon[strongest[0] as usize];
+        assert!(
+            top.stats.total() >= 720,
+            "{} has {}",
+            top.name.as_str(),
+            top.stats.total()
+        );
+
+        // Assets referenced by the data exist on disk.
+        let pikachu = dex.pokemon(25).unwrap();
+        assert!(core.sprite(pikachu, SpriteKind::Front).unwrap().exists());
+        assert!(
+            core.asset(&pikachu.cry_path(starrydex_model::CryKind::Latest).unwrap())
+                .exists()
+        );
+
+        // Evolution data, including branching chains and conditions.
+        let eevee = dex.species(133).unwrap();
+        let chain = dex
+            .evolution_chain(eevee.evolution_chain_id.as_ref().unwrap().to_native())
+            .unwrap();
+        assert_eq!(chain.nodes.len(), 9);
+        let bulba = dex
+            .evolution_chain(
+                dex.species(1)
+                    .unwrap()
+                    .evolution_chain_id
+                    .as_ref()
+                    .unwrap()
+                    .to_native(),
+            )
+            .unwrap();
+        let ivysaur = &bulba.nodes[1];
+        let text =
+            crate::app::utils::presentation::describe_evolution(dex, &ivysaur.methods[0], Lang::En);
+        assert!(text.contains("16"), "{text}");
+
+        // Type chart: Electric does nothing to Ground, Water is weak to Electric.
+        assert_eq!(
+            dex.effectiveness(PokemonType::Electric, &[PokemonType::Ground]),
+            0.0
+        );
+        assert_eq!(
+            dex.effectiveness(
+                PokemonType::Electric,
+                &[PokemonType::Water, PokemonType::Flying]
+            ),
+            4.0
+        );
+
+        let _ = std::fs::remove_dir_all(&tmp);
     }
 
-    /// Filter pokémon by type (exclusive)
-    pub fn filter_pokemon_exclusive(
-        &self,
-        selected_types: &HashSet<StarryPokemonType>,
-    ) -> Vec<PokemonInfo> {
-        if let Some(data) = &self.inner.pokemon_data {
-            data.iter()
-                .filter_map(|(id, archived_pokemon)| {
-                    if let Ok(pokemon) =
-                        rkyv::deserialize::<StarryPokemon, rancor::Error>(archived_pokemon)
-                    {
-                        let matches = selected_types.is_empty()
-                            || selected_types
-                                .iter()
-                                .all(|selected_type| pokemon.pokemon.types.contains(selected_type));
-
-                        if matches {
-                            Some(PokemonInfo {
-                                id: id.to_native(),
-                                name: pokemon.pokemon.name,
-                                sprite_path: pokemon.sprite_path,
-                            })
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                })
-                .collect()
-        } else {
-            Vec::new()
-        }
-    }
-
-    /// Filter pokémon by generation
-    pub fn filter_pokemon_by_generation(
-        &self,
-        pokemon_list: &[PokemonInfo],
-        selected_generations: &HashSet<StarryPokemonGeneration>,
-    ) -> Vec<PokemonInfo> {
-        pokemon_list
-            .iter()
-            .filter(|pokemon_info| {
-                if let Some(data) = &self.inner.pokemon_data {
-                    if let Some(archived_pokemon) = data.get(&pokemon_info.id.into()) {
-                        if let Ok(pokemon) =
-                            rkyv::deserialize::<StarryPokemon, rancor::Error>(archived_pokemon)
-                        {
-                            if let Some(pokemon_specie) = pokemon.specie {
-                                selected_generations.contains(&pokemon_specie.generation)
-                            } else {
-                                false
-                            }
-                        } else {
-                            false
-                        }
-                    } else {
-                        false
-                    }
-                } else {
-                    false
-                }
-            })
-            .cloned()
-            .collect()
-    }
-
-    /// Filter the provided Pokémon list by pokémon that have at least X total_power
-    pub fn filter_pokemon_stats_with_list(
-        &self,
-        pokemon_list: &[PokemonInfo],
-        total_power: i64,
-    ) -> Vec<PokemonInfo> {
-        pokemon_list
-            .iter()
-            .filter(|pokemon_info| {
-                if let Some(data) = &self.inner.pokemon_data {
-                    if let Some(archived_pokemon) = data.get(&pokemon_info.id.into()) {
-                        if let Ok(pokemon) =
-                            rkyv::deserialize::<StarryPokemon, rancor::Error>(archived_pokemon)
-                        {
-                            pokemon.get_total_stats() >= total_power
-                        } else {
-                            false
-                        }
-                    } else {
-                        false
-                    }
-                } else {
-                    false
-                }
-            })
-            .cloned()
-            .collect()
-    }
-
-    /// Filter by pokémon that have at least X total_power
-    #[allow(dead_code)]
-    pub fn filter_pokemon_stats(&self, total_power: i64) -> Vec<PokemonInfo> {
-        if let Some(data) = &self.inner.pokemon_data {
-            data.iter()
-                .filter_map(|(id, archived_pokemon)| {
-                    if let Ok(pokemon) =
-                        rkyv::deserialize::<StarryPokemon, rancor::Error>(archived_pokemon)
-                    {
-                        if pokemon.get_total_stats() >= total_power {
-                            Some(PokemonInfo {
-                                id: id.to_native(),
-                                name: pokemon.pokemon.name.as_str().to_string(),
-                                sprite_path: pokemon
-                                    .sprite_path
-                                    .as_ref()
-                                    .map(|s| s.as_str().to_string()),
-                            })
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                })
-                .collect()
-        } else {
-            Vec::new()
-        }
-    }
-
-    /// Attempts to serialize the given data and save it to our cache replacing the old file if exists
-    fn save_to_file(pokemons: BTreeMap<i64, StarryPokemon>) -> Result<(), Error> {
-        let cache_dir = dirs::data_dir()
-            .unwrap()
-            .join(APP_ID)
-            .join("cache")
-            .join(format!("v{}", CACHE_VERSION));
-
-        std::fs::create_dir_all(&cache_dir)?;
-
-        let cache_path = cache_dir.join("pokemon_cache.bin");
-
-        let bytes = rkyv::to_bytes::<rancor::Error>(&pokemons)
-            .map_err(|e| anywho!("Failed to serialize data: {}", e))?;
-
-        let mut file = std::fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(cache_path)?;
-
-        file.write_all(&bytes)?;
-        file.flush()?;
-
-        Ok(())
-    }
-
-    /// Attempts to load the application cache from it's preconfigured location and creates a MMap out of it
-    fn load_from_file() -> Result<Mmap, Error> {
-        let cache_path = dirs::data_dir()
-            .unwrap()
-            .join(APP_ID)
-            .join("cache")
-            .join(format!("v{}", CACHE_VERSION))
-            .join("pokemon_cache.bin");
-
-        let file = std::fs::File::open(cache_path).map_err(|_| anywho!("Cache file not found"))?;
-
-        let mmap = unsafe { MmapOptions::new().map(&file)? };
-
-        rkyv::access::<ArchivedStarryPokemonMap, rancor::Error>(&mmap[..])
-            .map_err(|e| anywho!("Failed to access archived data: {}", e))?;
-
-        Ok(mmap)
+    #[test]
+    fn folds_names() {
+        assert_eq!(fold("Flabébé"), "flabebe");
+        assert_eq!(fold("Mr. Mime"), "mr mime");
+        assert_eq!(fold("Nidoran♀"), "nidoran");
+        assert_eq!(fold("Farfetch’d"), "farfetchd");
     }
 }

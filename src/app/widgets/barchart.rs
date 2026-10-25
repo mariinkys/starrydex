@@ -294,7 +294,11 @@ impl<'a, Message: 'static + Clone> Widget<Message, cosmic::Theme, cosmic::Render
 
             // value on top of bar
             if self.show_values {
-                let value_text = format!("{:.1}", column.value);
+                let value_text = if column.value.fract() == 0.0 {
+                    format!("{:.0}", column.value)
+                } else {
+                    format!("{:.1}", column.value)
+                };
                 let text_x = bar_x + column_width / 2.0;
 
                 renderer.fill_text(
