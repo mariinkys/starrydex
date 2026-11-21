@@ -122,7 +122,7 @@ pub fn view<'a>(app: &'a AppModel, ready: &'a Ready) -> Element<'a, Message> {
             ViewMode::Responsive => widget::flex_row(cards.collect())
                 .row_spacing(spacing.space_xs)
                 .column_spacing(spacing.space_xs)
-                .justify_content(widget::JustifyContent::Center)
+                .justify_content(widget::JustifyContent::CENTER)
                 .width(Length::Fill)
                 .into(),
         }

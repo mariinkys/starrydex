@@ -72,9 +72,7 @@ fn varieties(ctx: Ctx<'_>, layout: Layout) -> Element<'_, Message> {
             .padding(8)
             .selected(is_current)
             .class(theme::Button::IconVertical)
-            .on_press_maybe(
-                (!is_current).then_some(Message::OpenPokemon(variety.id.to_native())),
-            )
+            .on_press_maybe((!is_current).then_some(Message::OpenPokemon(variety.id.to_native())))
             .into()
         })
         .collect();
@@ -85,7 +83,7 @@ fn varieties(ctx: Ctx<'_>, layout: Layout) -> Element<'_, Message> {
         widget::flex_row(cards)
             .row_spacing(8)
             .column_spacing(8)
-            .justify_content(widget::JustifyContent::Center)
+            .justify_content(widget::JustifyContent::CENTER)
             .width(Length::Fill)
             .into()
     };
@@ -102,7 +100,10 @@ fn gallery(ctx: Ctx<'_>, layout: Layout) -> Element<'_, Message> {
         (SpriteKind::BackShiny, fl!("sprite-back-shiny")),
         (SpriteKind::FrontFemale, fl!("sprite-front-female")),
         (SpriteKind::BackFemale, fl!("sprite-back-female")),
-        (SpriteKind::FrontShinyFemale, fl!("sprite-front-shiny-female")),
+        (
+            SpriteKind::FrontShinyFemale,
+            fl!("sprite-front-shiny-female"),
+        ),
         (SpriteKind::BackShinyFemale, fl!("sprite-back-shiny-female")),
     ];
     let tiles: Vec<Element<'_, Message>> = labels
@@ -126,7 +127,7 @@ fn gallery(ctx: Ctx<'_>, layout: Layout) -> Element<'_, Message> {
         widget::flex_row(tiles)
             .row_spacing(12)
             .column_spacing(12)
-            .justify_content(widget::JustifyContent::Center)
+            .justify_content(widget::JustifyContent::CENTER)
             .width(Length::Fill)
             .into()
     };

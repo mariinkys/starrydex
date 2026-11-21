@@ -95,7 +95,7 @@ pub fn view<'a>(ctx: Ctx<'a>, layout: Layout) -> Element<'a, Message> {
                 widget::flex_row(cards)
                     .row_spacing(8)
                     .column_spacing(8)
-                    .justify_content(widget::JustifyContent::Center)
+                    .justify_content(widget::JustifyContent::CENTER)
                     .width(Length::Fill)
                     .into()
             });
@@ -139,7 +139,11 @@ pub fn view<'a>(ctx: Ctx<'a>, layout: Layout) -> Element<'a, Message> {
     )
 }
 
-fn node_card<'a>(ctx: Ctx<'a>, node: &'a ArchivedEvolutionNode, width: f32) -> Element<'a, Message> {
+fn node_card<'a>(
+    ctx: Ctx<'a>,
+    node: &'a ArchivedEvolutionNode,
+    width: f32,
+) -> Element<'a, Message> {
     let Ctx {
         core,
         dex,
@@ -184,8 +188,6 @@ fn node_card<'a>(ctx: Ctx<'a>, node: &'a ArchivedEvolutionNode, width: f32) -> E
     .padding(8)
     .selected(is_current)
     .class(theme::Button::IconVertical)
-    .on_press_maybe(
-        (!is_current && pokemon.is_some()).then_some(Message::OpenPokemon(pokemon_id)),
-    )
+    .on_press_maybe((!is_current && pokemon.is_some()).then_some(Message::OpenPokemon(pokemon_id)))
     .into()
 }
